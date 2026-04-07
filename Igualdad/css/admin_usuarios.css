@@ -1,0 +1,25 @@
+/* Hacer el panel más ancho SOLO cuando estamos en ver_usuarios */
+.panel.panel-wide{
+  max-width: 95vw;  /* ajusta a tu gusto: 1100, 1300, etc */
+  width: 100%;
+}
+
+/* Tabla: que aproveche el ancho sin generar scroll horizontal */
+.usuarios-table{
+  width: 100%;
+  table-layout: fixed;
+}
+
+.usuarios-table th,
+.usuarios-table td{
+     white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+/* Columna de acciones estrecha */
+.usuarios-table .col-actions{
+  width: 90px;
+}
+.panel.panel-wide{ max-width: 95vw; }

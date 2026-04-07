@@ -1,0 +1,8 @@
+.empresa-list{
+  max-height: 520px;
+  overflow: auto;
+  background: #fff;
+}
+.empresa-item:hover{
+  background: #f8f9fa;
+}
