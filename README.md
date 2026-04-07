@@ -1,0 +1,2 @@
+# TFG
+aplicacion de igualdad
