@@ -1,148 +1,116 @@
 <?php
-
 declare(strict_types=1);
 
-session_start();
+require __DIR__ . '/auth.php';
+require_once __DIR__ . '/helpers.php';
 require __DIR__ . '/../config/config.php';
-
-function h($s): string
-{
-    return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-}
+require_once __DIR__ . '/password_reset_tokens.php';
+require_once __DIR__ . '/mails.php';
+header('Content-Type: text/html; charset=UTF-8');
 
 $error = '';
 $success = '';
-$step = (string)($_GET['step'] ?? 'request');
-
-// Si ya está logueado, redirige
-if (isset($_SESSION['user'])) {
-    $rol = (string)($_SESSION['user']['rol'] ?? '');
-    if ($rol === 'ADMINISTRADOR') {
-        header('Location: /Proyecto/model/admin.php');
-        exit;
-    }
-    if ($rol === 'TECNICO') {
-        header('Location: /Proyecto/model/tecnico.php');
-        exit;
-    }
-    if ($rol === 'CLIENTE') {
-        header('Location: /Proyecto/model/cliente.php');
-        exit;
-    }
-}
+$identifier = '';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-    $action = (string)($_POST['action'] ?? '');
+    if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
+        $error = 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.';
+    } else {
+        $identifier = trim((string)($_POST['identifier'] ?? ''));
 
-    if ($action === 'request') {
-        $username = trim((string)($_POST['username'] ?? ''));
-
-        if ($username === '') {
-            $error = 'El usuario es obligatorio.';
+        if ($identifier === '') {
+            $error = 'Introduce tu email o nombre de usuario.';
         } else {
-            $db = db();
+            $success = 'Si los datos son correctos, te hemos enviado un enlace para restablecer tu contrasena.';
 
-            // Buscar usuario y email asociado
-            $stmt = $db->prepare("SELECT id, email FROM usuario WHERE username = ? LIMIT 1");
-            $stmt->bind_param('s', $username);
+            $stmt = db()->prepare('SELECT nombre_usuario, email FROM usuario WHERE email = ? OR nombre_usuario = ? LIMIT 1');
+            $stmt->bind_param('ss', $identifier, $identifier);
             $stmt->execute();
-            $user = $stmt->get_result()->fetch_assoc();
+            $user = $stmt->get_result()->fetch_assoc() ?: null;
             $stmt->close();
 
-            // Mensaje genérico (seguridad)
-            if (!$user || empty($user['email'])) {
-                $success = 'Si el usuario existe y tiene email, recibirás un correo con instrucciones.';
-            } else {
-                $userId  = (int)$user['id'];
-                $toEmail = (string)$user['email'];
-
-                // Generar token y expiración
-                $token   = bin2hex(random_bytes(32));
-                $expires = date('Y-m-d H:i:s', time() + 3600); // 1 hora
-
-                $stmt = $db->prepare("UPDATE usuario SET reset_token = ?, reset_expires = ? WHERE id = ?");
-                $stmt->bind_param('ssi', $token, $expires, $userId);
-                $stmt->execute();
-                $stmt->close();
-
-                $resetLink = "http://localhost/Proyecto/php/reset_password.php?token=" . urlencode($token);
-
-                // Envío con PHPMailer + Mailtrap 
-
-                $sentOk = false;
-                $mailError = '';
-
+            if ($user) {
                 try {
-                    $mailCfg = require __DIR__ . '/../config/mail.php';
+                    $email = (string)$user['email'];
+                    $username = (string)$user['nombre_usuario'];
+                    $token = bin2hex(random_bytes(32));
+                    $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60));
 
-                    require_once __DIR__ . '/../lib/PHPMailer/src/Exception.php';
-                    require_once __DIR__ . '/../lib/PHPMailer/src/PHPMailer.php';
-                    require_once __DIR__ . '/../lib/PHPMailer/src/SMTP.php';
+                    save_password_reset_token($email, $token, $expiresAt);
 
-                    $mail = new PHPMailer\PHPMailer\PHPMailer(true);
-
-                    // Debug (si quieres ver el log en pantalla, deja 2; si no, pon 0)
-                    // $mail->SMTPDebug = 2;
-                    // $mail->Debugoutput = 'html';
-
-                    $mail->isSMTP(); // IMPORTANTE: fuerza SMTP (si no, intenta mail())
-                    $mail->Host = (string)$mailCfg['host'];
-                    $mail->SMTPAuth = true;
-                    $mail->Username = (string)$mailCfg['username'];
-                    $mail->Password = (string)$mailCfg['password'];
-                    $mail->Port = (int)$mailCfg['port'];
-                    $mail->SMTPSecure = false;
-                    $mail->SMTPAutoTLS = false;
-
-                    // Mailtrap con 2525: lo más estable es sin forzar TLS.
-                    // Si en tu panel de Mailtrap te indica STARTTLS, cambia esto a ENCRYPTION_STARTTLS.
-                    $secure = (string)($mailCfg['secure'] ?? 'none');
-                    if ($secure === 'ssl') {
-                        $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-                    } elseif ($secure === 'tls') {
-                        $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-                    } else {
-                        $mail->SMTPSecure = false;
-                        $mail->SMTPAutoTLS = false;
-                    }
-
-                    $mail->CharSet = 'UTF-8';
-
-                    $fromEmail = (string)($mailCfg['from_email'] ?? 'no-reply@proyecto.local');
-                    $fromName  = (string)($mailCfg['from_name'] ?? 'Proyecto');
-
-                    $mail->setFrom($fromEmail, $fromName);
-                    $mail->addAddress($toEmail);
-
-                    $mail->isHTML(true);
-                    $mail->Subject = 'Recuperación de contraseña';
-                    $mail->Body = '
-                        <p>Hola,</p>
-                        <p>Has solicitado recuperar tu contraseña.</p>
-                        <p>Haz clic aquí para restablecerla (caduca en 1 hora):</p>
-                        <p><a href="' . h($resetLink) . '">' . h($resetLink) . '</a></p>
-                        <p>Si no lo solicitaste, ignora este correo.</p>
-                    ';
-                    $mail->AltBody =
-                        "Hola,\n\n" .
-                        "Has solicitado recuperar tu contraseña.\n\n" .
-                        "Abre este enlace (caduca en 1 hora):\n$resetLink\n\n" .
-                        "Si no lo solicitaste, ignora este correo.\n";
-
-                    $mail->send();
-                    $sentOk = true;
+                    $baseUrl = correo_url_base();
+                    $resetLink = $baseUrl . '/php/reset_password.php?token=' . urlencode($token);
+                    correo_enviar_restablecimiento_contrasena($email, $username, $resetLink);
                 } catch (Throwable $e) {
-                    $mailError = $e->getMessage();
-                }
-
-                if ($sentOk) {
-                    $success = 'Te hemos enviado un email con el enlace de recuperación (revisa Mailtrap).';
-                } else {
-                    $success = "No se pudo enviar el email: $mailError. Enlace para pruebas: $resetLink";
+                    error_log('Error en recuperacion de contrasena: ' . $e->getMessage());
+                    $error = 'No se pudo completar el envio del enlace. Intentalo de nuevo en unos minutos.';
+                    $success = '';
                 }
             }
         }
     }
 }
+?>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Restablecer contraseña</title>
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/login.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      
+      <!-- Encabezado con logo -->
+      <div class="login-header">
+        <div class="login-logo">CI</div>
+        <div>
+          <h1 class="login-title">Restablecer contraseña</h1>
+          <p class="login-subtitle">Recibe un enlace seguro por email</p>
+        </div>
+      </div>
 
-require __DIR__ . '/../html/forgot_password.html.php';
+      <!-- MENSAJE DE ERROR -->
+      <?php if ($error !== ''): ?>
+        <div class="login-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+      <?php endif; ?>
+
+      <!-- MENSAJE DE ÉXITO -->
+      <?php if ($success !== ''): ?>
+        <div class="login-success"><?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?></div>
+      <?php endif; ?>
+
+      <!-- FORMULARIO -->
+      <form method="post" action="forgot_password.php">
+        <?= csrf_input() ?>
+        
+        <div class="form-group">
+          <label for="identifier">Email o usuario</label>
+          <input
+            type="text"
+            class="form-control"
+            id="identifier"
+            name="identifier"
+            autocomplete="username"
+            value="<?= htmlspecialchars($identifier, ENT_QUOTES, 'UTF-8') ?>"
+            required
+          >
+        </div>
+
+        <button class="login-button" type="submit">Enviar enlace</button>
+      </form>
+
+      <!-- Pie de página -->
+      <div class="login-footer" style="text-align: center; margin-top: 20px;">
+        <a href="login.php" style="color: var(--color-blue); text-decoration: none; font-weight: 500;">
+          Volver al login
+        </a>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

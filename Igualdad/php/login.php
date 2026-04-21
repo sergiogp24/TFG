@@ -1,25 +1,36 @@
 <?php
 declare(strict_types=1); // evita conversiones automáticas peligrosas.
 
-session_start();  
+require __DIR__ . '/auth.php';
+require_once __DIR__ . '/helpers.php';
 
 require __DIR__ . '/../config/config.php'; 
 
-/**
- * Helper para escapar HTML y evitar XSS.
- * Se usa cuando imprimes variables en HTML (por ejemplo, mensajes o valores de formularios).
- */
-function h($s): string {
-  return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+$error = ''; // Aquí guardaremos el mensaje de error si el login falla.
+
+if (!is_local_request() && !is_https_request()) {
+  $host = (string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost');
+  $requestUri = (string)($_SERVER['REQUEST_URI'] ?? '/');
+  header('Location: https://' . $host . $requestUri, true, 301);
+  exit;
 }
 
-$error = ''; // Aquí guardaremos el mensaje de error si el login falla.
+if (is_https_request()) {
+  header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 /**
  * Solo procesamos el login si el formulario se ha enviado por POST.
  * Si es GET, simplemente mostrará la vista del login (login.html.php).
  */
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+  if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
+    $error = 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.';
+  } else {
 
   // Leer los datos que envía el formulario
   $username = trim($_POST['nombre_usuario'] ?? '');
@@ -66,21 +77,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 // Redirección por rol
             switch ($_SESSION['user']['rol']) {
                 case 'ADMINISTRADOR':
-                    header('Location: ../model/empresa.php?view=ver_empresas');
+                    header('Location: ../model/admin.php?view=menu');
                     exit;
                 case 'TECNICO':
-                    header('Location: ../model/tecnico.php');
+                  header('Location: ../model/tecnico.php?view=menu');
                     exit;
                 case 'CLIENTE':
                     header('Location: ../html/index_cliente.php');
                     exit;
                 default:
                     // Si el rol no es uno de los esperados
-                    header('Location: panel.php');
+                  header('Location: logout.php');
                     exit;
             }
         }
     }
+        }
 }
 
 require __DIR__ . '/../html/login.html.php';

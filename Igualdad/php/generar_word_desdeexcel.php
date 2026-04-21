@@ -10,7 +10,7 @@ use PhpOffice\PhpWord\TemplateProcessor;
 /**
  * Rellena el Word plantilla SIN romper formato
  */
-function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial): string
+function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?string $anioRegistro = null): string
 {
     try {
 
@@ -24,13 +24,16 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial): strin
         // RUTAS
         // =========================
         $parentDir = dirname(__DIR__);
-        $destDirWord = $parentDir . DIRECTORY_SEPARATOR . 'empresa_word';
+        $destDirWord = $parentDir . DIRECTORY_SEPARATOR . 'uploads';
 
         if (!is_dir($destDirWord)) {
             mkdir($destDirWord, 0755, true);
         }
 
         $nombreArchivoEmpresa = normalizarNombreArchivoEmpresa($razonSocial);
+        $nombreArchivoEmpresa = ($anioRegistro !== null && $anioRegistro !== '') 
+            ? $nombreArchivoEmpresa . '_' . $anioRegistro 
+            : $nombreArchivoEmpresa;
         $rutaWordFinal = $destDirWord . DIRECTORY_SEPARATOR . $nombreArchivoEmpresa . '_PLAN_IGUALDAD.docx';
 
         // =========================
@@ -52,6 +55,11 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial): strin
 
         foreach ($reemplazosEmpresa as $clave => $valor) {
             $template->setValue($clave, escaparTextoWord(formatearNumeroConComaSiAplica($valor, false)));
+        }
+
+        // Reemplazar año si se proporcionó
+        if ($anioRegistro !== null && $anioRegistro !== '') {
+            $template->setValue('anioRegistro', $anioRegistro);
         }
 
         // =========================
@@ -92,6 +100,7 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial): strin
         rellenarTablaDinamicaHoja6($template, $spreadsheet);
         rellenarTablaDinamicaHoja7($template, $spreadsheet);
         rellenarTablaDinamicaHoja8($template, $spreadsheet);
+        rellenarTablaDinamicaHoja14($template, $spreadsheet);
         rellenarTablaDinamicaHoja20($template, $spreadsheet);
         rellenarTablaDinamicaHoja21($template, $spreadsheet);
 
@@ -371,6 +380,34 @@ function rellenarTablaDinamicaHoja8(TemplateProcessor $template, \PhpOffice\PhpS
     ];
 
     rellenarTablaDinamicaPorConfig($template, $spreadsheet, $cfg, 'hoja 8');
+}
+
+function rellenarTablaDinamicaHoja14(TemplateProcessor $template, \PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet): void
+{
+    $cfg = [
+        'indiceHoja' => 14,
+        'filaInicio' => 3,
+        'filaFin' => 100,
+        'colCategoriaAlt' => 'A',
+        'columnas' => [
+            'f14_c' => 'B',
+            'f14_m' => 'C',
+            'f14_dm' => 'D',
+            'f14_cm' => 'E',
+            'f14_pm' => 'F',
+            'f14_h' => 'G',
+            'f14_dh' => 'H',
+            'f14_ch' => 'I',
+            'f14_ph' => 'J',
+            'f14_pt' => 'K',
+            'f14_tf' => 'L',
+            'f14_bg' => 'M',
+            'f14_if' => 'N',
+        ],
+        'ancla' => 'f14_c',
+    ];
+
+    rellenarTablaDinamicaPorConfig($template, $spreadsheet, $cfg, 'hoja 14');
 }
 
 function rellenarTablaDinamicaHoja20(TemplateProcessor $template, \PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet): void

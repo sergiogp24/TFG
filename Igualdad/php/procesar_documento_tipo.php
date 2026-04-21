@@ -8,7 +8,7 @@ require __DIR__ . '/../config/config.php';
 
 function redirect_documentos(string $msg): void
 {
-    header('Location: /Igualdad/html/index_documentos_tipo.php?msg=' . urlencode($msg));
+    header('Location: ' . app_path('/html/index_documentos_tipo.php?msg=') . urlencode($msg));
     exit;
 }
 
@@ -17,15 +17,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Metodo no permitido');
 }
 
+if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
+    redirect_documentos('La sesion ha expirado. Recarga la pagina e intentalo de nuevo.');
+}
+
 $asunto = trim((string)($_POST['asunto'] ?? ''));
+$referenciaEmpresa = trim((string)($_POST['referencia_empresa'] ?? ''));
 $tipo = strtoupper(trim((string)($_POST['tipo'] ?? '')));
 $maxTamanoBytes = 50 * 1024 * 1024; // 50MB
+$usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
-$tiposPermitidos = ['IGUALDAD', 'SELECCION', 'SALUD', 'COMUNICACION', 'LGTBI'];
-
-if ($asunto === '') {
-    redirect_documentos('El asunto es obligatorio.');
-}
+$tiposPermitidos = ['IGUALDAD', 'SELECCION', 'SALUD', 'COMUNICACION', 'LGTBI', 'TOMA DE DATOS'];
 
 if (!in_array($tipo, $tiposPermitidos, true)) {
     redirect_documentos('Tipo de archivo no valido.');
@@ -73,7 +75,70 @@ if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
     redirect_documentos('No se pudo crear la carpeta de subida.');
 }
 
-$nombreGuardado = bin2hex(random_bytes(16)) . '.' . $ext;
+$db = db();
+
+$empresaNombre = '';
+$idEmpresaContexto = 0;
+if ($usuarioId > 0) {
+    $stmtEmpresa = $db->prepare(
+        'SELECT e.razon_social
+         FROM usuario_empresa ue
+         INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
+         WHERE ue.id_usuario = ?
+         ORDER BY e.razon_social ASC
+         LIMIT 1'
+    );
+    if ($stmtEmpresa) {
+        $stmtEmpresa->bind_param('i', $usuarioId);
+        $stmtEmpresa->execute();
+        $rowEmpresa = $stmtEmpresa->get_result()->fetch_assoc();
+        $stmtEmpresa->close();
+        $empresaNombre = trim((string)($rowEmpresa['razon_social'] ?? ''));
+    }
+
+    $stmtEmpresaId = $db->prepare(
+        'SELECT e.id_empresa
+         FROM usuario_empresa ue
+         INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
+         WHERE ue.id_usuario = ?
+         ORDER BY e.razon_social ASC
+         LIMIT 1'
+    );
+    if ($stmtEmpresaId) {
+        $stmtEmpresaId->bind_param('i', $usuarioId);
+        $stmtEmpresaId->execute();
+        $rowEmpresaId = $stmtEmpresaId->get_result()->fetch_assoc();
+        $stmtEmpresaId->close();
+        $idEmpresaContexto = (int)($rowEmpresaId['id_empresa'] ?? 0);
+    }
+}
+
+if ($tipo === 'TOMA DE DATOS') {
+    if ($empresaNombre !== '') {
+        $referenciaEmpresa = $empresaNombre . ' - TOMA DE DATOS';
+    }
+
+    if ($referenciaEmpresa === '') {
+        redirect_documentos('No se pudo determinar la empresa para TOMA DE DATOS.');
+    }
+}
+
+if ($asunto === '') {
+    redirect_documentos('El asunto es obligatorio.');
+}
+
+$empresaToken = $empresaNombre !== '' ? $empresaNombre : 'SIN_EMPRESA';
+$empresaToken = preg_replace('/[\\\/\:\"\*\?<>\|]+/', '-', $empresaToken);
+$empresaToken = preg_replace('/\s+/', '_', (string)$empresaToken);
+$empresaToken = trim((string)$empresaToken, '._-');
+$empresaToken = mb_strtoupper($empresaToken !== '' ? $empresaToken : 'SIN_EMPRESA', 'UTF-8');
+
+$tipoToken = preg_replace('/\s+/', '_', $tipo);
+$tipoToken = mb_strtoupper((string)$tipoToken, 'UTF-8');
+
+$uniqueSuffix = substr(md5(uniqid('', true)), 0, 8);
+$nombreGuardadoBase = $empresaToken . '_' . $tipoToken . '_' . $uniqueSuffix;
+$nombreGuardado = $nombreGuardadoBase . '.' . $ext;
 $rutaDestino = $uploadDir . '/' . $nombreGuardado;
 
 if (!move_uploaded_file($tmpName, $rutaDestino)) {
@@ -84,12 +149,18 @@ $rutaRelativa = 'uploads/documentos_tipo/' . $nombreGuardado;
 $mime = mime_content_type($rutaDestino) ?: null;
 $sha256 = hash_file('sha256', $rutaDestino) ?: null;
 
-try {
-    $db = db();
+$nombreOriginalMostrar = $empresaToken . '_' . $tipoToken;
+if ($tipo === 'TOMA DE DATOS' && $referenciaEmpresa !== '') {
+    $nombreOriginalMostrar = $referenciaEmpresa;
+}
+if ($ext !== '') {
+    $nombreOriginalMostrar .= '.' . $ext;
+}
 
+try {
     $stmt = $db->prepare(
-        'INSERT INTO archivos (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+           'INSERT INTO archivos (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
 
     if (!$stmt) {
@@ -97,15 +168,16 @@ try {
     }
 
     $stmt->bind_param(
-        'sssssiss',
+        'sssssissi',
         $tipo,
         $asunto,
-        $nombreOriginal,
+        $nombreOriginalMostrar,
         $nombreGuardado,
         $rutaRelativa,
         $tamanoBytes,
         $mime,
-        $sha256
+        $sha256,
+        $idEmpresaContexto
     );
 
     if (!$stmt->execute()) {

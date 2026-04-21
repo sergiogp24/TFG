@@ -2,11 +2,10 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../php/auth.php';
+require_once __DIR__ . '/../php/helpers.php';
 require_role('ADMINISTRADOR');
 
 require __DIR__ . '/../config/config.php';
-
-function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 $userId = (int)($_GET['id_usuario'] ?? $_POST['id_usuario'] ?? 0);
 if ($userId <= 0) {
@@ -32,6 +31,13 @@ $ok = '';
 
 // Guardar asignación
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
+    $error = 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.';
+  }
+
+  if ($error !== '') {
+    // No continuar con cambios de asignacion cuando el token no es valido.
+  } else {
   $empresaIds = $_POST['empresas'] ?? [];
   if (!is_array($empresaIds)) $empresaIds = [];
 
@@ -59,7 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ok = 'Empresas asignadas correctamente.';
   } catch (Throwable $t) {
     db()->rollback();
-    $error = 'Error guardando asignación: ' . $t->getMessage();
+    error_log(sprintf('[lista_empresa.asignacion] %s in %s:%d', $t->getMessage(), $t->getFile(), $t->getLine()));
+    $error = 'No se pudo guardar la asignacion. Intentalo de nuevo.';
+  }
   }
 }
 
@@ -90,7 +98,8 @@ if ($accion === 'eliminar') {
     $stmt->close();
     redirect_menu('Empresa Eliminada');
   } catch (Throwable $e) {
-    redirect_view('delete', 'No se pudo eliminar: ' . $e->getMessage());
+    error_log(sprintf('[lista_empresa.eliminar] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
+    redirect_view('delete', 'No se pudo eliminar. Intentalo de nuevo.');
   }
 }
 

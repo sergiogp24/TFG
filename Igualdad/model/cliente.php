@@ -3,19 +3,17 @@ declare(strict_types=1);
 
 // SEGURIDAD / AUTORIZACIÓN
 require __DIR__ . '/../php/auth.php';
+require_once __DIR__ . '/../php/helpers.php';
 require_role('CLIENTE');
 
 // CONFIGURACIÓN / BD
 require __DIR__ . '/../config/config.php';
 
-// Helper para escapar HTML en la vista
-function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
-
 // DATOS DEL CLIENTE 
 $clienteId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 if ($clienteId <= 0) {
   // Si por algún motivo no hay id, obligamos a reloguear
-  header('Location: /Igualdad/php/logout.php');
+  header('Location: ../php/logout.php');
   exit;
 }
 

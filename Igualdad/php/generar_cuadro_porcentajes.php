@@ -777,6 +777,23 @@ function normalizarTextoPuesto(string $texto): string
     return trim($v);
 }
 
+function normalizarTipoBaja(string $texto): string
+{
+    $v = normalizarTextoPuesto($texto);
+    if ($v === '') {
+        return '';
+    }
+
+    // Unifica variantes frecuentes de captura para el mismo motivo.
+    $v = str_replace('PRUEBANO', 'PRUEBA NO', $v);
+
+    if (preg_match('/NO\s+SUPER(?:ACION|A|O).*PERIODO.*PRUEBA/', $v) === 1) {
+        return 'NO SUPERACION DE PERIODO DE PRUEBA';
+    }
+
+    return $v;
+}
+
 /**
  * Obtiene conteos de puestos directivos (solo grupo 01) agrupados por puesto.
  *
@@ -1478,7 +1495,7 @@ FROM (
         throw new RuntimeException('No existe la plantilla CUADRO_PORCENTAJES.xlsx.');
     }
 
-    $destinoDir = __DIR__ . '/../empresa_porcentajes';
+    $destinoDir = __DIR__ . '/../uploads';
     if (!is_dir($destinoDir) && !mkdir($destinoDir, 0755, true)) {
         throw new RuntimeException('No se pudo crear el directorio empresa_porcentajes.');
     }
@@ -1949,6 +1966,72 @@ FROM (
         throw new RuntimeException('Error al rellenar hoja HIJOS: ' . $e->getMessage());
     }
 
+    // ================== HOJA 11: BAJAS (TEMPORALES Y DEFINITIVAS) ==================
+    try {
+        $sheetBajas = $spreadsheet->getSheetByName('BAJAS');
+        if ($sheetBajas === null) {
+            $sheetBajas = $spreadsheet->getSheetByName('Bajas');
+        }
+        if ($sheetBajas === null || $spreadsheet->getIndex($sheetBajas) !== 11) {
+            $sheetBajas = $spreadsheet->getSheet(11);
+        }
+
+        area_bajas($db, $idEmpresa, $sheetBajas);
+    } catch (\Throwable $e) {
+        throw new RuntimeException('Error al rellenar hoja 11 BAJAS: ' . $e->getMessage());
+    }
+
+    // ================== HOJA 12: EXCEDENCIAS ==================
+    try {
+        $sheetExcedencias = $spreadsheet->getSheetByName('EXCEDENCIAS');
+        if ($sheetExcedencias === null) {
+            $sheetExcedencias = $spreadsheet->getSheetByName('Excedencias');
+        }
+        if ($sheetExcedencias === null || $spreadsheet->getIndex($sheetExcedencias) !== 12) {
+            $sheetExcedencias = $spreadsheet->getSheet(12);
+        }
+
+        area_excedencias($db, $idEmpresa, $sheetExcedencias);
+    } catch (\Throwable $e) {
+        throw new RuntimeException('Error al rellenar hoja 12 EXCEDENCIAS: ' . $e->getMessage());
+    }
+
+    // ================== HOJA 13: PERMISOS RETRIBUIDOS ==================
+    try {
+        $sheetPermisos = $spreadsheet->getSheetByName('PERMISOS RETRIBUIDOS');
+        if ($sheetPermisos === null) {
+            $sheetPermisos = $spreadsheet->getSheetByName('Permisos Retribuidos');
+        }
+        if ($sheetPermisos === null || $spreadsheet->getIndex($sheetPermisos) !== 13) {
+            $sheetPermisos = $spreadsheet->getSheet(13);
+        }
+
+        area_permisos_retribuidos($db, $idEmpresa, $sheetPermisos);
+    } catch (\Throwable $e) {
+        throw new RuntimeException('Error al rellenar hoja 13 PERMISOS RETRIBUIDOS: ' . $e->getMessage());
+    }
+
+    // ================== HOJA 14: FORMACIONES ==================
+    try {
+        $sheetFormaciones = $spreadsheet->getSheetByName('FORMACIONES');
+        if ($sheetFormaciones === null) {
+            $sheetFormaciones = $spreadsheet->getSheetByName('Formaciones');
+        }
+        if ($sheetFormaciones === null) {
+            $sheetFormaciones = $spreadsheet->getSheetByName('FORMACION');
+        }
+        if ($sheetFormaciones === null) {
+            $sheetFormaciones = $spreadsheet->getSheetByName('Formacion');
+        }
+        if ($sheetFormaciones === null || $spreadsheet->getIndex($sheetFormaciones) !== 14) {
+            $sheetFormaciones = $spreadsheet->getSheet(14);
+        }
+
+        area_formaciones($db, $idEmpresa, $sheetFormaciones);
+    } catch (\Throwable $e) {
+        throw new RuntimeException('Error al rellenar hoja 14 FORMACIONES: ' . $e->getMessage());
+    }
+
     // ================== HOJA 15: GRUPO PROFESIONAL ==================
     try {
         $sheetGrupoProfesional = $spreadsheet->getSheetByName('GRUPO PROFESIONAL');
@@ -2191,6 +2274,42 @@ function normalizarNombreArchivoEmpresa(string $nombre): string
     return $normalizado !== '' ? $normalizado : 'empresa';
 }
 
+function resolverTablaExistente(mysqli $db, array $candidatas): ?string
+{
+    foreach ($candidatas as $tabla) {
+        $stmt = $db->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1');
+        if (!$stmt) {
+            continue;
+        }
+        $stmt->bind_param('s', $tabla);
+        $stmt->execute();
+        $fila = $stmt->get_result()->fetch_row();
+        $stmt->close();
+        if ($fila) {
+            return $tabla;
+        }
+    }
+
+    return null;
+}
+
+function tablaTieneColumna(mysqli $db, string $tabla, string $columna): bool
+{
+    $stmt = $db->prepare(
+        'SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1'
+    );
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('ss', $tabla, $columna);
+    $stmt->execute();
+    $fila = $stmt->get_result()->fetch_row();
+    $stmt->close();
+
+    return (bool)$fila;
+}
+
 /**
  * Obtiene los estudios distintos y cuenta mujeres y hombres para cada uno, de forma dinámica.
  * @return array<int, array{estudio:string, mujeres:int, hombres:int}>
@@ -2241,4 +2360,424 @@ function obtenerConteosEstudiosDinamico(mysqli $db, int $idEmpresa, int $idAnoDa
         return strcasecmp($a['estudio'], $b['estudio']);
     });
     return $filas;
+
+}
+
+/**
+ * Lee datos de la tabla area_Permisos_retribuidos de la BD y los escribe en la hoja 13.
+ * 
+ * Obtiene el valor de la celda B3 en la hoja 13, lo toma como tipo,
+ * y suma n_mujeres/nhombres de todos los registros de ese tipo para la empresa.
+ * 
+ * @param mysqli $db
+ * @param int $idEmpresa
+ * @param \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet Hoja 13 del excel
+ * @return bool true si se ejecutó correctamente
+ * @throws RuntimeException
+ */
+function area_Permisos_retribuidos(mysqli $db, int $idEmpresa, $sheet): bool
+{
+    // Consultar la tabla area_Permisos_retribuidos en la BD agrupando por tipo.
+    $stmt = $db->prepare(
+        "
+        SELECT 
+            tipo,
+            COALESCE(SUM(n_mujeres), 0) AS n_mujeres,
+            COALESCE(SUM(n_hombres), 0) AS n_hombres
+        FROM area_Permisos_retribuidos
+        WHERE id_empresa = ?
+        GROUP BY tipo
+        "
+    );
+    
+    if (!$stmt) {
+        throw new RuntimeException('No se pudo preparar la consulta a area_Permisos_retribuidos.');
+    }
+    
+    $stmt->bind_param('i', $idEmpresa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $totalesPorTipo = [];
+    while ($row = $result->fetch_assoc()) {
+        $tipoOriginal = trim((string)($row['tipo'] ?? ''));
+        if ($tipoOriginal === '') {
+            continue;
+        }
+
+        $tipoClave = normalizarTextoPuesto($tipoOriginal);
+        if ($tipoClave === '') {
+            continue;
+        }
+
+        if (!isset($totalesPorTipo[$tipoClave])) {
+            $totalesPorTipo[$tipoClave] = ['tipo' => $tipoOriginal, 'mujeres' => 0, 'hombres' => 0];
+        }
+
+        $totalesPorTipo[$tipoClave]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
+        $totalesPorTipo[$tipoClave]['hombres'] += (int)($row['n_hombres'] ?? 0);
+    }
+    
+    $ultimaFilaTipos = max(3, $sheet->getHighestDataRow('B'));
+    for ($fila = 3; $fila <= $ultimaFilaTipos; $fila++) {
+        $tipoHoja = normalizarTextoPuesto((string)$sheet->getCell('B' . $fila)->getValue());
+        if ($tipoHoja === '') {
+            continue;
+        }
+
+        $nMujeres = (int)($totalesPorTipo[$tipoHoja]['mujeres'] ?? 0);
+        $nHombres = (int)($totalesPorTipo[$tipoHoja]['hombres'] ?? 0);
+
+        $sheet->setCellValue('C' . $fila, $nMujeres);
+        $sheet->setCellValue('G' . $fila, $nHombres);
+    }
+
+    $stmt->close();
+    
+    return true;
+}
+
+/**
+ * Lee datos de la tabla area_formaciones de la BD y los escribe en la hoja 14.
+ *
+ * Toma los tipos de la columna B de la hoja y rellena C/G con los acumulados
+ * de mujeres y hombres por tipo para la empresa indicada.
+ *
+ * @param mysqli $db
+ * @param int $idEmpresa
+ * @param \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet Hoja 14 del excel
+ * @return bool true si se ejecuto correctamente
+ * @throws RuntimeException
+ */
+function area_formaciones(mysqli $db, int $idEmpresa, $sheet): bool
+{
+    $stmt = $db->prepare(
+        "
+        SELECT
+            tipo,
+            COALESCE(SUM(n_mujeres), 0) AS n_mujeres,
+            COALESCE(SUM(n_hombres), 0) AS n_hombres
+        FROM area_formaciones
+        WHERE id_empresa = ?
+        GROUP BY tipo
+        "
+    );
+
+    if (!$stmt) {
+        throw new RuntimeException('No se pudo preparar la consulta a area_formaciones.');
+    }
+
+    $stmt->bind_param('i', $idEmpresa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $totalesPorTipo = [];
+    while ($row = $result->fetch_assoc()) {
+        $tipo = normalizarTextoPuesto((string)($row['tipo'] ?? ''));
+        if ($tipo === '') {
+            continue;
+        }
+        if (!isset($totalesPorTipo[$tipo])) {
+            $totalesPorTipo[$tipo] = [
+                'tipo' => (string)($row['tipo'] ?? ''),
+                'mujeres' => 0,
+                'hombres' => 0,
+            ];
+        }
+        $totalesPorTipo[$tipo]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
+        $totalesPorTipo[$tipo]['hombres'] += (int)($row['n_hombres'] ?? 0);
+    }
+
+    $filas = array_values($totalesPorTipo);
+    usort($filas, static function (array $a, array $b): int {
+        $totalA = (int)$a['mujeres'] + (int)$a['hombres'];
+        $totalB = (int)$b['mujeres'] + (int)$b['hombres'];
+
+        if ($totalA !== $totalB) {
+            return $totalB <=> $totalA;
+        }
+
+        return strcasecmp((string)$a['tipo'], (string)$b['tipo']);
+    });
+
+    $filaPlantilla = 3;
+    $filaTotal = $filaPlantilla + count($filas);
+    $highestRow = max($sheet->getHighestRow(), $filaPlantilla);
+    $plantillaStyle = $sheet->getStyle('B' . $filaPlantilla . ':N' . $filaPlantilla);
+    $alturaPlantilla = $sheet->getRowDimension($filaPlantilla)->getRowHeight();
+    $totalStyle = $highestRow > $filaPlantilla ? $sheet->getStyle('B' . $highestRow . ':N' . $highestRow) : $plantillaStyle;
+
+    if ($highestRow >= $filaPlantilla) {
+        $sheet->removeRow($filaPlantilla, $highestRow - $filaPlantilla + 1);
+    }
+
+    foreach ($filas as $indice => $filaDatos) {
+        $filaExcel = $filaPlantilla + $indice;
+        $mujeres = (int)($filaDatos['mujeres'] ?? 0);
+        $hombres = (int)($filaDatos['hombres'] ?? 0);
+
+        $sheet->duplicateStyle($plantillaStyle, 'B' . $filaExcel . ':N' . $filaExcel);
+        if ($alturaPlantilla > 0) {
+            $sheet->getRowDimension($filaExcel)->setRowHeight($alturaPlantilla);
+        }
+
+        $sheet->setCellValue('B' . $filaExcel, (string)($filaDatos['tipo'] ?? ''));
+        $sheet->setCellValue('C' . $filaExcel, $mujeres);
+        $sheet->setCellValue('G' . $filaExcel, $hombres);
+        $sheet->setCellValue('D' . $filaExcel, '=IF(L' . $filaExcel . '=0,0,C' . $filaExcel . '/L' . $filaExcel . '*100)');
+        $sheet->setCellValue('E' . $filaExcel, '=IF($C$' . $filaTotal . '=0,0,C' . $filaExcel . '/$C$' . $filaTotal . '*100)');
+        $sheet->setCellValue('F' . $filaExcel, '=IF($L$' . $filaTotal . '=0,0,C' . $filaExcel . '/$L$' . $filaTotal . '*100)');
+        $sheet->setCellValue('H' . $filaExcel, '=IF(L' . $filaExcel . '=0,0,G' . $filaExcel . '/L' . $filaExcel . '*100)');
+        $sheet->setCellValue('I' . $filaExcel, '=IF($G$' . $filaTotal . '=0,0,G' . $filaExcel . '/$G$' . $filaTotal . '*100)');
+        $sheet->setCellValue('J' . $filaExcel, '=IF($L$' . $filaTotal . '=0,0,G' . $filaExcel . '/$L$' . $filaTotal . '*100)');
+        $sheet->setCellValue('K' . $filaExcel, '=F' . $filaExcel . '+J' . $filaExcel);
+        $sheet->setCellValue('L' . $filaExcel, '=C' . $filaExcel . '+G' . $filaExcel);
+        $sheet->setCellValue('M' . $filaExcel, '=H' . $filaExcel . '-D' . $filaExcel);
+        $sheet->setCellValue('N' . $filaExcel, '=IF(G' . $filaExcel . '=0,0,C' . $filaExcel . '/G' . $filaExcel . ')');
+    }
+
+    $sheet->duplicateStyle($totalStyle, 'B' . $filaTotal . ':N' . $filaTotal);
+    if ($alturaPlantilla > 0) {
+        $sheet->getRowDimension($filaTotal)->setRowHeight($alturaPlantilla);
+    }
+
+    $sheet->setCellValue('B' . $filaTotal, 'TOTAL');
+    if (count($filas) > 0) {
+        $sheet->setCellValue('C' . $filaTotal, '=SUM(C' . $filaPlantilla . ':C' . ($filaTotal - 1) . ')');
+        $sheet->setCellValue('G' . $filaTotal, '=SUM(G' . $filaPlantilla . ':G' . ($filaTotal - 1) . ')');
+        $sheet->setCellValue('L' . $filaTotal, '=SUM(L' . $filaPlantilla . ':L' . ($filaTotal - 1) . ')');
+    } else {
+        $sheet->setCellValue('C' . $filaTotal, 0);
+        $sheet->setCellValue('G' . $filaTotal, 0);
+        $sheet->setCellValue('L' . $filaTotal, 0);
+    }
+
+    $sheet->setCellValue('D' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,C' . $filaTotal . '/L' . $filaTotal . '*100)');
+    $sheet->setCellValue('E' . $filaTotal, '=IF(C' . $filaTotal . '=0,0,C' . $filaTotal . '/C' . $filaTotal . '*100)');
+    $sheet->setCellValue('F' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,C' . $filaTotal . '/L' . $filaTotal . '*100)');
+    $sheet->setCellValue('H' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,G' . $filaTotal . '/L' . $filaTotal . '*100)');
+    $sheet->setCellValue('I' . $filaTotal, '=IF(G' . $filaTotal . '=0,0,G' . $filaTotal . '/G' . $filaTotal . '*100)');
+    $sheet->setCellValue('J' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,G' . $filaTotal . '/L' . $filaTotal . '*100)');
+    $sheet->setCellValue('K' . $filaTotal, '=F' . $filaTotal . '+J' . $filaTotal);
+    $sheet->setCellValue('M' . $filaTotal, '=H' . $filaTotal . '-D' . $filaTotal);
+    $sheet->setCellValue('N' . $filaTotal, '=IF(G' . $filaTotal . '=0,0,C' . $filaTotal . '/G' . $filaTotal . ')');
+
+    $stmt->close();
+
+    return true;
+}
+
+/**
+ * Lee datos de la tabla area_excedencias de la BD y los escribe en la hoja 12.
+ * 
+ * Obtiene el valor de la columna B de la hoja 12, lo toma como tipo,
+ * y suma n_mujeres/nhombres de todos los registros de ese tipo para la empresa.
+ * 
+ * @param mysqli $db
+ * @param int $idEmpresa
+ * @param \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet Hoja 12 del excel
+ * @return bool true si se ejecutó correctamente
+ * @throws RuntimeException
+ */
+function area_excedencias(mysqli $db, int $idEmpresa, $sheet): bool
+{
+    // Consultar la tabla area_excedencias en la BD agrupando por tipo.
+    $stmt = $db->prepare(
+        "
+        SELECT 
+            tipo,
+            COALESCE(SUM(n_mujeres), 0) AS n_mujeres,
+            COALESCE(SUM(n_hombres), 0) AS n_hombres
+        FROM area_excedencias
+        WHERE id_empresa = ?
+        GROUP BY tipo
+        "
+    );
+    
+    if (!$stmt) {
+        throw new RuntimeException('No se pudo preparar la consulta a area_excedencias.');
+    }
+    
+    $stmt->bind_param('i', $idEmpresa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $totalesPorTipo = [];
+    while ($row = $result->fetch_assoc()) {
+        $tipo = normalizarTextoPuesto((string)($row['tipo'] ?? ''));
+        if ($tipo === '') {
+            continue;
+        }
+        if (!isset($totalesPorTipo[$tipo])) {
+            $totalesPorTipo[$tipo] = ['mujeres' => 0, 'hombres' => 0];
+        }
+        $totalesPorTipo[$tipo]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
+        $totalesPorTipo[$tipo]['hombres'] += (int)($row['n_hombres'] ?? 0);
+    }
+    
+    $ultimaFilaTipos = max(3, $sheet->getHighestDataRow('B'));
+    for ($fila = 3; $fila <= $ultimaFilaTipos; $fila++) {
+        $tipoHoja = normalizarTextoPuesto((string)$sheet->getCell('B' . $fila)->getValue());
+        if ($tipoHoja === '') {
+            continue;
+        }
+
+        $nMujeres = (int)($totalesPorTipo[$tipoHoja]['mujeres'] ?? 0);
+        $nHombres = (int)($totalesPorTipo[$tipoHoja]['hombres'] ?? 0);
+
+        $sheet->setCellValue('C' . $fila, $nMujeres);
+        $sheet->setCellValue('G' . $fila, $nHombres);
+    }
+
+    $stmt->close();
+    
+    return true;
+}
+
+/**
+ * Lee datos de baja_temporales y baja_definitivas y los escribe en la hoja 11.
+ *
+ * Se tratan como fuentes independientes: suma por tipo en cada tabla y pinta
+ * cualquier fila de la hoja cuyo texto en columna B coincida con ese tipo.
+ *
+ * @param mysqli $db
+ * @param int $idEmpresa
+ * @param \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet Hoja 11 del excel
+ * @return bool
+ */
+function area_bajas(mysqli $db, int $idEmpresa, $sheet): bool
+{
+    $totalesPorTipo = [];
+
+    $tablaTemporales = resolverTablaExistente($db, ['baja_temporales']);
+    $tablaDefinitivas = resolverTablaExistente($db, ['baja_definitivas']);
+    $tablaBajas = resolverTablaExistente($db, ['bajas']);
+
+    if ($tablaTemporales === null && $tablaDefinitivas === null) {
+        throw new RuntimeException('No existen tablas de bajas temporales ni definitivas.');
+    }
+
+    if ($tablaTemporales !== null) {
+        if (tablaTieneColumna($db, $tablaTemporales, 'id_empresa')) {
+            $stmtTemporales = $db->prepare(
+                "
+                SELECT
+                    tipo,
+                    COALESCE(SUM(num_mujeres), 0) AS n_mujeres,
+                    COALESCE(SUM(num_hombres), 0) AS n_hombres
+                FROM `{$tablaTemporales}`
+                WHERE id_empresa = ?
+                GROUP BY tipo
+                "
+            );
+        } elseif ($tablaBajas !== null && tablaTieneColumna($db, $tablaTemporales, 'id_bajas') && tablaTieneColumna($db, $tablaBajas, 'id_empresa')) {
+            $stmtTemporales = $db->prepare(
+                "
+                SELECT
+                    t.tipo,
+                    COALESCE(SUM(t.num_mujeres), 0) AS n_mujeres,
+                    COALESCE(SUM(t.num_hombres), 0) AS n_hombres
+                FROM `{$tablaTemporales}` t
+                INNER JOIN `{$tablaBajas}` b ON b.id_bajas = t.id_bajas
+                WHERE b.id_empresa = ?
+                GROUP BY t.tipo
+                "
+            );
+        } else {
+            throw new RuntimeException('No se puede filtrar bajas temporales por empresa (falta id_empresa o relacion con bajas).');
+        }
+
+        if (!$stmtTemporales) {
+            throw new RuntimeException('No se pudo preparar la consulta de bajas temporales.');
+        }
+
+        $stmtTemporales->bind_param('i', $idEmpresa);
+        $stmtTemporales->execute();
+        $resTemporales = $stmtTemporales->get_result();
+        while ($row = $resTemporales->fetch_assoc()) {
+            $tipo = normalizarTipoBaja((string)($row['tipo'] ?? ''));
+            if ($tipo === '') {
+                continue;
+            }
+            if (!isset($totalesPorTipo[$tipo])) {
+                $totalesPorTipo[$tipo] = ['mujeres' => 0, 'hombres' => 0];
+            }
+            $totalesPorTipo[$tipo]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
+            $totalesPorTipo[$tipo]['hombres'] += (int)($row['n_hombres'] ?? 0);
+        }
+        $stmtTemporales->close();
+    }
+
+    if ($tablaDefinitivas !== null) {
+        if (tablaTieneColumna($db, $tablaDefinitivas, 'id_empresa')) {
+            $stmtDefinitivas = $db->prepare(
+                "
+                SELECT
+                    tipo,
+                    COALESCE(SUM(num_mujeres), 0) AS n_mujeres,
+                    COALESCE(SUM(num_hombres), 0) AS n_hombres
+                FROM `{$tablaDefinitivas}`
+                WHERE id_empresa = ?
+                GROUP BY tipo
+                "
+            );
+        } elseif ($tablaBajas !== null && tablaTieneColumna($db, $tablaDefinitivas, 'id_bajas') && tablaTieneColumna($db, $tablaBajas, 'id_empresa')) {
+            $stmtDefinitivas = $db->prepare(
+                "
+                SELECT
+                    d.tipo,
+                    COALESCE(SUM(d.num_mujeres), 0) AS n_mujeres,
+                    COALESCE(SUM(d.num_hombres), 0) AS n_hombres
+                FROM `{$tablaDefinitivas}` d
+                INNER JOIN `{$tablaBajas}` b ON b.id_bajas = d.id_bajas
+                WHERE b.id_empresa = ?
+                GROUP BY d.tipo
+                "
+            );
+        } else {
+            throw new RuntimeException('No se puede filtrar bajas definitivas por empresa (falta id_empresa o relacion con bajas).');
+        }
+
+        if (!$stmtDefinitivas) {
+            throw new RuntimeException('No se pudo preparar la consulta de bajas definitivas.');
+        }
+
+        $stmtDefinitivas->bind_param('i', $idEmpresa);
+        $stmtDefinitivas->execute();
+        $resDefinitivas = $stmtDefinitivas->get_result();
+        while ($row = $resDefinitivas->fetch_assoc()) {
+            $tipo = normalizarTipoBaja((string)($row['tipo'] ?? ''));
+            if ($tipo === '') {
+                continue;
+            }
+            if (!isset($totalesPorTipo[$tipo])) {
+                $totalesPorTipo[$tipo] = ['mujeres' => 0, 'hombres' => 0];
+            }
+            $totalesPorTipo[$tipo]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
+            $totalesPorTipo[$tipo]['hombres'] += (int)($row['n_hombres'] ?? 0);
+        }
+        $stmtDefinitivas->close();
+    }
+
+    $ultimaFilaTipos = max(3, $sheet->getHighestDataRow('B'));
+    for ($fila = 3; $fila <= $ultimaFilaTipos; $fila++) {
+        $tipoHoja = normalizarTipoBaja((string)$sheet->getCell('B' . $fila)->getValue());
+        if ($tipoHoja === '') {
+            continue;
+        }
+
+        $nMujeres = (int)($totalesPorTipo[$tipoHoja]['mujeres'] ?? 0);
+        $nHombres = (int)($totalesPorTipo[$tipoHoja]['hombres'] ?? 0);
+
+        $sheet->setCellValue('C' . $fila, $nMujeres);
+        $sheet->setCellValue('G' . $fila, $nHombres);
+
+        if (($nMujeres + $nHombres) === 0) {
+            foreach (['D', 'E', 'F', 'H', 'I', 'J', 'K', 'L', 'M', 'N'] as $columna) {
+                $sheet->setCellValue($columna . $fila, 0);
+            }
+        }
+    }
+
+    return true;
 }

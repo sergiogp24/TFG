@@ -12,9 +12,9 @@ function fail(int $code, string $msg): void {
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($id <= 0) fail(400, 'ID inválido');
 
-// Ruta fija para la plantilla de registro retributivo (TOMADEDATOS.xlsx)
+// Ruta fija para la plantilla de registro retributivo (Herramienta_Registro_Redtributivo.xlsx)
 $defaultId = 1;
-$defaultPath = __DIR__ . '/../PlantillaRegistroRetributivo/TOMADEDATOS.xlsx';
+$defaultPath = __DIR__ . '/../PlantillaRegistroRetributivo/Herramienta_Registro_Retributivo.xlsx';
 
 if ($id === $defaultId) {
   $fullPath = realpath($defaultPath);
@@ -22,7 +22,7 @@ if ($id === $defaultId) {
     fail(404, 'Archivo no existe en disco');
   }
 
-  $filename = 'TOMADEDATOS.xlsx';
+  $filename = 'Herramienta_Registro_Retributivo.xlsx';
   $mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   $filesize = filesize($fullPath);
 
@@ -60,7 +60,7 @@ if (!$isDefault) {
 
   // ADMINISTRADOR/TECNICO pueden descargar cualquiera; CLIENTE solo el suyo.
   if ($rol === 'CLIENTE') {
-    $stmt = $db->prepare("\n      SELECT 1\n      FROM archivos a\n      JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n      JOIN plan_cliente pc ON pc.id_plan_cliente = cm.id_plan_cliente\n      JOIN usuario_empresa ue ON ue.id_empresa = pc.id_empresa\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
+    $stmt = $db->prepare("\n      SELECT 1\n      FROM archivos a\n      JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n      JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = ac.id_empresa\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
     $stmt->bind_param('ii', $id, $currentUserId);
     $stmt->execute();
     $hasAccess = (bool)$stmt->get_result()->fetch_assoc();
