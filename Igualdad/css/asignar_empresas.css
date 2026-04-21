@@ -1,8 +1,38 @@
-.empresa-list{
+/* ===== ASIGNAR EMPRESAS ===== */
+
+.empresa-list {
   max-height: 520px;
-  overflow: auto;
-  background: #fff;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
 }
-.empresa-item:hover{
-  background: #f8f9fa;
+
+.empresa-item {
+  padding: 14px;
+  border-bottom: 1px solid var(--color-gray-200);
+  transition: all 0.2s ease;
+}
+
+.empresa-item:last-child {
+  border-bottom: none;
+}
+
+.empresa-item:hover {
+  background: var(--color-gray-50);
+  border-bottom-color: var(--color-gray-300);
+}
+
+.empresa-item a {
+  text-decoration: none;
+  color: var(--color-gray-800);
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.empresa-item a:hover {
+  color: var(--color-teal);
 }

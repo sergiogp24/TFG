@@ -29,3 +29,48 @@
 .w-110px{ width:110px; }
 .w-120px{ width:120px; }
 .w-150px{ width:150px; }
+
+.admin-kpi-card{
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: #ffffff;
+  border: 1px solid #d9dee6;
+  border-radius: 16px;
+  padding: 18px 16px;
+  min-height: 120px;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.admin-kpi-card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
+  border-color: #bac4d1;
+}
+
+.admin-kpi-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: #44566f;
+  font-size: 1.05rem;
+}
+
+.admin-kpi-icon{
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2f7;
+  font-size: 1.05rem;
+}
+
+.admin-kpi-value{
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1f2e43;
+}

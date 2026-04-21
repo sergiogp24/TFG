@@ -101,15 +101,15 @@
 }
 
 .contratos-table .col-actions {
-  width: 170px;
+  width: 260px;
 }
 
 .contratos-table .actions-nowrap {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   width: 100%;
-  max-width: 160px;
+  max-width: 250px;
   margin: 0 auto;
 }
 
@@ -118,6 +118,15 @@
   min-width: 0;
   padding-left: 0.4rem;
   padding-right: 0.4rem;
+}
+
+.contratos-table .actions-nowrap .shared-table-action-btn {
+  min-height: 34px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .contratos-table .actions-nowrap form {
