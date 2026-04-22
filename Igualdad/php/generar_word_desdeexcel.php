@@ -734,14 +734,6 @@ function obtenerConfigCuestionarios(): array
         'cuestionario_infrarrepresentacion_femenina' => [
             'barreras_internas',
             'hay_mujeres',
-            'hay_personas_referencia',
-            'ocupacion_mujeres',
-            'porcentaje_mujeres',
-            'mujeres_sin_cualificacion',
-            'existe_plan',
-            'acciones_reforzar',
-            'ultimos_5_anios',
-            'analisis_segregar',
         ],
         'cuestionario_salud_laboral' => [
             'seguridad_salud',

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -130,19 +131,9 @@ function correo_obtener_empresas_asignadas(mysqli $db, int $userId): array
     $empresas = [];
 
     $stmt = $db->prepare(
-        "SELECT
-                e.razon_social,
-                COALESCE((
-                        SELECT ce.tipo_contrato
-                        FROM contrato_empresa ce
-                        WHERE ce.id_empresa = e.id_empresa
-                        ORDER BY ce.id_contrato_empresa DESC
-                        LIMIT 1
-                ), 'SIN CONTRATO') AS tipo_contrato
-         FROM usuario_empresa ue
-         INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
-         WHERE ue.id_usuario = ?
-         ORDER BY e.razon_social ASC"
+        "SELECT e.razon_social, COALESCE(( SELECT ce.tipo_contrato FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa ORDER BY ce.id_contrato_empresa DESC
+                LIMIT 1), 'SIN CONTRATO') AS tipo_contrato FROM usuario_empresa ue INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
+     WHERE ue.id_usuario = ? ORDER BY e.razon_social ASC"
     );
 
     if (!$stmt) {
