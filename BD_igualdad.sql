@@ -196,7 +196,7 @@ CREATE TABLE `ano_datos`(
  CONSTRAINT fk_ano_datos_contrato_empresa FOREIGN KEY (id_contrato_empresa) REFERENCES contrato_empresa(id_contrato_empresa) ON DELETE CASCADE,
  INDEX idx__ano_datos_contrato_empresa (id_contrato_empresa)
  )ENGINE= InnoDB;
- 
+ SELECT * FROM ano_datos;
 -- --------------------------------------------------------
 
 --
@@ -656,7 +656,7 @@ CREATE TABLE `cuestionario_seleccion_personal`(
   CONSTRAINT fk_cuestionario_seleccion_personal_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   CONSTRAINT fk_seleccion_personal_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_seleccion_personal_empresa (id_ano_datos))ENGINE=InnoDB;
-
+SELECT * FROM cuestionario_seleccion_personal;
 -- --------------------------------------------------------
 
 --
@@ -707,7 +707,6 @@ CREATE TABLE `cuestionario_formacion`(
   CONSTRAINT fk_cuestionario_formacion_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   CONSTRAINT fk_cuestionario_formacion_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_formacion_empresa (id_ano_datos))ENGINE=InnoDB;
-    
     -- --------------------------------------------------------
 
 --
