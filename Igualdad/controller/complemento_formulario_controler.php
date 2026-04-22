@@ -25,7 +25,21 @@ function complemento_redirect(string $tab, string $msg, bool $embed): void
 function complemento_redirect_csrf(bool $embed): void
 {
   $tab = (string)($_POST['tab'] ?? $_GET['tab'] ?? 'bajas');
-  if (!in_array($tab, ['bajas', 'formacion', 'excedencias', 'permisos'], true)) {
+  if (!in_array($tab, [
+    'bajas',
+    'formacion',
+    'excedencias',
+    'permisos',
+    'cuestionario_seleccion_personal',
+    'cuestionario_promocion_profesional',
+    'cuestionario_formacion',
+    'cuestionario_conciliacion_corresponsabilidad',
+    'cuestionario_infrarrepresentacion_femenina',
+    'cuestionario_salud_laboral',
+    'cuestionario_prevencion_acoso_sexual',
+    'cuestionario_violencia_genero',
+    'cuestionario_comunicacion_identidad_corporativa',
+  ], true)) {
     $tab = 'bajas';
   }
 
@@ -336,6 +350,162 @@ function complemento_tipo_temporal_valido(string $tipoTemporal): bool
   return in_array($tipoTemporal, ['Enfermedad Común', 'Accidente Laboral', 'Riesgo embarazo', 'COVID'], true);
 }
 
+function complemento_cuestionarios_config(): array
+{
+  return [
+    'cuestionario_seleccion_personal' => [
+      'table' => 'cuestionario_seleccion_personal',
+      'fields' => [
+        'factores_determinantes',
+        'incorporacion_nuevo_personal',
+        'publicacion_interna',
+        'personas_responsables',
+        'caracteristicas_candidaturas',
+        'entrevista_salida',
+        'sistema_reclutamiento',
+        'definicion_perfiles',
+        'metodos_seleccion',
+        'ultima_decision',
+        'barreras_internas_externas',
+      ],
+    ],
+    'cuestionario_promocion_profesional' => [
+      'table' => 'cuestionario_promocion_profesional',
+      'fields' => [
+        'metodologia',
+        'metodologia_evaluacion',
+        'personas_intervienen',
+        'formacion_ligada',
+        'acciones_fomentar',
+        'requisitos',
+        'planes_carrera',
+        'comunicacion_vacantes',
+        'dificultades_promocion',
+      ],
+    ],
+    'cuestionario_formacion' => [
+      'table' => 'cuestionario_formacion',
+      'fields' => [
+        'deteccion_formativas',
+        'difusion_ofertas',
+        'puede_solicitar',
+        'compensacion_fuera',
+        'posibilidad_formacion',
+        'formacion_mujeres',
+        'existencia_plan',
+        'asisten_igualmente',
+        'criterios_seleccion',
+        'impartacion_fuera',
+        'ayudas_formacion',
+        'formacion_igualdad',
+        'coste_medio',
+        'formacion_reciclaje',
+      ],
+    ],
+    'cuestionario_conciliacion_corresponsabilidad' => [
+      'table' => 'cuestionario_conciliacion_corresponsabilidad',
+      'fields' => [
+        'ordenacion_tiempo',
+        'quienes_utilizan',
+        'reduccion_jornada',
+        'mecanismos_disponibles',
+        'cuantas_personas',
+        'canales_informacion',
+      ],
+    ],
+    'cuestionario_infrarrepresentacion_femenina' => [
+      'table' => 'cuestionario_infrarrepresentacion_femenina',
+      'fields' => [
+        'barreras_internas',
+        'hay_mujeres',
+      ],
+    ],
+    'cuestionario_salud_laboral' => [
+      'table' => 'cuestionario_salud_laboral',
+      'fields' => [
+        'seguridad_salud',
+        'medidas_linea',
+        'incluido_perspectiva',
+        'permite_desconexion',
+      ],
+    ],
+    'cuestionario_prevencion_acoso_sexual' => [
+      'table' => 'cuestionario_prevencion_acoso_sexual',
+      'fields' => [
+        'conocen_acoso',
+        'protocolo_prevencion',
+        'medidas_sensibilizacion',
+      ],
+    ],
+    'cuestionario_violencia_genero' => [
+      'table' => 'cuestionario_violencia_genero',
+      'fields' => [
+        'conocimiento_contratada',
+        'prevision_progama',
+      ],
+    ],
+    'cuestionario_comunicacion_identidad_corporativa' => [
+      'table' => 'cuestionario_comunicacion_identidad_corporativa',
+      'fields' => [
+        'canales_comunicacion',
+        'campanas_comunicacion',
+        'imagen_empresa',
+        'existencia_comunicacion',
+        'frecuencia',
+        'lenguaje_imagen',
+        'objetivos',
+        'filosofia',
+        'procesos_calidad',
+        'responsabilidad_social',
+      ],
+    ],
+  ];
+}
+
+function complemento_insert_cuestionario(mysqli $db, string $table, array $fields, int $idAnoDatos, int $idEmpresa): void
+{
+  $cols = [];
+  $values = [];
+  foreach ($fields as $field) {
+    $cols[] = '`' . str_replace('`', '``', $field) . '`';
+    $values[] = trim((string)($_POST[$field] ?? ''));
+  }
+
+  $cols[] = 'id_ano_datos';
+  $cols[] = 'id_empresa';
+  $values[] = $idAnoDatos;
+  $values[] = $idEmpresa;
+
+  $placeholders = implode(', ', array_fill(0, count($cols), '?'));
+  $sql = 'INSERT INTO `' . str_replace('`', '``', $table) . '` (' . implode(', ', $cols) . ') VALUES (' . $placeholders . ')';
+  $stmt = $db->prepare($sql);
+  $types = str_repeat('s', count($fields)) . 'ii';
+  $stmt->bind_param($types, ...$values);
+  $stmt->execute();
+  $stmt->close();
+}
+
+function complemento_update_cuestionario(mysqli $db, string $table, string $pk, array $fields, int $idRegistro, int $idEmpresa): void
+{
+  $set = [];
+  $values = [];
+  foreach ($fields as $field) {
+    $fieldEsc = str_replace('`', '``', $field);
+    $set[] = "`{$fieldEsc}` = ?";
+    $values[] = trim((string)($_POST[$field] ?? ''));
+  }
+
+  $pkEsc = str_replace('`', '``', $pk);
+  $sql = 'UPDATE `' . str_replace('`', '``', $table) . '` SET ' . implode(', ', $set) . " WHERE `{$pkEsc}` = ? AND id_empresa = ?";
+  $stmt = $db->prepare($sql);
+  $values[] = $idRegistro;
+  $values[] = $idEmpresa;
+  $types = str_repeat('s', count($fields)) . 'ii';
+  $stmt->bind_param($types, ...$values);
+  $stmt->execute();
+  $stmt->close();
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   http_response_code(405);
   exit('Metodo no permitido');
@@ -360,6 +530,33 @@ $tabPorAccion = [
   'permisos_retribuidos' => 'permisos',
   'editar_permiso' => 'permisos',
   'eliminar_permiso' => 'permisos',
+  'cuestionario_seleccion_personal' => 'cuestionario_seleccion_personal',
+  'editar_cuestionario_seleccion_personal' => 'cuestionario_seleccion_personal',
+  'eliminar_cuestionario_seleccion_personal' => 'cuestionario_seleccion_personal',
+  'cuestionario_promocion_profesional' => 'cuestionario_promocion_profesional',
+  'editar_cuestionario_promocion_profesional' => 'cuestionario_promocion_profesional',
+  'eliminar_cuestionario_promocion_profesional' => 'cuestionario_promocion_profesional',
+  'cuestionario_formacion' => 'cuestionario_formacion',
+  'editar_cuestionario_formacion' => 'cuestionario_formacion',
+  'eliminar_cuestionario_formacion' => 'cuestionario_formacion',
+  'cuestionario_conciliacion_corresponsabilidad' => 'cuestionario_conciliacion_corresponsabilidad',
+  'editar_cuestionario_conciliacion_corresponsabilidad' => 'cuestionario_conciliacion_corresponsabilidad',
+  'eliminar_cuestionario_conciliacion_corresponsabilidad' => 'cuestionario_conciliacion_corresponsabilidad',
+  'cuestionario_infrarrepresentacion_femenina' => 'cuestionario_infrarrepresentacion_femenina',
+  'editar_cuestionario_infrarrepresentacion_femenina' => 'cuestionario_infrarrepresentacion_femenina',
+  'eliminar_cuestionario_infrarrepresentacion_femenina' => 'cuestionario_infrarrepresentacion_femenina',
+  'cuestionario_salud_laboral' => 'cuestionario_salud_laboral',
+  'editar_cuestionario_salud_laboral' => 'cuestionario_salud_laboral',
+  'eliminar_cuestionario_salud_laboral' => 'cuestionario_salud_laboral',
+  'cuestionario_prevencion_acoso_sexual' => 'cuestionario_prevencion_acoso_sexual',
+  'editar_cuestionario_prevencion_acoso_sexual' => 'cuestionario_prevencion_acoso_sexual',
+  'eliminar_cuestionario_prevencion_acoso_sexual' => 'cuestionario_prevencion_acoso_sexual',
+  'cuestionario_violencia_genero' => 'cuestionario_violencia_genero',
+  'editar_cuestionario_violencia_genero' => 'cuestionario_violencia_genero',
+  'eliminar_cuestionario_violencia_genero' => 'cuestionario_violencia_genero',
+  'cuestionario_comunicacion_identidad_corporativa' => 'cuestionario_comunicacion_identidad_corporativa',
+  'editar_cuestionario_comunicacion_identidad_corporativa' => 'cuestionario_comunicacion_identidad_corporativa',
+  'eliminar_cuestionario_comunicacion_identidad_corporativa' => 'cuestionario_comunicacion_identidad_corporativa',
 ];
 $tab = $tabPorAccion[$accion] ?? 'bajas';
 
@@ -754,6 +951,53 @@ try {
     $stmt->close();
 
     complemento_redirect($tab, 'Permiso eliminado correctamente.', $embed);
+  }
+
+  foreach (complemento_cuestionarios_config() as $accionBase => $configCuestionario) {
+    $accionesValidas = [$accionBase, 'editar_' . $accionBase, 'eliminar_' . $accionBase];
+    if (!in_array($accion, $accionesValidas, true)) {
+      continue;
+    }
+
+    $table = (string)$configCuestionario['table'];
+    $fields = (array)$configCuestionario['fields'];
+    $pk = complemento_primary_key($table);
+    if ($pk === null) {
+      complemento_redirect($tab, 'No se encontro clave primaria en el cuestionario.', $embed);
+    }
+
+    $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
+    complemento_validar_empresa($idEmpresa, $idUsuario, $rol, $tab, $embed);
+    complemento_validar_requisito_registro($idEmpresa, $tab, $embed);
+    $idAnoDatos = complemento_resolver_id_ano_datos_empresa($idEmpresa);
+    if ($idAnoDatos <= 0) {
+      complemento_redirect($tab, 'No se encontro ano_datos para la empresa seleccionada.', $embed);
+    }
+
+    $db = db();
+
+    if ($accion === $accionBase) {
+      complemento_insert_cuestionario($db, $table, $fields, $idAnoDatos, $idEmpresa);
+      complemento_redirect($tab, 'Cuestionario guardado correctamente.', $embed);
+    }
+
+    $idRegistro = (int)($_POST['id_registro'] ?? 0);
+    if ($idRegistro <= 0) {
+      complemento_redirect($tab, 'Registro invalido.', $embed);
+    }
+
+    if ($accion === 'editar_' . $accionBase) {
+      complemento_update_cuestionario($db, $table, $pk, $fields, $idRegistro, $idEmpresa);
+      complemento_redirect($tab, 'Cuestionario actualizado correctamente.', $embed);
+    }
+
+    $sql = "DELETE FROM `{$table}` WHERE `{$pk}` = ? AND id_empresa = ?";
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('ii', $idRegistro, $idEmpresa);
+    $stmt->execute();
+    $stmt->close();
+
+    complemento_redirect($tab, 'Cuestionario eliminado correctamente.', $embed);
   }
 
   complemento_redirect($tab, 'Accion no valida.', $embed);

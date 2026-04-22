@@ -1,14 +1,5 @@
 <?php
-
 declare(strict_types=1);
-
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
-ini_set('log_errors', '1');
-ini_set('error_log', __DIR__ . '/../uploads/procesar_registro_retributivo_error.log');
-ini_set('max_execution_time', '0');
-ini_set('memory_limit', '2048M');
-error_reporting(E_ALL);
 
 function registrarLogProcesarRegistroRetributivo(string $mensaje): void
 {
@@ -1021,7 +1012,7 @@ foreach ($names as $i => $originalName) {
         }
 
         try {
-            $rutaWordPlan = rellenarWordPlanIgualdad($rutaExcelPorcentajes, $razon_social, $anioRegistro);
+            $rutaWordPlan = rellenarWordPlanIgualdad($rutaExcelPorcentajes, $razon_social, $anioRegistro, $id_empresa);
             registrarArchivoGeneradoEnTabla(
                 $db,
                 'REGISTRO_RETRIBUTIVO',
@@ -1045,10 +1036,10 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
     // Eliminar la reunión "Subir R.R" cuando el cliente sube un registro retributivo exitosamente
     try {
         $stmtGetReunion = $db->prepare(
-            "SELECT r.id_reunion, u.email, u.username FROM reuniones r 
+            "SELECT r.id_reunion, u.email, u.nombre_usuario FROM reuniones r 
              INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion 
              INNER JOIN usuario u ON u.id_usuario = ur.id_usuario
-             WHERE ur.id_usuario = ? AND r.objetivo = 'Subir R.R' 
+             WHERE ur.id_usuario = ? AND UPPER(TRIM(r.objetivo)) = 'SUBIR R.R' 
              LIMIT 1"
         );
         if ($stmtGetReunion) {
@@ -1058,7 +1049,7 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
             if ($rowReunion = $resultReunion->fetch_assoc()) {
                 $idReunionAEliminar = (int)$rowReunion['id_reunion'];
                 $emailUsuario = $rowReunion['email'];
-                $nombreUsuario = $rowReunion['username'];
+                $nombreUsuario = $rowReunion['nombre_usuario'];
                 
                 // Eliminar primero de usuario_reunion
                 $stmtDelUserReunion = $db->prepare("DELETE FROM usuario_reunion WHERE id_reunion = ?");

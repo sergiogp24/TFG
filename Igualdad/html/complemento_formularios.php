@@ -209,7 +209,135 @@ $msg = trim((string)($_GET['msg'] ?? ''));
 $tab = trim((string)($_GET['tab'] ?? 'bajas'));
 $embed = ((string)($_GET['embed'] ?? '') === '1');
 $idEmpresaSeleccionada = (int)($_GET['id_empresa'] ?? 0);
-$tabsPermitidas = ['bajas', 'formacion', 'excedencias', 'permisos'];
+
+$cuestionarioTabs = [
+    'cuestionario_seleccion_personal' => [
+        'label' => 'Cuest. seleccion personal',
+        'table' => 'cuestionario_seleccion_personal',
+        'title' => 'Cuestionario seleccion personal',
+        'fields' => [
+            ['name' => 'factores_determinantes', 'label' => 'Factores determinantes'],
+            ['name' => 'incorporacion_nuevo_personal', 'label' => 'Incorporacion nuevo personal'],
+            ['name' => 'publicacion_interna', 'label' => 'Publicacion interna'],
+            ['name' => 'personas_responsables', 'label' => 'Personas responsables'],
+            ['name' => 'caracteristicas_candidaturas', 'label' => 'Caracteristicas candidaturas'],
+            ['name' => 'entrevista_salida', 'label' => 'Entrevista salida'],
+            ['name' => 'sistema_reclutamiento', 'label' => 'Sistema reclutamiento'],
+            ['name' => 'definicion_perfiles', 'label' => 'Definicion perfiles'],
+            ['name' => 'metodos_seleccion', 'label' => 'Metodos seleccion'],
+            ['name' => 'ultima_decision', 'label' => 'Ultima decision'],
+            ['name' => 'barreras_internas_externas', 'label' => 'Barreras internas/externas'],
+        ],
+    ],
+    'cuestionario_promocion_profesional' => [
+        'label' => 'Cuest. promocion profesional',
+        'table' => 'cuestionario_promocion_profesional',
+        'title' => 'Cuestionario promocion profesional',
+        'fields' => [
+            ['name' => 'metodologia', 'label' => 'Metodologia'],
+            ['name' => 'metodologia_evaluacion', 'label' => 'Metodologia evaluacion'],
+            ['name' => 'personas_intervienen', 'label' => 'Personas intervienen'],
+            ['name' => 'formacion_ligada', 'label' => 'Formacion ligada'],
+            ['name' => 'acciones_fomentar', 'label' => 'Acciones fomentar'],
+            ['name' => 'requisitos', 'label' => 'Requisitos'],
+            ['name' => 'planes_carrera', 'label' => 'Planes carrera'],
+            ['name' => 'comunicacion_vacantes', 'label' => 'Comunicacion vacantes'],
+            ['name' => 'dificultades_promocion', 'label' => 'Dificultades promocion'],
+        ],
+    ],
+    'cuestionario_formacion' => [
+        'label' => 'Cuest. formacion',
+        'table' => 'cuestionario_formacion',
+        'title' => 'Cuestionario formacion',
+        'fields' => [
+            ['name' => 'deteccion_formativas', 'label' => 'Deteccion formativas'],
+            ['name' => 'difusion_ofertas', 'label' => 'Difusion ofertas'],
+            ['name' => 'puede_solicitar', 'label' => 'Puede solicitar'],
+            ['name' => 'compensacion_fuera', 'label' => 'Compensacion fuera'],
+            ['name' => 'posibilidad_formacion', 'label' => 'Posibilidad formacion'],
+            ['name' => 'formacion_mujeres', 'label' => 'Formacion mujeres'],
+            ['name' => 'existencia_plan', 'label' => 'Existencia plan'],
+            ['name' => 'asisten_igualmente', 'label' => 'Asisten igualmente'],
+            ['name' => 'criterios_seleccion', 'label' => 'Criterios seleccion'],
+            ['name' => 'impartacion_fuera', 'label' => 'Impartacion fuera'],
+            ['name' => 'ayudas_formacion', 'label' => 'Ayudas formacion'],
+            ['name' => 'formacion_igualdad', 'label' => 'Formacion igualdad'],
+            ['name' => 'coste_medio', 'label' => 'Coste medio'],
+            ['name' => 'formacion_reciclaje', 'label' => 'Formacion reciclaje'],
+        ],
+    ],
+    'cuestionario_conciliacion_corresponsabilidad' => [
+        'label' => 'Cuest. conciliacion',
+        'table' => 'cuestionario_conciliacion_corresponsabilidad',
+        'title' => 'Cuestionario conciliacion corresponsabilidad',
+        'fields' => [
+            ['name' => 'ordenacion_tiempo', 'label' => 'Ordenacion tiempo'],
+            ['name' => 'quienes_utilizan', 'label' => 'Quienes utilizan'],
+            ['name' => 'reduccion_jornada', 'label' => 'Reduccion jornada'],
+            ['name' => 'mecanismos_disponibles', 'label' => 'Mecanismos disponibles'],
+            ['name' => 'cuantas_personas', 'label' => 'Cuantas personas'],
+            ['name' => 'canales_informacion', 'label' => 'Canales informacion'],
+        ],
+    ],
+    'cuestionario_infrarrepresentacion_femenina' => [
+        'label' => 'Cuest. infrarrepresentacion',
+        'table' => 'cuestionario_infrarrepresentacion_femenina',
+        'title' => 'Cuestionario infrarrepresentacion femenina',
+        'fields' => [
+            ['name' => 'barreras_internas', 'label' => 'Barreras internas'],
+            ['name' => 'hay_mujeres', 'label' => 'Hay mujeres'],
+        ],
+    ],
+    'cuestionario_salud_laboral' => [
+        'label' => 'Cuest. salud laboral',
+        'table' => 'cuestionario_salud_laboral',
+        'title' => 'Cuestionario salud laboral',
+        'fields' => [
+            ['name' => 'seguridad_salud', 'label' => 'Seguridad salud'],
+            ['name' => 'medidas_linea', 'label' => 'Medidas en linea'],
+            ['name' => 'incluido_perspectiva', 'label' => 'Incluido perspectiva'],
+            ['name' => 'permite_desconexion', 'label' => 'Permite desconexion'],
+        ],
+    ],
+    'cuestionario_prevencion_acoso_sexual' => [
+        'label' => 'Cuest. prevencion acoso',
+        'table' => 'cuestionario_prevencion_acoso_sexual',
+        'title' => 'Cuestionario prevencion acoso sexual',
+        'fields' => [
+            ['name' => 'conocen_acoso', 'label' => 'Conocen acoso'],
+            ['name' => 'protocolo_prevencion', 'label' => 'Protocolo prevencion'],
+            ['name' => 'medidas_sensibilizacion', 'label' => 'Medidas sensibilizacion'],
+        ],
+    ],
+    'cuestionario_violencia_genero' => [
+        'label' => 'Cuest. violencia genero',
+        'table' => 'cuestionario_violencia_genero',
+        'title' => 'Cuestionario violencia genero',
+        'fields' => [
+            ['name' => 'conocimiento_contratada', 'label' => 'Conocimiento contratada'],
+            ['name' => 'prevision_progama', 'label' => 'Prevision programa'],
+        ],
+    ],
+    'cuestionario_comunicacion_identidad_corporativa' => [
+        'label' => 'Cuest. comunicacion identidad',
+        'table' => 'cuestionario_comunicacion_identidad_corporativa',
+        'title' => 'Cuestionario comunicacion identidad corporativa',
+        'fields' => [
+            ['name' => 'canales_comunicacion', 'label' => 'Canales comunicacion'],
+            ['name' => 'campanas_comunicacion', 'label' => 'Campanas comunicacion'],
+            ['name' => 'imagen_empresa', 'label' => 'Imagen empresa'],
+            ['name' => 'existencia_comunicacion', 'label' => 'Existencia comunicacion'],
+            ['name' => 'frecuencia', 'label' => 'Frecuencia'],
+            ['name' => 'lenguaje_imagen', 'label' => 'Lenguaje imagen'],
+            ['name' => 'objetivos', 'label' => 'Objetivos'],
+            ['name' => 'filosofia', 'label' => 'Filosofia'],
+            ['name' => 'procesos_calidad', 'label' => 'Procesos calidad'],
+            ['name' => 'responsabilidad_social', 'label' => 'Responsabilidad social'],
+        ],
+    ],
+];
+
+$tabsPermitidas = array_merge(['bajas', 'formacion', 'excedencias', 'permisos'], array_keys($cuestionarioTabs));
 if (!in_array($tab, $tabsPermitidas, true)) {
     $tab = 'bajas';
 }
@@ -284,20 +412,7 @@ if ($idEmpresaSeleccionada > 0) {
 }
 
 if (!$empresaFijada && !empty($empresasDisponibles)) {
-    $empresaConRegistro = null;
-
-    foreach ($empresasDisponibles as $empresaDisponible) {
-        $idEmpresaDisponible = (int)($empresaDisponible['id_empresa'] ?? 0);
-        if ($idEmpresaDisponible > 0 && complemento_empresa_tiene_registro_retributivo($idEmpresaDisponible)) {
-            $empresaConRegistro = $empresaDisponible;
-            break;
-        }
-    }
-
-    if ($empresaConRegistro === null) {
-        $empresaConRegistro = $empresasDisponibles[0];
-    }
-
+    $empresaConRegistro = $empresasDisponibles[0];
     $idEmpresaSeleccionada = (int)($empresaConRegistro['id_empresa'] ?? 0);
     $empresaFijadaNombre = trim((string)($empresaConRegistro['razon_social'] ?? ''));
     $empresaFijada = ($idEmpresaSeleccionada > 0);
@@ -309,20 +424,6 @@ if ($empresaFijada) {
 
 $empresaTieneRegistro = ($idEmpresaSeleccionada > 0) ? complemento_empresa_tiene_registro_retributivo($idEmpresaSeleccionada) : false;
 
-if ($idEmpresaSeleccionada > 0 && !$empresaTieneRegistro) {
-    foreach ($empresasDisponibles as $empresaDisponible) {
-        $idEmpresaDisponible = (int)($empresaDisponible['id_empresa'] ?? 0);
-        if ($idEmpresaDisponible > 0 && complemento_empresa_tiene_registro_retributivo($idEmpresaDisponible)) {
-            $idEmpresaSeleccionada = $idEmpresaDisponible;
-            $empresaFijadaNombre = trim((string)($empresaDisponible['razon_social'] ?? ''));
-            $empresaFijada = true;
-            $empresaTieneRegistro = true;
-            $tabHrefExtra = $embed ? '&embed=1' : '';
-            $tabHrefExtra .= '&id_empresa=' . urlencode((string)$idEmpresaSeleccionada);
-            break;
-        }
-    }
-}
 
 $complementosBloqueados = (!$empresaFijada || !$empresaTieneRegistro);
 
@@ -330,6 +431,7 @@ $bajasRows = [];
 $formacionRows = [];
 $excedenciasRows = [];
 $permisosRows = [];
+$cuestionarioRows = [];
 $erroresListado = [];
 
 if ($idEmpresaSeleccionada > 0) {
@@ -356,6 +458,19 @@ if ($idEmpresaSeleccionada > 0) {
         $permisosRows = $resPermisos['rows'] ?? [];
         if (($resPermisos['error'] ?? '') !== '') {
             $erroresListado[] = 'Permisos: ' . $resPermisos['error'];
+        }
+
+        foreach ($cuestionarioTabs as $tabCuestionario => $configCuestionario) {
+            $fieldsCuestionario = array_column(($configCuestionario['fields'] ?? []), 'name');
+            $resCuestionario = complemento_fetch_simple_rows(
+                (string)($configCuestionario['table'] ?? ''),
+                $idEmpresaSeleccionada,
+                $fieldsCuestionario
+            );
+            $cuestionarioRows[$tabCuestionario] = $resCuestionario['rows'] ?? [];
+            if (($resCuestionario['error'] ?? '') !== '') {
+                $erroresListado[] = (string)($configCuestionario['title'] ?? $tabCuestionario) . ': ' . $resCuestionario['error'];
+            }
         }
     } catch (Throwable $e) {
         error_log(sprintf('[complemento_formularios.carga_listados] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
@@ -456,6 +571,20 @@ if ($idEmpresaSeleccionada > 0) {
                         </div>
                     <?php endif; ?>
 
+                    <div class="mb-4 d-flex align-items-center gap-3">
+                        <label class="form-label mb-0 fw-bold">Empresa:</label>
+                        <?php if ($embed): ?>
+                            <input type="text" class="form-control w-auto" value="<?= h($empresaFijadaNombre) ?>" readonly>
+                        <?php else: ?>
+                            <select class="form-select w-auto" onchange="window.location.href='complemento_formularios.php?tab=<?= h($tab) ?><?= $embed ? '&embed=1' : '' ?>&id_empresa=' + this.value;">
+                                <option value="">-- Seleccionar --</option>
+                                <?php foreach ($empresasDisponibles as $empresa): ?>
+                                    <option value="<?= (int)$empresa['id_empresa'] ?>" <?= ((int)$empresa['id_empresa'] === $idEmpresaSeleccionada) ? 'selected' : '' ?>><?= h($empresa['razon_social']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php endif; ?>
+                    </div>
+
                     <?php if ($complementosBloqueados): ?>
                         <div class="alert alert-warning mb-4">
                             Debes subir primero el Registro Retributivo en esta empresa para desbloquear los complementos de formularios.
@@ -463,10 +592,13 @@ if ($idEmpresaSeleccionada > 0) {
                     <?php endif; ?>
 
                     <div class="d-flex flex-wrap gap-2 mb-4">
-                        <a class="btn <?= $tab === 'bajas' ? 'btn-primary' : 'btn-outline-primary' ?>" href="complemento_formularios.php?tab=bajas<?= $tabHrefExtra ?>">Bajas</a>
-                        <a class="btn <?= $tab === 'formacion' ? 'btn-primary' : 'btn-outline-primary' ?>" href="complemento_formularios.php?tab=formacion<?= $tabHrefExtra ?>">Formacion</a>
-                        <a class="btn <?= $tab === 'excedencias' ? 'btn-primary' : 'btn-outline-primary' ?>" href="complemento_formularios.php?tab=excedencias<?= $tabHrefExtra ?>">Excedencias</a>
-                        <a class="btn <?= $tab === 'permisos' ? 'btn-primary' : 'btn-outline-primary' ?>" href="complemento_formularios.php?tab=permisos<?= $tabHrefExtra ?>">Permisos retributivos</a>
+                        <a class="btn <?= $tab === 'bajas' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=bajas' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Bajas</a>
+                        <a class="btn <?= $tab === 'formacion' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=formacion' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Formacion</a>
+                        <a class="btn <?= $tab === 'excedencias' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=excedencias' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Excedencias</a>
+                        <a class="btn <?= $tab === 'permisos' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=permisos' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Permisos retributivos</a>
+                        <?php foreach ($cuestionarioTabs as $tabCuestionario => $configCuestionario): ?>
+                            <a class="btn <?= $tab === $tabCuestionario ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=' . urlencode($tabCuestionario) . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>"><?= h((string)($configCuestionario['label'] ?? $tabCuestionario)) ?></a>
+                        <?php endforeach; ?>
                     </div>
 
                     <?php if ($complementosBloqueados): ?>
@@ -481,20 +613,7 @@ if ($idEmpresaSeleccionada > 0) {
                             <?= csrf_input() ?>
                             <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
 
-                            <div>
-                                <label class="form-label" for="bajas_id_empresa">Empresa</label>
-                                <?php if ($empresaFijada): ?>
-                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                    <input id="bajas_id_empresa" type="text" class="form-control" value="<?= h($empresaFijadaNombre) ?>" readonly>
-                                <?php else: ?>
-                                    <select id="bajas_id_empresa" name="id_empresa" class="form-control" required>
-                                        <option value="">-- Selecciona una empresa --</option>
-                                        <?php foreach ($empresasDisponibles as $empresa): ?>
-                                            <option value="<?= (int)$empresa['id_empresa'] ?>"><?= h($empresa['razon_social']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                <?php endif; ?>
-                            </div>
+                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
                             <div>
                                 <label class="form-label">Tipo de baja</label>
@@ -654,20 +773,7 @@ if ($idEmpresaSeleccionada > 0) {
                             <?= csrf_input() ?>
                             <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
 
-                            <div>
-                                <label class="form-label" for="formacion_id_empresa">Empresa</label>
-                                <?php if ($empresaFijada): ?>
-                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                    <input id="formacion_id_empresa" type="text" class="form-control" value="<?= h($empresaFijadaNombre) ?>" readonly>
-                                <?php else: ?>
-                                    <select id="formacion_id_empresa" name="id_empresa" class="form-control" required>
-                                        <option value="">-- Selecciona una empresa --</option>
-                                        <?php foreach ($empresasDisponibles as $empresa): ?>
-                                            <option value="<?= (int)$empresa['id_empresa'] ?>"><?= h($empresa['razon_social']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                <?php endif; ?>
-                            </div>
+                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
                             <div>
                                 <label class="form-label" for="formacion_tipo">Tipo</label>
@@ -756,20 +862,7 @@ if ($idEmpresaSeleccionada > 0) {
                             <?= csrf_input() ?>
                             <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
 
-                            <div>
-                                <label class="form-label" for="excedencias_id_empresa">Empresa</label>
-                                <?php if ($empresaFijada): ?>
-                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                    <input id="excedencias_id_empresa" type="text" class="form-control" value="<?= h($empresaFijadaNombre) ?>" readonly>
-                                <?php else: ?>
-                                    <select id="excedencias_id_empresa" name="id_empresa" class="form-control" required>
-                                        <option value="">-- Selecciona una empresa --</option>
-                                        <?php foreach ($empresasDisponibles as $empresa): ?>
-                                            <option value="<?= (int)$empresa['id_empresa'] ?>"><?= h($empresa['razon_social']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                <?php endif; ?>
-                            </div>
+                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
                             <div>
                                 <label class="form-label" for="excedencias_motivo">Motivo</label>
@@ -875,20 +968,7 @@ if ($idEmpresaSeleccionada > 0) {
                             <?= csrf_input() ?>
                             <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
 
-                            <div>
-                                <label class="form-label" for="permisos_id_empresa">Empresa</label>
-                                <?php if ($empresaFijada): ?>
-                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                    <input id="permisos_id_empresa" type="text" class="form-control" value="<?= h($empresaFijadaNombre) ?>" readonly>
-                                <?php else: ?>
-                                    <select id="permisos_id_empresa" name="id_empresa" class="form-control" required>
-                                        <option value="">-- Selecciona una empresa --</option>
-                                        <?php foreach ($empresasDisponibles as $empresa): ?>
-                                            <option value="<?= (int)$empresa['id_empresa'] ?>"><?= h($empresa['razon_social']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                <?php endif; ?>
-                            </div>
+                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
                             <div>
                                 <label class="form-label" for="permisos_motivo">Motivo</label>
@@ -975,6 +1055,99 @@ if ($idEmpresaSeleccionada > 0) {
                                                         <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
                                                         <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
                                                         <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php if (isset($cuestionarioTabs[$tab])): ?>
+                        <?php
+                        $configCuestionarioActivo = $cuestionarioTabs[$tab];
+                        $filasCuestionarioActivo = $cuestionarioRows[$tab] ?? [];
+                        $camposCuestionarioActivo = $configCuestionarioActivo['fields'] ?? [];
+                        ?>
+                        <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
+                            <input type="hidden" name="accion" value="<?= h($tab) ?>">
+                            <?= csrf_input() ?>
+                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+
+                            <div class="row g-3">
+                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label"><?= h((string)($campo['label'] ?? 'Campo')) ?></label>
+                                        <input type="text" name="<?= h((string)($campo['name'] ?? '')) ?>" class="form-control">
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+
+                            <div>
+                                <button type="submit" class="btn btn-primary">Guardar cuestionario</button>
+                            </div>
+                        </form>
+
+                        <hr class="my-4">
+                        <h6 class="mb-3">Registros de <?= h((string)($configCuestionarioActivo['title'] ?? $tab)) ?></h6>
+
+                        <?php if ($idEmpresaSeleccionada <= 0): ?>
+                            <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
+                        <?php elseif (empty($filasCuestionarioActivo)): ?>
+                            <div class="alert alert-secondary py-2">No hay registros para esta empresa.</div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                <th><?= h((string)($campo['label'] ?? 'Campo')) ?></th>
+                                            <?php endforeach; ?>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($filasCuestionarioActivo as $fila): ?>
+                                            <tr>
+                                                <td><?= (int)($fila['id_registro'] ?? 0) ?></td>
+                                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                    <td><?= h((string)($fila[(string)($campo['name'] ?? '')] ?? '')) ?></td>
+                                                <?php endforeach; ?>
+                                                <td>
+                                                    <?php if ($puedeEditarTablas): ?>
+                                                        <details>
+                                                            <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
+                                                            <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
+                                                                <input type="hidden" name="accion" value="<?= h('editar_' . $tab) ?>">
+                                                                <?= csrf_input() ?>
+                                                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                                <input type="hidden" name="id_registro" value="<?= (int)($fila['id_registro'] ?? 0) ?>">
+                                                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                                    <?php $nombreCampo = (string)($campo['name'] ?? ''); ?>
+                                                                    <input
+                                                                        type="text"
+                                                                        name="<?= h($nombreCampo) ?>"
+                                                                        class="form-control form-control-sm"
+                                                                        placeholder="<?= h((string)($campo['label'] ?? $nombreCampo)) ?>"
+                                                                        value="<?= h((string)($fila[$nombreCampo] ?? '')) ?>"
+                                                                    >
+                                                                <?php endforeach; ?>
+                                                                <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
+                                                            </form>
+                                                        </details>
+                                                    <?php endif; ?>
+                                                    <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este cuestionario?');">
+                                                        <input type="hidden" name="accion" value="<?= h('eliminar_' . $tab) ?>">
+                                                        <?= csrf_input() ?>
+                                                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                        <input type="hidden" name="id_registro" value="<?= (int)($fila['id_registro'] ?? 0) ?>">
                                                         <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
                                                     </form>
                                                 </td>

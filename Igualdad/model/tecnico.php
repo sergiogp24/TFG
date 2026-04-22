@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../php/auth.php';
 require_once __DIR__ . '/../php/helpers.php';
+require_once __DIR__ . '/../php/mails.php';
 require_role('TECNICO');
 
 require __DIR__ . '/../config/config.php';
@@ -138,6 +139,7 @@ $tecnicoClientesEmpresa = [];
 $tecnicoTodasReuniones = [];
 
 if (in_array($view, ['privada', 'reuniones'], true) && $tecnicoId > 0) {
+  correo_enviar_recordatorio_rr_reuniones_vencidas(db());
   db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
   
   // Mis reuniones

@@ -10,7 +10,7 @@ use PhpOffice\PhpWord\TemplateProcessor;
 /**
  * Rellena el Word plantilla SIN romper formato
  */
-function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?string $anioRegistro = null): string
+function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?string $anioRegistro = null, ?int $idEmpresa = null): string
 {
     try {
 
@@ -60,6 +60,24 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         // Reemplazar año si se proporcionó
         if ($anioRegistro !== null && $anioRegistro !== '') {
             $template->setValue('anioRegistro', $anioRegistro);
+        }
+
+        // =========================
+        // CUESTIONARIOS DESDE BD
+        // =========================
+        $valoresCuestionarios = [];
+        if (function_exists('db')) {
+            $dbConn = db();
+            if ($dbConn instanceof mysqli) {
+                $valoresCuestionarios = obtenerValoresCuestionariosDesdeBD($dbConn, $razonSocial, $anioRegistro, $idEmpresa);
+            }
+        }
+
+        // Cada placeholder se reemplaza una sola vez: valor BD si existe, si no cadena vacia.
+        $defaultsCuestionarios = array_fill_keys(obtenerCamposCuestionariosConfigurados(), '');
+        $cuestionariosFinal = array_merge($defaultsCuestionarios, $valoresCuestionarios);
+        foreach ($cuestionariosFinal as $clave => $valor) {
+            $template->setValue($clave, escaparTextoWord(formatearNumeroConComaSiAplica($valor, false)));
         }
 
         // =========================
@@ -218,6 +236,197 @@ function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial): array
     $stmt->close();
 
     return $empresa;
+}
+
+/**
+ * Obtiene los valores de cuestionarios permitidos para una empresa.
+ * Prioriza la fila del año solicitado y, si no existe, usa la más reciente de la empresa.
+ */
+function obtenerValoresCuestionariosDesdeBD(mysqli $db, string $razonSocial, ?string $anioRegistro, ?int $idEmpresaForzado = null): array
+{
+    $idEmpresa = ($idEmpresaForzado !== null && $idEmpresaForzado > 0)
+        ? $idEmpresaForzado
+        : obtenerIdEmpresaPorRazonSocial($db, $razonSocial);
+    if ($idEmpresa === null) {
+        error_log('[obtenerValoresCuestionariosDesdeBD] No se pudo resolver id_empresa para razon social: ' . $razonSocial);
+        return [];
+    }
+
+    $anio = extraerAnioDesdeTexto($anioRegistro);
+    $configCuestionarios = obtenerConfigCuestionarios();
+    $valores = [];
+
+    foreach ($configCuestionarios as $tabla => $campos) {
+        $camposUnicos = array_values(array_unique(array_filter($campos, static fn($campo) => is_string($campo) && $campo !== '')));
+        if ($camposUnicos === []) {
+            continue;
+        }
+
+        $columnasDisponibles = obtenerColumnasTabla($db, $tabla);
+        if ($columnasDisponibles === []) {
+            error_log("[obtenerValoresCuestionariosDesdeBD] Tabla {$tabla} sin columnas disponibles.");
+            continue;
+        }
+
+        $camposValidos = array_values(array_filter(
+            $camposUnicos,
+            static fn(string $campo): bool => isset($columnasDisponibles[$campo])
+        ));
+
+        if ($camposValidos === []) {
+            continue;
+        }
+
+        $select = implode(', ', array_map(static fn(string $campo): string => "`{$campo}`", $camposValidos));
+        $fila = [];
+
+        if ($anio !== null) {
+            $sqlAnio = "
+                SELECT {$select}
+                FROM `{$tabla}` q
+                INNER JOIN ano_datos ad ON ad.id_ano_datos = q.id_ano_datos
+                INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+                WHERE q.id_empresa = ?
+                  AND ce.id_empresa = ?
+                  AND (YEAR(ad.fecha_inicio) = ? OR YEAR(ad.fecha_fin) = ?)
+                ORDER BY q.id_ano_datos DESC
+                LIMIT 1
+            ";
+            $stmtAnio = $db->prepare($sqlAnio);
+            if ($stmtAnio) {
+                $stmtAnio->bind_param('iiii', $idEmpresa, $idEmpresa, $anio, $anio);
+                $stmtAnio->execute();
+                $fila = $stmtAnio->get_result()->fetch_assoc() ?: [];
+                $stmtAnio->close();
+            }
+        }
+
+        if ($fila === []) {
+            $sqlUltima = "SELECT {$select} FROM `{$tabla}` WHERE id_empresa = ? ORDER BY id_ano_datos DESC LIMIT 1";
+            $stmtUltima = $db->prepare($sqlUltima);
+            if ($stmtUltima) {
+                $stmtUltima->bind_param('i', $idEmpresa);
+                $stmtUltima->execute();
+                $fila = $stmtUltima->get_result()->fetch_assoc() ?: [];
+                $stmtUltima->close();
+            }
+        }
+
+        foreach ($camposValidos as $campo) {
+            if (array_key_exists($campo, $fila) && $fila[$campo] !== null && $fila[$campo] !== '') {
+                $valores[$campo] = $fila[$campo];
+            }
+        }
+
+        error_log("[obtenerValoresCuestionariosDesdeBD] tabla={$tabla} empresa={$idEmpresa} anio=" . ($anio ?? 'null') . " campos=" . count($fila));
+    }
+
+    error_log("[obtenerValoresCuestionariosDesdeBD] empresa={$idEmpresa} total_campos=" . count($valores));
+    return $valores;
+}
+
+/**
+ * Devuelve las columnas reales de una tabla para evitar SELECT con columnas inexistentes.
+ *
+ * @return array<string, true>
+ */
+function obtenerColumnasTabla(mysqli $db, string $tabla): array
+{
+    static $cache = [];
+
+    if (isset($cache[$tabla])) {
+        return $cache[$tabla];
+    }
+
+    $sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) {
+        $cache[$tabla] = [];
+        return $cache[$tabla];
+    }
+
+    $stmt->bind_param('s', $tabla);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $columnas = [];
+    while ($fila = $result->fetch_assoc()) {
+        if (isset($fila['COLUMN_NAME']) && $fila['COLUMN_NAME'] !== '') {
+            $columnas[(string)$fila['COLUMN_NAME']] = true;
+        }
+    }
+
+    $stmt->close();
+    $cache[$tabla] = $columnas;
+
+    return $cache[$tabla];
+}
+
+/**
+ * Busca el id_empresa a partir de la razón social.
+ */
+function obtenerIdEmpresaPorRazonSocial(mysqli $db, string $razonSocial): ?int
+{
+    $stmt = $db->prepare("SELECT id_empresa FROM empresa WHERE UPPER(TRIM(razon_social)) = ? LIMIT 1");
+    if (!$stmt) {
+        return null;
+    }
+
+    $razonSocialNormalizada = mb_strtoupper(trim($razonSocial));
+    $stmt->bind_param('s', $razonSocialNormalizada);
+    $stmt->execute();
+    $fila = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$fila || !isset($fila['id_empresa'])) {
+        // Fallback tolerante: compara razón social normalizada para evitar fallos por espacios/acentos/puntuación.
+        $sql = "SELECT id_empresa, razon_social FROM empresa";
+        $res = $db->query($sql);
+        if (!$res) {
+            return null;
+        }
+
+        $objetivo = normalizarRazonSocialComparacion($razonSocial);
+        while ($row = $res->fetch_assoc()) {
+            if (!isset($row['id_empresa'], $row['razon_social'])) {
+                continue;
+            }
+
+            if (normalizarRazonSocialComparacion((string)$row['razon_social']) === $objetivo) {
+                return (int)$row['id_empresa'];
+            }
+        }
+
+        return null;
+    }
+
+    return (int)$fila['id_empresa'];
+}
+
+function extraerAnioDesdeTexto(?string $texto): ?int
+{
+    if ($texto === null) {
+        return null;
+    }
+
+    $valor = trim($texto);
+    if ($valor === '') {
+        return null;
+    }
+
+    if (preg_match('/\b(\d{4})\b/', $valor, $m) === 1) {
+        return (int)$m[1];
+    }
+
+    return null;
+}
+
+function normalizarRazonSocialComparacion(string $texto): string
+{
+    $texto = mb_strtoupper(trim($texto));
+    $texto = preg_replace('/\s+/u', ' ', $texto) ?? $texto;
+    $texto = preg_replace('/[^\p{L}\p{N}]+/u', '', $texto) ?? $texto;
+    return $texto;
 }
 
 /**
@@ -464,4 +673,121 @@ function rellenarTablaDinamicaHoja21(TemplateProcessor $template, \PhpOffice\Php
     ];
 
     rellenarTablaDinamicaPorConfig($template, $spreadsheet, $cfg, 'hoja 21');
+}
+
+/**
+ * Configuracion centralizada de tablas y campos de cuestionarios.
+ *
+ * @return array<string, array<int, string>>
+ */
+function obtenerConfigCuestionarios(): array
+{
+    return [
+        'cuestionario_seleccion_personal' => [
+            'factores_determinantes',
+            'incorporacion_nuevo_personal',
+            'publicacion_interna',
+            'personas_responsables',
+            'caracteristicas_candidaturas',
+            'entrevista_salida',
+            'sistema_reclutamiento',
+            'definicion_perfiles',
+            'metodos_seleccion',
+            'ultima_decision',
+            'barreras_internas_externas',
+        ],
+        'cuestionario_promocion_profesional' => [
+            'metodologia',
+            'metodologia_evaluacion',
+            'personas_intervienen',
+            'formacion_ligada',
+            'acciones_fomentar',
+            'requisitos',
+            'planes_carrera',
+            'comunicacion_vacantes',
+            'dificultades_promocion',
+        ],
+        'cuestionario_formacion' => [
+            'deteccion_formativas',
+            'difusion_ofertas',
+            'puede_solicitar',
+            'compensacion_fuera',
+            'posibilidad_formacion',
+            'formacion_mujeres',
+            'existencia_plan',
+            'asisten_igualmente',
+            'criterios_seleccion',
+            'impartacion_fuera',
+            'ayudas_formacion',
+            'formacion_igualdad',
+            'coste_medio',
+            'formacion_reciclaje',
+        ],
+        'cuestionario_conciliacion_corresponsabilidad' => [
+            'ordenacion_tiempo',
+            'quienes_utilizan',
+            'reduccion_jornada',
+            'mecanismos_disponibles',
+            'cuantas_personas',
+            'canales_informacion',
+        ],
+        'cuestionario_infrarrepresentacion_femenina' => [
+            'barreras_internas',
+            'hay_mujeres',
+            'hay_personas_referencia',
+            'ocupacion_mujeres',
+            'porcentaje_mujeres',
+            'mujeres_sin_cualificacion',
+            'existe_plan',
+            'acciones_reforzar',
+            'ultimos_5_anios',
+            'analisis_segregar',
+        ],
+        'cuestionario_salud_laboral' => [
+            'seguridad_salud',
+            'medidas_linea',
+            'incluido_perspectiva',
+            'permite_desconexion',
+        ],
+        'cuestionario_prevencion_acoso_sexual' => [
+            'conocen_acoso',
+            'protocolo_prevencion',
+            'medidas_sensibilizacion',
+        ],
+        'cuestionario_violencia_genero' => [
+            'conocimiento_contratada',
+            'prevision_progama',
+        ],
+        'cuestionario_comunicacion_identidad_corporativa' => [
+            'canales_comunicacion',
+            'campanas_comunicacion',
+            'imagen_empresa',
+            'existencia_comunicacion',
+            'frecuencia',
+            'lenguaje_imagen',
+            'objetivos',
+            'filosofia',
+            'procesos_calidad',
+            'responsabilidad_social',
+        ],
+    ];
+}
+
+/**
+ * Devuelve todos los placeholders de cuestionarios definidos en configuracion.
+ *
+ * @return array<int, string>
+ */
+function obtenerCamposCuestionariosConfigurados(): array
+{
+    $campos = [];
+    foreach (obtenerConfigCuestionarios() as $listaCampos) {
+        foreach ($listaCampos as $campo) {
+            if (is_string($campo) && $campo !== '') {
+                $campos[$campo] = true;
+            }
+        }
+    }
+
+    return array_keys($campos);
 }

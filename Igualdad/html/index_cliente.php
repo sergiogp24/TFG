@@ -6,6 +6,7 @@ require __DIR__ . '/../php/auth.php';
 require_login();
 require_role('CLIENTE');
 require_once __DIR__ . '/../php/helpers.php';
+require_once __DIR__ . '/../php/mails.php';
 require __DIR__ . '/../config/config.php';
 
 function formatear_fecha_resumen(string $fecha): string
@@ -161,6 +162,7 @@ if ($usuarioId > 0) {
     }
 
     if (in_array($view, ['privada', 'reuniones'], true)) {
+        correo_enviar_recordatorio_rr_reuniones_vencidas(db());
         db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
         $stmtReuniones = db()->prepare(
             'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion
@@ -225,6 +227,14 @@ if (!empty($empresasDisponibles)) {
 $sinEmpresaAsignada = ($empresaAsignada === null);
 $idEmpresaAsignada = (int)($empresaAsignada['id_empresa'] ?? 0);
 $registroSubido = (!$sinEmpresaAsignada && empresa_tiene_registro_retributivo($idEmpresaAsignada));
+
+// BLOQUEO DE ACCESO A COMPLEMENTOS DESDE AQUÍ
+if ($idEmpresaAsignada > 0 && !$registroSubido) {
+    
+    // Opcional: puedes ocultar o deshabilitar aquí los enlaces/botones a complementos
+    // Por ejemplo, si tienes un botón o enlace a complemento_formularios.php:
+    echo '<style>.btn-complemento, .link-complemento { pointer-events: none; opacity: 0.5; }</style>';
+}
 $idEmpresaWordFinalSeleccionada = (int)($_GET['id_empresa_word_final'] ?? 0);
 $wordFinalPorEmpresa = [];
 
@@ -259,7 +269,18 @@ if (!empty($empresasDisponibles)) {
 }
 
 $wordFinalSeleccionado = $wordFinalPorEmpresa[$idEmpresaWordFinalSeleccionada] ?? null;
-$pendientesEspacio = $registroSubido ? 0 : 1;
+
+$pendientesEspacio = 0;
+$empresasPendientesLista = [];
+if (!empty($empresasDisponibles)) {
+    foreach ($empresasDisponibles as $empresa) {
+        $idEmp = (int)($empresa['id_empresa'] ?? 0);
+        if ($idEmp > 0 && !empresa_tiene_registro_retributivo($idEmp)) {
+            $pendientesEspacio++;
+            $empresasPendientesLista[] = $empresa['razon_social'] ?? 'Sin nombre';
+        }
+    }
+}
 $globalCssVersion = @filemtime(__DIR__ . '/../css/global.css') ?: time();
 $adminCssVersion = @filemtime(__DIR__ . '/../css/admin.css') ?: time();
 $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
@@ -571,7 +592,12 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                         <div class="space-stat-card h-100">
                                             <div class="space-stat-label">Clientes con Registro retributivo pendiente</div>
                                             <div class="space-stat-value"><?= (int)$pendientesEspacio ?></div>
-                                            <div class="space-stat-icon">▣</div>
+                                            <div class="space-stat-icon" <?= $pendientesEspacio > 0 ? 'style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes" title="Ver empresas pendientes"' : '' ?>>▣</div>
+                                            <?php if ($pendientesEspacio > 0): ?>
+                                            <div class="mt-2 text-end">
+                                                <button class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes">Ver detalles</button>
+                                            </div>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -783,6 +809,27 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                     <?php endif; ?>
                                                 </div>
 
+                                                 <div class="mt-4">
+                                                    <label class="form-label d-block">Cuestionario Cualitativo</label>
+                                                    <?php if (!$registroSubido): ?>
+                                                        <div class="alert alert-warning py-2 mb-0">
+                                                            Debes subir primero el Registro Retributivo para poder subir los cuestionarios sobre Seleccion Peronal, Promocion Profesional, Formación, Conciliación, Infrarepresentación femenina, Salud Laboral, Acoso Sexual y Violencia de Género.
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="seleccion_personal">Seleccion Personal</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="promocion_profesional">Promoción Profesional</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="cuestionario_formacion">Formación</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="conciliacion">Conciliación y Corresponsabilidad</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="infrarrepresentacion">Infrarepresentación femenina</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="salud_laboral">Salud Laboral</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="acoso_sexual">Prevención del Acoso Sexual y por Razón de sexo</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="violencia_genero">Violencia de Género</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="comunicacion">Comunicación e identidad corporativa</button>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+
                                             </div>
                                         </div>
                                     </div>
@@ -805,6 +852,29 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                     </div>
                     <div class="modal-body p-0" style="min-height: 70vh;">
                         <iframe id="complementoFormulariosFrame" title="Formulario complemento" style="width:100%; height:70vh; border:0;"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($view === 'mi_espacio' && $pendientesEspacio > 0): ?>
+        <div class="modal fade" id="modalEmpresasPendientes" tabindex="-1" aria-labelledby="modalEmpresasPendientesLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalEmpresasPendientesLabel">Empresas con Registro Pendiente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <ul class="list-group list-group-flush">
+                            <?php foreach ($empresasPendientesLista as $empName): ?>
+                                <li class="list-group-item">📁 <?= h($empName) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                     </div>
                 </div>
             </div>
