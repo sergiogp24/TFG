@@ -1,7 +1,7 @@
-drop database igualdad;
+drop database igualdadconsulting;
 -- BASE DE DATOS IGUALDAD
-CREATE DATABASE IF NOT EXISTS igualdad;
-USE igualdad;
+CREATE DATABASE IF NOT EXISTS igualdadconsulting;
+USE igualdadconsulting;
 -- --------------------------------------------------------
 
 --
@@ -36,6 +36,44 @@ INDEX idx_usuario_rol (rol_id)
 -- --------------------------------------------------------
 
 --
+-- Tokens para establecer la contraseña al crear o recuperar
+--
+
+CREATE TABLE IF NOT EXISTS password_reset_token (
+  `id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `token` VARCHAR(255) NOT NULL UNIQUE,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` DATETIME NOT NULL,
+  `used` BOOLEAN DEFAULT FALSE,
+  KEY `idx_email` (`email`),
+  KEY `idx_token` (`token`),
+  KEY `idx_expires_at` (`expires_at`)
+) ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tablas de Reuniones
+--
+
+CREATE TABLE reuniones(
+ id_reunion INT PRIMARY KEY AUTO_INCREMENT,
+ objetivo TEXT DEFAULT NULL,
+ hora_reunion VARCHAR(255) NOT NULL,
+ fecha_reunion DATE NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE usuario_reunion(
+ id_usuario INT NOT NULL,
+ id_reunion INT NOT NULL,
+ PRIMARY KEY (id_usuario, id_reunion),
+ CONSTRAINT fk_ur_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+ CONSTRAINT fk_ur_reunion FOREIGN KEY (id_reunion) REFERENCES reuniones(id_reunion) ON DELETE CASCADE
+) ENGINE=InnoDB;
+-- --------------------------------------------------------
+
+--
 -- Estructura para la tabla CLIENTE(EMPRESA)
 --
 
@@ -54,7 +92,7 @@ CREATE TABLE `empresa`(
   `telefono` VARCHAR(20) DEFAULT NULL,
   -- ACTIVIDAD
   `sector` VARCHAR(255) DEFAULT NULL,
-  `cnae` VARCHAR(20) DEFAULT NULL,
+  `cnae` VARCHAR(255) DEFAULT NULL,
   `convenio` VARCHAR(255) DEFAULT NULL,
   -- DIMENSIÓN
   `personas_mujeres` INT DEFAULT NULL,
@@ -79,9 +117,9 @@ CREATE TABLE `empresa`(
 CREATE TABLE `usuario_empresa`(
 `id_usuario_empresa` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
 `id_usuario` INT,
-CONSTRAINT fk_usuario_empresa_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE RESTRICT,
+CONSTRAINT fk_usuario_empresa_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
 `id_empresa` INT,
-CONSTRAINT fk_usuario_empresa_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE RESTRICT)ENGINE = InnoDB;
+CONSTRAINT fk_usuario_empresa_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE)ENGINE = InnoDB;
 
 -- --------------------------------------------------------
 
@@ -100,8 +138,8 @@ CREATE TABLE `area_plan`(
 CREATE TABLE `medida`(
 `id_medida`INT AUTO_INCREMENT PRIMARY KEY,
 `id_plan`INT NOT NULL,
-`descripcion`TEXT NOT NULL ,
-`indicador`VARCHAR(255) DEFAULT NULL, 
+`descripcion`TEXT DEFAULT NULL ,
+`indicador`TEXT DEFAULT NULL, 
 CONSTRAINT fk_medida_area FOREIGN KEY (id_plan) REFERENCES area_plan(id_plan),
 INDEX idx_medida_plan (id_plan)
 )ENGINE=InnoDB;
@@ -126,7 +164,6 @@ INDEX idx_areas_contratadas_empresa (id_empresa),
 INDEX idx_areas_contratadas_plan (id_plan)
 )ENGINE=InnoDB;
 
-select * from areas_contratadas;
 -- --------------------------------------------------------
 
 --
@@ -137,7 +174,7 @@ select * from areas_contratadas;
 
 CREATE TABLE `contrato_empresa`(
 `id_contrato_empresa`INT AUTO_INCREMENT PRIMARY KEY,
-`tipo_contrato`	ENUM('COMPLETO' , 'MANTENIMIENTO'),
+`tipo_contrato`	ENUM('PLAN IGUALDAD' , 'MANTENIMIENTO'),
 `inicio_contratacion`DATE NOT NULL,
 `fin_contratacion`DATE NOT NULL,
 `id_empresa`INT NOT NULL,
@@ -159,7 +196,7 @@ CREATE TABLE `ano_datos`(
  CONSTRAINT fk_ano_datos_contrato_empresa FOREIGN KEY (id_contrato_empresa) REFERENCES contrato_empresa(id_contrato_empresa) ON DELETE CASCADE,
  INDEX idx__ano_datos_contrato_empresa (id_contrato_empresa)
  )ENGINE= InnoDB;
-
+ 
 -- --------------------------------------------------------
 
 --
@@ -203,11 +240,11 @@ CREATE TABLE `datos_empleados`(
 `salario_base_eq` DECIMAL (10,2) DEFAULT NULL,
 `salario_base_ef` DECIMAL (10,2) DEFAULT NULL,
 `grupo_cotizacion_seg_social` INT DEFAULT NULL,
+`ano_registro` DATE NOT NULL,
 `id_ano_datos`INT NOT NULL,
-  CONSTRAINT Fk_ano_datos_datos_empleados FOREIGN KEY (iD_ano_datos) REFERENCES Ano_datos(iD_ano_datos) ON DELETE CASCADE,
-INDEX Idx_ano_datos_datos_empleados(iD_ano_datos)
-)ENGINE=INNODB;
-select * from datos_empleados;
+  CONSTRAINT fk_ano_datos_datos_empleados FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+INDEX idx_ano_datos_datos_empleados(id_ano_datos)
+)ENGINE=InnoDB;
 
 -- --------------------------------------------------------
 
@@ -373,7 +410,7 @@ CREATE TABLE `area_formacion`(
  `voluntaria_obligatoria`ENUM('Voluntaria','Obligatoria') NOT NULL,
  `n_horas`INT NOT NULL,
  `n_hombres`INT NOT NULL,
-`n_mujeres`INT NOT NULL,
+ `n_mujeres`INT NOT NULL,
  `informado_plantilla`VARCHAR(100) NOT NULL,
  `criterio_seleccion`VARCHAR(100) NOT NULL,
 `id_cliente_medida`INT NOT NULL,
@@ -459,9 +496,14 @@ CREATE TABLE `contrato`(
 --
 -- Estructura para la tabla BAJAS
 --
+
 CREATE TABLE `bajas`(
 `id_bajas`INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-`tipo`ENUM('TEMPORALES' , 'DEFINITIVAS')
+`tipo`ENUM('TEMPORALES' , 'DEFINITIVAS'),
+`id_ano_datos`INT NOT  NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT Fk_ano_bajas FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(iD_ano_datos) ON DELETE CASCADE,
+  CONSTRAINT fk_bajas_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
 -- --------------------------------------------------------
@@ -472,8 +514,13 @@ CREATE TABLE `bajas`(
 CREATE TABLE `baja_temporales`(
 `id_temporales`INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
 `motivo`VARCHAR(255) NOT NULL,
+`tipo`ENUM('Enfermedad Común','Accidente Laboral','Riesgo embarazo','COVID') NOT NULL,
 `num_mujeres`INT NOT NULL DEFAULT 0,
 `num_hombres`INT NOT NULL DEFAULT 0, 
+`id_ano_datos`INT NOT  NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_anotemporales_bajas FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(iD_ano_datos) ON DELETE CASCADE,
+  CONSTRAINT fk_bajastemporales_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
 `id_bajas`INT NOT NULL,
 CONSTRAINT fk_temporales_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)ON DELETE CASCADE)ENGINE=InnoDB;
 
@@ -485,11 +532,18 @@ CONSTRAINT fk_temporales_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)
 
 CREATE TABLE `baja_definitivas`(
 `id_definitivas`INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-`motivo`VARCHAR(255) NOT NULL,
+`motivo`VARCHAR(255) DEFAULT NULL,
+`tipo`ENUM('Despido','Fallecimiento','Finalización contrato','Jubilación','No superación de periodo de prueba','Baja voluntaria') NOT NULL,
 `num_mujeres`INT NOT NULL DEFAULT 0,
 `num_hombres`INT NOT NULL DEFAULT 0,
+`id_ano_datos`INT NOT  NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_anodefinitivas_bajas FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(iD_ano_datos) ON DELETE CASCADE,
+  CONSTRAINT fk_bajasdefinitivas_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
 `id_bajas`INT NOT NULL,
 CONSTRAINT fk_definitivas_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)ON DELETE CASCADE)ENGINE=InnoDB;
+
+
 
 -- --------------------------------------------------------
 
@@ -499,12 +553,50 @@ CONSTRAINT fk_definitivas_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas
 
 CREATE TABLE `area_excedencias`(
 `id_excedencias`INT AUTO_INCREMENT PRIMARY KEY,
-`excedencia`VARCHAR(100) NOT NULL,
+`motivo`VARCHAR(100) DEFAULT NULL,
+`tipo`ENUM('Excedencias Voluntarias','Excedencias Cuidado Menores','Excedencias Cuidado de Personas Mayores') NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
+`id_ano_datos`INT NOT NULL,
 `id_empresa` INT NOT NULL,
+  CONSTRAINT fk_ano_excedencias FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(iD_ano_datos) ON DELETE CASCADE,
   CONSTRAINT fk_excedencias_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
-    INDEX idx_excedencias_empresa (id_empresa))ENGINE=InnoDB;
+    INDEX idx_excedencias_empresa (id_ano_datos))ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla Formacion
+--
+
+CREATE TABLE `area_formaciones`(
+`id_formaciones`INT AUTO_INCREMENT PRIMARY KEY,
+`tipo`VARCHAR(100) DEFAULT NULL,
+`n_mujeres`INT DEFAULT 0,
+`n_hombres`INT DEFAULT 0,
+`id_ano_datos`INT NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_formaciones_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+  CONSTRAINT fk_formaciones_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+    INDEX idx_formaciones_ano_empresa (id_ano_datos))ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla Permisos Retribuidos
+--
+
+CREATE TABLE `area_Permisos_retribuidos`(
+`id_permisos_retribuidos`INT AUTO_INCREMENT PRIMARY KEY,
+`motivo`VARCHAR(100) DEFAULT NULL,
+`tipo` ENUM('Lactancia','Nacimiento') NOT NULL,
+`n_mujeres`INT DEFAULT 0,
+`n_hombres`INT DEFAULT 0,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_permisos_retribuidos_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_permisos_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_permisos_retribuidos_empresa (id_ano_datos))ENGINE=InnoDB;
 
 -- --------------------------------------------------------
 
@@ -517,9 +609,9 @@ CREATE TABLE `area_reducciones_jornada`(
 `reduccion_jornada`VARCHAR(100) NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
-`id_empresa` INT NOT NULL,
-  CONSTRAINT fk_reducciones_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
-   INDEX idx_reducciones_empresa (id_empresa))ENGINE=InnoDB;
+`id_ano_datos`INT NOT NULL,
+  CONSTRAINT Fk_reducciones_empresa FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+   INDEX idx_reducciones_empresa (id_ano_datos))ENGINE=InnoDB;
    -- --------------------------------------------------------
 
 --
@@ -531,11 +623,204 @@ CREATE TABLE `area_adaptaciones_jornada`(
 `adaptacion`VARCHAR(100) NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
-`id_empresa` INT NOT NULL,
-  CONSTRAINT fk_adaptaciones_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
-   INDEX idx_adaptaciones_empresa (id_empresa))ENGINE=InnoDB;
+`id_ano_datos`INT NOT NULL,
+  CONSTRAINT fk_adaptaciones_empresa FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+   INDEX idx_adaptaciones_empresa (id_ano_datos))ENGINE=InnoDB;
 
 -- --------------------------------------------------------
+
+--
+-- Estructura Cuestionario Cualitativo
+--
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_seleccion_personal
+--
+
+CREATE TABLE `cuestionario_seleccion_personal`(
+`id_cuestionario_seleccion_personal`INT AUTO_INCREMENT PRIMARY KEY,
+`factores_determinantes`VARCHAR(255) DEFAULT NULL,
+`incorporacion_nuevo_personal`VARCHAR(255) DEFAULT NULL,
+`publicacion_interna`VARCHAR(255) DEFAULT NULL,
+`personas_responsables`VARCHAR(255) DEFAULT NULL,
+`caracteristicas_candidaturas`VARCHAR(255) DEFAULT NULL,
+`entrevista_salida`VARCHAR(255) DEFAULT NULL,
+`sistema_reclutamiento`VARCHAR(255) DEFAULT NULL,
+`definicion_perfiles`VARCHAR(255) DEFAULT NULL,
+`metodos_seleccion`VARCHAR(255) DEFAULT NULL,
+`ultima_decision`VARCHAR(255) DEFAULT NULL,
+`barreras_internas_externas`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_seleccion_personal_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_seleccion_personal_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_seleccion_personal_empresa (id_ano_datos))ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_promocion_profesional
+--
+
+CREATE TABLE `cuestionario_promocion_profesional`(
+`id_promocion_profesional`INT AUTO_INCREMENT PRIMARY KEY,
+`metodologia`VARCHAR(255) DEFAULT NULL,
+`metodologia_evaluacion`VARCHAR(255) DEFAULT NULL,
+`personas_intervienen`VARCHAR(255) DEFAULT NULL,
+`formacion_ligada`VARCHAR(255) DEFAULT NULL,
+`acciones_fomentar`VARCHAR(255) DEFAULT NULL,
+`requisitos`VARCHAR(255) DEFAULT NULL,
+`planes_carrera`VARCHAR(255) DEFAULT NULL,
+`comunicacion_vacantes`VARCHAR(255) DEFAULT NULL,
+`dificultades_promocion`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_promocion_profesional_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_promocion_profesional_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_promocion_profesional_empresa (id_ano_datos))ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_formacion
+--
+
+CREATE TABLE `cuestionario_formacion`(
+`id_cuestionario_formacion`INT AUTO_INCREMENT PRIMARY KEY,
+`deteccion_formativas`VARCHAR(255) DEFAULT NULL,
+`difusion_ofertas`VARCHAR(255) DEFAULT NULL,
+`puede_solicitar`VARCHAR(255) DEFAULT NULL,
+`compensacion_fuera`VARCHAR(255) DEFAULT NULL,
+`posibilidad_formacion`VARCHAR(255) DEFAULT NULL,
+`formacion_mujeres`VARCHAR(255) DEFAULT NULL,
+`existencia_plan`VARCHAR(255) DEFAULT NULL,
+`asisten_igualmente`VARCHAR(255) DEFAULT NULL,
+`criterios_seleccion`VARCHAR(255) DEFAULT NULL,
+`impartacion_fuera`VARCHAR(255) DEFAULT NULL,
+`ayudas_formacion`VARCHAR(255) DEFAULT NULL,
+`formacion_igualdad`VARCHAR(255) DEFAULT NULL,
+`coste_medio`VARCHAR(255) DEFAULT NULL,
+`formacion_reciclaje`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_formacion_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_cuestionario_formacion_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_formacion_empresa (id_ano_datos))ENGINE=InnoDB;
+    
+    -- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_conciliacion_corresponsabilidad
+--
+
+CREATE TABLE `cuestionario_conciliacion_corresponsabilidad`(
+`id_conciliacion_corresponsabilidad`INT AUTO_INCREMENT PRIMARY KEY,
+`ordenacion_tiempo`VARCHAR(255) DEFAULT NULL,
+`quienes_utilizan`VARCHAR(255) DEFAULT NULL,
+`reduccion_jornada`VARCHAR(255) DEFAULT NULL,
+`mecanismos_disponibles`VARCHAR(255) DEFAULT NULL,
+`cuantas_personas`VARCHAR(255) DEFAULT NULL,
+`canales_informacion`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_conciliacion_corresponsabilidad_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_cuestionario_conciliacion_corresponsabilidad_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_conciliacion_corresponsabilidad_empresa (id_ano_datos))ENGINE=InnoDB;
+
+    -- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_infrarrepresentacion_femenina
+--
+
+CREATE TABLE `cuestionario_infrarrepresentacion_femenina`(
+`id_infrarrepresentacion_femenina`INT AUTO_INCREMENT PRIMARY KEY,
+`barreras_internas`VARCHAR(255) DEFAULT NULL,
+`hay_mujeres`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_infrarrepresentacion_femenina_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_cuestionario_infrarrepresentacion_femenina_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_infrarrepresentacion_femenina_empresa (id_ano_datos))ENGINE=InnoDB;
+    
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_salud_laboral
+--
+
+CREATE TABLE `cuestionario_salud_laboral`(
+`id_salud_laboral`INT AUTO_INCREMENT PRIMARY KEY,
+`seguridad_salud`VARCHAR(255) DEFAULT NULL,
+`medidas_linea`VARCHAR(255) DEFAULT NULL,
+`incluido_perspectiva`VARCHAR(255) DEFAULT NULL,
+`permite_desconexion`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_salud_laboral_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_cuestionario_salud_laboral_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_salud_laboral_empresa (id_ano_datos))ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_prevencion_acoso_sexual
+--
+
+CREATE TABLE `cuestionario_prevencion_acoso_sexual`(
+`id_prevencion_acoso_sexual`INT AUTO_INCREMENT PRIMARY KEY,
+`conocen_acoso`VARCHAR(255) DEFAULT NULL,
+`protocolo_prevencion`VARCHAR(255) DEFAULT NULL,
+`medidas_sensibilizacion`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_prevencion_acoso_sexual_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_cuestionario_prevencion_acoso_sexual_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_prevencion_acoso_sexual_empresa (id_ano_datos))ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_violencia_genero
+--
+
+CREATE TABLE `cuestionario_violencia_genero`(
+`id_violencia_genero`INT AUTO_INCREMENT PRIMARY KEY,
+`conocimiento_contratada`VARCHAR(255) DEFAULT NULL,
+`prevision_progama`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_violencia_genero_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_cuestionario_violencia_genero_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_violencia_genero_empresa (id_ano_datos))ENGINE=InnoDB;
+    
+-- --------------------------------------------------------
+
+--
+-- Estructura para la tabla cuestionario_comunicacion_identidad_corporativa
+--
+
+CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
+`id_comunicacion_identidad_corporativa`INT AUTO_INCREMENT PRIMARY KEY,
+`canales_comunicacion`VARCHAR(255) DEFAULT NULL,
+`campanas_comunicacion`VARCHAR(255) DEFAULT NULL,
+`imagen_empresa`VARCHAR(255) DEFAULT NULL,
+`existencia_comunicacion`VARCHAR(255) DEFAULT NULL,
+`frecuencia`VARCHAR(255) DEFAULT NULL,
+`lenguaje_imagen`VARCHAR(255) DEFAULT NULL,
+`objetivos`VARCHAR(255) DEFAULT NULL,
+`filosofia`VARCHAR(255) DEFAULT NULL,
+`procesos_calidad`VARCHAR(255) DEFAULT NULL,
+`responsabilidad_social`VARCHAR(255) DEFAULT NULL,
+`id_ano_datos`INT  NOT NULL,
+`id_empresa` INT NOT NULL,
+  CONSTRAINT fk_cuestionario_comunicacion_identidad_corporativa_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
+  CONSTRAINT fk_cuestionario_comunicacion_identidad_corporativa_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
+    INDEX idx_cuestionario_comunicacion_identidad_corporativa_empresa (id_ano_datos))ENGINE=InnoDB;
+
+-- --------------------------------------------------------
+
 
 --
 -- Estructura para la tabla archivo_registro_retributivo
@@ -543,7 +828,7 @@ CREATE TABLE `area_adaptaciones_jornada`(
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES') NOT NULL,
+  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -553,12 +838,25 @@ CREATE TABLE `archivos`(
   `sha256` CHAR(64) NULL,
   `subido_en` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `id_cliente_medida` INT,
+  `id_empresa` INT,
   CONSTRAINT fk_archivo_cliente_medida FOREIGN KEY (id_cliente_medida) REFERENCES cliente_medida(id_cliente_medida) ON DELETE CASCADE,
+  CONSTRAINT fk_archivos_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   INDEX idx_archivos_cliente_medida (id_cliente_medida),
   INDEX idx_archivos_tipo (tipo),
   INDEX idx_archivos_cliente_medida_fecha (id_cliente_medida, subido_en)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS archivo_descarga_log (
+  id_descarga INT AUTO_INCREMENT PRIMARY KEY,
+  id_empresa INT NOT NULL,
+  id_usuario INT NOT NULL,
+  tipo_descarga VARCHAR(60) NOT NULL,
+  archivo VARCHAR(255) NULL,
+  descargado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_descarga_empresa (id_empresa),
+  INDEX idx_descarga_usuario (id_usuario),
+  INDEX idx_descarga_tipo (tipo_descarga)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- --------------------------------------------------------
 
 --
@@ -595,10 +893,7 @@ INSERT INTO usuario (
   (SELECT id FROM rol WHERE nombre='CLIENTE' LIMIT 1)
 );
 
-select * from usuario;
-select * from empresa;
-select * from rol;
-select * from usuario_empresa;
+
 
 -- 10 empresas de ejemplo
 -- Nota: id_usuario lo dejo en NULL para no romper la FK (fk_usuario_empresa).
@@ -1906,34 +2201,4 @@ AND NOT EXISTS (SELECT 1 FROM medida m WHERE m.id_plan = ap.id_plan AND m.descri
 -- ------------------------------
 -- Cheks
 
-SELECT 
-    ap.nombre AS 'Área del Plan',
-    m.descripcion AS 'Medida',
-    m.indicador AS 'Indicador/Evidencia'
-FROM medida m
-JOIN area_plan ap ON ap.id_plan = m.id_plan
-ORDER BY ap.nombre, m.id_medida;
 
--- VER TODAS LAS MEDIDAS SELECCIONADAS POR UNA EMPRESA
-SELECT 
-    e.razon_social AS empresa,
-    ap.nombre AS área_plan,
-    m.descripcion AS medida,
-    m.indicador AS indicador_evidencia,
-    cm.creado_en AS fecha_selección
-FROM cliente_medida cm
-JOIN areas_contratadas pc ON cm.id_areas_contratadas = pc.id_areas_contratadas
-JOIN empresa e ON pc.id_empresa = e.id_empresa
-JOIN medida m ON cm.id_medida = m.id_medida
-JOIN area_plan ap ON m.id_plan = ap.id_plan
-ORDER BY e.razon_social, ap.nombre, m.id_medida;
-
-select * from archivos;
-select * from empresa;
-select * from areas_contratadas;
-select * from area_plan;
-select * from cliente_medida;
-select * from contrato_empresa;
-select * from ano_datos;
-select * from datos_empleados;
-select count(*) from datos_empleados;
