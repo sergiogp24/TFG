@@ -327,13 +327,7 @@ $sinEmpresaAsignada = ($empresaAsignada === null);
 $idEmpresaAsignada = (int)($empresaAsignada['id_empresa'] ?? 0);
 $registroSubido = (!$sinEmpresaAsignada && empresa_tiene_registro_retributivo($idEmpresaAsignada));
 
-// BLOQUEO DE ACCESO A COMPLEMENTOS DESDE AQUÍ
-if ($idEmpresaAsignada > 0 && !$registroSubido) {
-    
-    // Opcional: puedes ocultar o deshabilitar aquí los enlaces/botones a complementos
-    // Por ejemplo, si tienes un botón o enlace a complemento_formularios.php:
-    echo '<style>.btn-complemento, .link-complemento { pointer-events: none; opacity: 0.5; }</style>';
-}
+
 $idEmpresaWordFinalSeleccionada = (int)($_GET['id_empresa_word_final'] ?? 0);
 $wordFinalPorEmpresa = [];
 
@@ -875,12 +869,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                     <input type="text" id="Asunto" name="asunto" class="form-control">
                                                 </div>
 
-                                                <div class="mb-3">
-                                                    <label for="Tipo" class="form-label">Tipo de archivo</label>
-                                                    <select id="Tipo" name="tipo" class="form-select" required>
-                                                        <option value="REGISTRO_RETRIBUTIVO">Registro Retributivo</option>
-                                                    </select>
-                                                </div>
+                                                <input type="hidden" name="tipo" value="REGISTRO_RETRIBUTIVO">
 
                                                 <div class="mb-3">
                                                     <label for="archivoRegistro" class="form-label">Archivo</label>
@@ -910,38 +899,14 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                 </a>
 
                                                 <div class="mt-4">
-                                                    <label class="form-label d-block">Datos Cuantitativos</label>
+                                                    <label class="form-label d-block">Datos Cuantitativos / Cuestionarios Cualitativos</label>
                                                     <?php if (!$registroSubido): ?>
                                                         <div class="alert alert-warning py-2 mb-0">
-                                                            Debes subir primero el Registro Retributivo para poder subir los datos sobre Bajas, Formacion, Excedencias y Permisos.
+                                                            Debes subir primero el Registro Retributivo para desbloquear los Datos Cuantitativos / Cuestionarios Cualitativos.
                                                         </div>
                                                     <?php else: ?>
                                                         <div class="d-flex flex-wrap gap-2">
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="bajas">Bajas</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="formacion">Formacion</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="excedencias">Excedencias</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="permisos">Permisos retributivos</button>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </div>
-
-                                                 <div class="mt-4">
-                                                    <label class="form-label d-block">Cuestionario Cualitativo</label>
-                                                    <?php if (!$registroSubido): ?>
-                                                        <div class="alert alert-warning py-2 mb-0">
-                                                            Debes subir primero el Registro Retributivo para poder subir los cuestionarios sobre Seleccion Peronal, Promocion Profesional, Formación, Conciliación, Infrarepresentación femenina, Salud Laboral, Acoso Sexual y Violencia de Género.
-                                                        </div>
-                                                    <?php else: ?>
-                                                        <div class="d-flex flex-wrap gap-2">
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="seleccion_personal">Seleccion Personal</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="promocion_profesional">Promoción Profesional</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="cuestionario_formacion">Formación</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="conciliacion">Conciliación y Corresponsabilidad</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="infrarrepresentacion">Infrarepresentación femenina</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="salud_laboral">Salud Laboral</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="acoso_sexual">Prevención del Acoso Sexual y por Razón de sexo</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="violencia_genero">Violencia de Género</button>
-                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="comunicacion">Comunicación e identidad corporativa</button>
+                                                            <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="bajas">Ver Datos Cuantitativos / Cuestionarios Cualitativos</button>
                                                         </div>
                                                     <?php endif; ?>
                                                 </div>

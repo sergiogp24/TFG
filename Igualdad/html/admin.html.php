@@ -390,26 +390,31 @@
 
 
                                 <div>
-                                    <label class="form-label" id="addUserEmpresaLabel">Empresa asignada</label>
-                                    <div>
-                                        <?php foreach ($empresas as $e): ?>
-                                            <?php
-                                            $isChecked = in_array((int)$e['id_empresa'], array_map('intval', $addOld['empresas'] ?? []), true);
-                                            ?>
-                                            <div class="form-check">
-                                                <input
-                                                    class="form-check-input"
-                                                    type="checkbox"
-                                                    id="empresa_<?= (int)$e['id_empresa'] ?>"
-                                                    name="empresas[]"
-                                                    value="<?= (int)$e['id_empresa'] ?>"
-                                                    <?= $isChecked ? 'checked' : '' ?>>
-                                                <label class="form-check-label" for="empresa_<?= (int)$e['id_empresa'] ?>">
-                                                    <?= h($e['razon_social']) ?>
-                                                </label>
-                                            </div>
-                                        <?php endforeach; ?>
+                                    <label class="form-label" id="addUserEmpresaLabel">Empresas asignadas</label>
+                                    <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto; background-color: #fff;">
+                                        <?php if (empty($empresas)): ?>
+                                            <div class="text-muted small">No hay empresas disponibles.</div>
+                                        <?php else: ?>
+                                            <?php foreach ($empresas as $e): ?>
+                                                <?php
+                                                $isChecked = in_array((int)$e['id_empresa'], array_map('intval', $addOld['empresas'] ?? []), true);
+                                                ?>
+                                                <div class="form-check mb-1">
+                                                    <input
+                                                        class="form-check-input"
+                                                        type="checkbox"
+                                                        id="empresa_add_<?= (int)$e['id_empresa'] ?>"
+                                                        name="empresas[]"
+                                                        value="<?= (int)$e['id_empresa'] ?>"
+                                                        <?= $isChecked ? 'checked' : '' ?>>
+                                                    <label class="form-check-label" for="empresa_add_<?= (int)$e['id_empresa'] ?>">
+                                                        <?= h($e['razon_social']) ?>
+                                                    </label>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
                                     </div>
+                                    <div class="form-text text-muted small mt-1">Selecciona una o varias empresas.</div>
                                 </div>
 
                                 <div class="d-flex gap-2">
@@ -841,24 +846,38 @@
 
         (function() {
             const roleSelect = document.getElementById('addUserRol');
-            const companySelect = document.getElementById('addUserEmpresas');
             const companyLabel = document.getElementById('addUserEmpresaLabel');
+            const companyCheckboxes = document.querySelectorAll('input[name="empresas[]"]');
 
-            if (!roleSelect || !companySelect || !companyLabel) {
+            if (!roleSelect || !companyLabel) {
                 return;
             }
-
-            const companyPlaceholder = companySelect.querySelector('option[value=""]');
 
             function updateCompanyRequirementByRole() {
                 const selectedOption = roleSelect.options[roleSelect.selectedIndex] || null;
                 const selectedRole = String(selectedOption?.dataset?.roleNormalized || '').toUpperCase();
                 const isCliente = selectedRole === 'CLIENTE';
 
-                companySelect.required = isCliente;
-                companyLabel.textContent = isCliente ? 'Empresa asignada *' : 'Empresa asignada';
-                if (companyPlaceholder) {
-                    companyPlaceholder.textContent = isCliente ? '-- seleccionar --' : '-- opcional --';
+                companyLabel.textContent = isCliente ? 'Empresas asignadas *' : 'Empresas asignadas';
+
+                if (companyCheckboxes.length > 0) {
+                    if (isCliente) {
+                        const updateRequiredState = () => {
+                            const isAnyChecked = Array.from(companyCheckboxes).some(cb => cb.checked);
+                            companyCheckboxes.forEach(cb => {
+                                cb.required = !isAnyChecked;
+                            });
+                        };
+                        
+                        companyCheckboxes.forEach(cb => {
+                            cb.addEventListener('change', updateRequiredState);
+                        });
+                        updateRequiredState();
+                    } else {
+                        companyCheckboxes.forEach(cb => {
+                            cb.required = false;
+                        });
+                    }
                 }
             }
 
