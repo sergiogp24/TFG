@@ -3,11 +3,11 @@ declare(strict_types=1);
 
 
 return [
-  'host' => 'smtp.gmail.com',
-  'port' => 587,
-  'secure' => 'tls',
-  'username' => 'sergio.gomezpila24@campusfp.es',
-  'password' => 'lawgn rhan veeq xfj',
-  'from_email' => 'sergio.gomezpila24@campusfp.es',
-  'from_name' => 'Sergio Gómez',
+  'host' => 'smtp.ionos.es',
+  'port' => 465,
+  'secure' => 'ssl',
+  'username' => 'correo',
+  'password' => 'contraseña de correo',
+  'from_email' => 'correo',
+  'from_name' => 'nombre',
 ];
