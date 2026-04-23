@@ -649,7 +649,11 @@
                         option.value = String(c.id_usuario);
                         const nombre = (c.nombre_usuario || '').trim();
                         const apellidos = (c.apellidos || '').trim();
-                        option.textContent = (nombre + ' ' + apellidos).trim();
+                        const razonSocial = (c.razon_social || '').trim();
+                        const nombreCompleto = (nombre + ' ' + apellidos).trim();
+                        option.textContent = razonSocial !== ''
+                            ? ((nombreCompleto !== '' ? nombreCompleto : 'Cliente') + ' - ' + razonSocial)
+                            : (nombreCompleto !== '' ? nombreCompleto : 'Cliente');
                         selectCliente.appendChild(option);
                     });
 

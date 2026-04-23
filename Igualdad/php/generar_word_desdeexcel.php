@@ -248,7 +248,6 @@ function obtenerValoresCuestionariosDesdeBD(mysqli $db, string $razonSocial, ?st
         ? $idEmpresaForzado
         : obtenerIdEmpresaPorRazonSocial($db, $razonSocial);
     if ($idEmpresa === null) {
-        error_log('[obtenerValoresCuestionariosDesdeBD] No se pudo resolver id_empresa para razon social: ' . $razonSocial);
         return [];
     }
 
@@ -264,7 +263,6 @@ function obtenerValoresCuestionariosDesdeBD(mysqli $db, string $razonSocial, ?st
 
         $columnasDisponibles = obtenerColumnasTabla($db, $tabla);
         if ($columnasDisponibles === []) {
-            error_log("[obtenerValoresCuestionariosDesdeBD] Tabla {$tabla} sin columnas disponibles.");
             continue;
         }
 
@@ -317,11 +315,8 @@ function obtenerValoresCuestionariosDesdeBD(mysqli $db, string $razonSocial, ?st
                 $valores[$campo] = $fila[$campo];
             }
         }
-
-        error_log("[obtenerValoresCuestionariosDesdeBD] tabla={$tabla} empresa={$idEmpresa} anio=" . ($anio ?? 'null') . " campos=" . count($fila));
     }
 
-    error_log("[obtenerValoresCuestionariosDesdeBD] empresa={$idEmpresa} total_campos=" . count($valores));
     return $valores;
 }
 

@@ -388,17 +388,28 @@
                                     </select>
                                 </div>
 
+
                                 <div>
                                     <label class="form-label" id="addUserEmpresaLabel">Empresa asignada</label>
-                                    <select class="form-select" id="addUserEmpresas" name="empresas[]">
-                                        <option value="">-- opcional --</option>
+                                    <div>
                                         <?php foreach ($empresas as $e): ?>
-                                            <?php $isSelected = in_array((int)$e['id_empresa'], array_map('intval', $addOld['empresas'] ?? []), true); ?>
-                                            <option value="<?= (int)$e['id_empresa'] ?>" <?= $isSelected ? 'selected' : '' ?>>
-                                                <?= h($e['razon_social']) ?>
-                                            </option>
+                                            <?php
+                                            $isChecked = in_array((int)$e['id_empresa'], array_map('intval', $addOld['empresas'] ?? []), true);
+                                            ?>
+                                            <div class="form-check">
+                                                <input
+                                                    class="form-check-input"
+                                                    type="checkbox"
+                                                    id="empresa_<?= (int)$e['id_empresa'] ?>"
+                                                    name="empresas[]"
+                                                    value="<?= (int)$e['id_empresa'] ?>"
+                                                    <?= $isChecked ? 'checked' : '' ?>>
+                                                <label class="form-check-label" for="empresa_<?= (int)$e['id_empresa'] ?>">
+                                                    <?= h($e['razon_social']) ?>
+                                                </label>
+                                            </div>
                                         <?php endforeach; ?>
-                                    </select>
+                                    </div>
                                 </div>
 
                                 <div class="d-flex gap-2">
@@ -642,9 +653,13 @@
                                                         $nombreClienteReunion = trim((string)($clienteReunion['nombre_usuario'] ?? ''));
                                                         $apellidosClienteReunion = trim((string)($clienteReunion['apellidos'] ?? ''));
                                                         $emailClienteReunion = trim((string)($clienteReunion['email'] ?? ''));
+                                                        $empresaClienteReunion = trim((string)($clienteReunion['razon_social'] ?? ''));
                                                         $labelClienteReunion = trim($nombreClienteReunion . ' ' . $apellidosClienteReunion);
                                                         if ($labelClienteReunion === '') {
                                                             $labelClienteReunion = 'Cliente #' . $idClienteReunion;
+                                                        }
+                                                        if ($empresaClienteReunion !== '') {
+                                                            $labelClienteReunion .= ' - ' . $empresaClienteReunion;
                                                         }
                                                         if ($emailClienteReunion !== '') {
                                                             $labelClienteReunion .= ' (' . $emailClienteReunion . ')';
@@ -735,37 +750,37 @@
                             </div>
                     </div>
 
-                            <div class="card border-0 shadow-sm mt-3">
-                                <div class="card-body">
-                                    <h6 class="mb-3">🌐 Todas las reuniones del sistema</h6>
-                                    <?php if (empty($adminTodasReuniones)): ?>
-                                        <div class="alert alert-light border mb-0">No hay reuniones registradas.</div>
-                                    <?php else: ?>
-                                        <div class="vstack gap-3">
-                                            <?php foreach ($adminTodasReuniones as $reunionGlobal): ?>
-                                                <?php
-                                                $objetivoGlobal = trim((string)($reunionGlobal['objetivo'] ?? ''));
-                                                $fechaGlobalRaw = (string)($reunionGlobal['fecha_reunion'] ?? '');
-                                                $horaGlobalRaw = (string)($reunionGlobal['hora_reunion'] ?? '');
-                                                $horaGlobal = substr($horaGlobalRaw, 0, 5);
-                                                $participantesGlobal = trim((string)($reunionGlobal['participantes'] ?? ''));
-                                                $resumenGlobal = trim($fechaGlobalRaw . ' · ' . $horaGlobal, ' ·');
-                                                ?>
-                                                <div class="cita-item d-flex justify-content-between align-items-start flex-wrap gap-2">
-                                                    <div class="me-auto">
-                                                        <div class="cita-item-title">📄 <?= h($objetivoGlobal !== '' ? $objetivoGlobal : 'Reunión') ?></div>
-                                                        <div class="cita-item-subtitle">Participantes: <?= h($participantesGlobal !== '' ? $participantesGlobal : 'Sin participantes') ?></div>
-                                                    </div>
-                                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                        <span class="cita-pill">Reunión</span>
-                                                        <span class="cita-pill"><?= h($resumenGlobal !== '' ? $resumenGlobal : 'Sin fecha') ?></span>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
+                    <div class="card border-0 shadow-sm mt-3">
+                        <div class="card-body">
+                            <h6 class="mb-3">🌐 Todas las reuniones del sistema</h6>
+                            <?php if (empty($adminTodasReuniones)): ?>
+                                <div class="alert alert-light border mb-0">No hay reuniones registradas.</div>
+                            <?php else: ?>
+                                <div class="vstack gap-3">
+                                    <?php foreach ($adminTodasReuniones as $reunionGlobal): ?>
+                                        <?php
+                                        $objetivoGlobal = trim((string)($reunionGlobal['objetivo'] ?? ''));
+                                        $fechaGlobalRaw = (string)($reunionGlobal['fecha_reunion'] ?? '');
+                                        $horaGlobalRaw = (string)($reunionGlobal['hora_reunion'] ?? '');
+                                        $horaGlobal = substr($horaGlobalRaw, 0, 5);
+                                        $participantesGlobal = trim((string)($reunionGlobal['participantes'] ?? ''));
+                                        $resumenGlobal = trim($fechaGlobalRaw . ' · ' . $horaGlobal, ' ·');
+                                        ?>
+                                        <div class="cita-item d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                            <div class="me-auto">
+                                                <div class="cita-item-title">📄 <?= h($objetivoGlobal !== '' ? $objetivoGlobal : 'Reunión') ?></div>
+                                                <div class="cita-item-subtitle">Participantes: <?= h($participantesGlobal !== '' ? $participantesGlobal : 'Sin participantes') ?></div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <span class="cita-pill">Reunión</span>
+                                                <span class="cita-pill"><?= h($resumenGlobal !== '' ? $resumenGlobal : 'Sin fecha') ?></span>
+                                            </div>
                                         </div>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </div>
-                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
 
                     <div class="modal fade" id="adminReunionDetalleModal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">

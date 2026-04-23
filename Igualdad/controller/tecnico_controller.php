@@ -28,6 +28,19 @@ function log_internal_error_tecnico(string $context, Throwable $e): void
   ));
 }
 
+function ensure_reuniones_empresa_column(mysqli $db): void
+{
+  $check = $db->query("\n    SELECT 1\n    FROM information_schema.COLUMNS\n    WHERE TABLE_SCHEMA = DATABASE()\n      AND TABLE_NAME = 'reuniones'\n      AND COLUMN_NAME = 'id_empresa'\n    LIMIT 1\n  ");
+  $exists = ($check instanceof mysqli_result) && ($check->num_rows > 0);
+  if ($check instanceof mysqli_result) {
+    $check->close();
+  }
+
+  if (!$exists) {
+    $db->query("ALTER TABLE reuniones ADD COLUMN id_empresa INT NULL");
+  }
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   http_response_code(405);
   exit('Metodo no permitido');
@@ -234,12 +247,13 @@ if ($accion === 'crear_reunion') {
   }
 
   $db = db();
+  ensure_reuniones_empresa_column($db);
   try {
     $db->begin_transaction();
 
     $objetivoDb = ($objetivo === '') ? null : $objetivo;
-    $stmt = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion) VALUES (?, ?, ?)");
-    $stmt->bind_param('sss', $objetivoDb, $hora, $fecha);
+    $stmt = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion, id_empresa) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idEmpresa);
     $stmt->execute();
     $idReunion = (int)$stmt->insert_id;
     $stmt->close();

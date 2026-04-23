@@ -362,17 +362,14 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                             </a>
                         </div>
                         <div class="mt-4">
-                            <label class="form-label d-block">Complemento formularios:</label>
+                            <label class="form-label d-block">Datos Cuantitativos / Cuestionarios Cualitativos:</label>
                             <?php if (!$registroSubido): ?>
                                 <div class="alert alert-warning py-2">
-                                    Debes subir primero el Registro Retributivo para desbloquear Bajas, Formacion, Excedencias y Permisos.
+                                    Debes subir primero el Registro Retributivo para desbloquear los Datos Cuantitativos / Cuestionarios Cualitativos.
                                 </div>
                             <?php else: ?>
                                 <div class="d-flex flex-wrap gap-2">
-                                    <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="bajas">Bajas</button>
-                                    <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="formacion">Formacion</button>
-                                    <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="excedencias">Excedencias</button>
-                                    <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="permisos">Permisos retributivos</button>
+                                    <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="bajas">Ver Datos Cuantitativos / Cuestionarios Cualitativos</button>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -386,7 +383,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
         <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="modalComplementoFormulariosLabel">Complemento formularios</h5>
+                    <h5 class="modal-title" id="modalComplementoFormulariosLabel">Datos Cuantitativos / Cuestionarios Cualitativos</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body p-0" style="min-height: 70vh;">

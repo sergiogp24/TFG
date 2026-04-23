@@ -375,7 +375,9 @@ if ($fromPanel === 'tecnico') {
                                                 <?php endif; ?>
                                             <?php endif; ?>
                                             <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/php/archivos_subidos.php?id_empresa=' . $detalleEmpresaId)) ?>">📁 Archivos subidos</a>
+                                            <?php if (!$isAdmin): ?>
                                             <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/html/index_staff.php?id_empresa=' . $detalleEmpresaId)) ?>">📊 Subir registro retributivo</a>
+                                            <?php endif; ?>
                                             <a class="btn btn-secondary btn-sm ge-company-action-btn" href="../model/empresa.php?view=edit_empresas&id_empresa=<?= $detalleEmpresaId ?><?= $fromParam ?>">✏️ Editar empresa</a>
                                             <a class="btn btn-secondary btn-sm ge-company-action-btn" href="../model/empresa.php?view=ver_medidas&id_empresa=<?= $detalleEmpresaId ?><?= $fromParam ?>">📌 Ver áreas y medidas</a>
                                         </div>

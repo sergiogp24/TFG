@@ -9,6 +9,19 @@ require_once __DIR__ . '/../php/helpers.php';
 require_once __DIR__ . '/../php/mails.php';
 require __DIR__ . '/../config/config.php';
 
+function ensure_reuniones_empresa_column(mysqli $db): void
+{
+    $check = $db->query("\n        SELECT 1\n        FROM information_schema.COLUMNS\n        WHERE TABLE_SCHEMA = DATABASE()\n          AND TABLE_NAME = 'reuniones'\n          AND COLUMN_NAME = 'id_empresa'\n        LIMIT 1\n    ");
+    $exists = ($check instanceof mysqli_result) && ($check->num_rows > 0);
+    if ($check instanceof mysqli_result) {
+        $check->close();
+    }
+
+    if (!$exists) {
+        $db->query('ALTER TABLE reuniones ADD COLUMN id_empresa INT NULL');
+    }
+}
+
 function formatear_fecha_resumen(string $fecha): string
 {
     $timestamp = strtotime($fecha);
@@ -116,8 +129,10 @@ $empresaAsignada = null;
 $clientePerfil = null;
 $clienteReuniones = [];
 $proximaReunion = null;
+$clienteTecnicosEmpresa = [];
 
 if ($usuarioId > 0) {
+    ensure_reuniones_empresa_column(db());
     $stmtEmpresas = db()->prepare(
         'SELECT t.id_empresa, t.razon_social
          FROM (
@@ -165,8 +180,9 @@ if ($usuarioId > 0) {
         correo_enviar_recordatorio_rr_reuniones_vencidas(db());
         db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
         $stmtReuniones = db()->prepare(
-            'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion
+            'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion, r.id_empresa, er.razon_social AS empresa_reunion
              FROM reuniones r
+             LEFT JOIN empresa er ON er.id_empresa = r.id_empresa
              INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
              WHERE ur.id_usuario = ?
              ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC'
@@ -180,6 +196,89 @@ if ($usuarioId > 0) {
             }
             $stmtReuniones->close();
         }
+
+        $tecnicosEmpresaMap = [];
+
+        $stmtTecnicosEmpresa = db()->prepare(
+            'SELECT DISTINCT ue.id_empresa, e.razon_social, u.id_usuario, u.nombre_usuario, u.apellidos
+             FROM usuario_empresa ue
+             INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
+             INNER JOIN usuario u ON u.id_usuario = ue.id_usuario
+             INNER JOIN rol r ON r.id = u.rol_id
+             WHERE UPPER(TRIM(r.nombre)) LIKE "TECNICO%"
+               AND ue.id_empresa IN (
+                   SELECT t.id_empresa
+                   FROM (
+                       SELECT ue2.id_empresa
+                       FROM usuario_empresa ue2
+                       WHERE ue2.id_usuario = ?
+
+                       UNION
+
+                       SELECT e2.id_empresa
+                       FROM empresa e2
+                       WHERE e2.id_usuario = ?
+                   ) t
+               )
+             ORDER BY e.razon_social ASC, u.nombre_usuario ASC, u.apellidos ASC'
+        );
+        if ($stmtTecnicosEmpresa) {
+            $stmtTecnicosEmpresa->bind_param('ii', $usuarioId, $usuarioId);
+            $stmtTecnicosEmpresa->execute();
+            $resTecnicosEmpresa = $stmtTecnicosEmpresa->get_result();
+            while ($rowTecnicoEmpresa = $resTecnicosEmpresa->fetch_assoc()) {
+                $key = (int)($rowTecnicoEmpresa['id_empresa'] ?? 0) . ':' . (int)($rowTecnicoEmpresa['id_usuario'] ?? 0);
+                $tecnicosEmpresaMap[$key] = [
+                    'id_empresa' => (int)($rowTecnicoEmpresa['id_empresa'] ?? 0),
+                    'razon_social' => trim((string)($rowTecnicoEmpresa['razon_social'] ?? '')),
+                    'id_usuario' => (int)($rowTecnicoEmpresa['id_usuario'] ?? 0),
+                    'nombre_usuario' => trim((string)($rowTecnicoEmpresa['nombre_usuario'] ?? '')),
+                    'apellidos' => trim((string)($rowTecnicoEmpresa['apellidos'] ?? '')),
+                ];
+            }
+            $stmtTecnicosEmpresa->close();
+        }
+
+        $stmtTecnicosPropietarios = db()->prepare(
+            'SELECT DISTINCT e.id_empresa, e.razon_social, u.id_usuario, u.nombre_usuario, u.apellidos
+             FROM empresa e
+             INNER JOIN usuario u ON u.id_usuario = e.id_usuario
+             INNER JOIN rol r ON r.id = u.rol_id
+             WHERE UPPER(TRIM(r.nombre)) LIKE "TECNICO%"
+               AND e.id_empresa IN (
+                   SELECT t.id_empresa
+                   FROM (
+                       SELECT ue2.id_empresa
+                       FROM usuario_empresa ue2
+                       WHERE ue2.id_usuario = ?
+
+                       UNION
+
+                       SELECT e2.id_empresa
+                       FROM empresa e2
+                       WHERE e2.id_usuario = ?
+                   ) t
+               )
+             ORDER BY e.razon_social ASC, u.nombre_usuario ASC, u.apellidos ASC'
+        );
+        if ($stmtTecnicosPropietarios) {
+            $stmtTecnicosPropietarios->bind_param('ii', $usuarioId, $usuarioId);
+            $stmtTecnicosPropietarios->execute();
+            $resTecnicosPropietarios = $stmtTecnicosPropietarios->get_result();
+            while ($rowTecnicoPropietario = $resTecnicosPropietarios->fetch_assoc()) {
+                $key = (int)($rowTecnicoPropietario['id_empresa'] ?? 0) . ':' . (int)($rowTecnicoPropietario['id_usuario'] ?? 0);
+                $tecnicosEmpresaMap[$key] = [
+                    'id_empresa' => (int)($rowTecnicoPropietario['id_empresa'] ?? 0),
+                    'razon_social' => trim((string)($rowTecnicoPropietario['razon_social'] ?? '')),
+                    'id_usuario' => (int)($rowTecnicoPropietario['id_usuario'] ?? 0),
+                    'nombre_usuario' => trim((string)($rowTecnicoPropietario['nombre_usuario'] ?? '')),
+                    'apellidos' => trim((string)($rowTecnicoPropietario['apellidos'] ?? '')),
+                ];
+            }
+            $stmtTecnicosPropietarios->close();
+        }
+
+        $clienteTecnicosEmpresa = array_values($tecnicosEmpresaMap);
     }
 
     $stmtProximaReunion = db()->prepare(
@@ -462,15 +561,32 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                     <form method="post" action="<?= h(app_path('/controller/cliente_controller.php')) ?>" class="row g-2 align-items-end">
                                       <?= csrf_input() ?>
                                         <input type="hidden" name="accion" value="crear_reunion">
-                                        <div class="col-12 col-md-4">
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label">🏢 Empresa</label>
+                                            <select class="form-select" id="clienteSelectEmpresaReunion" name="id_empresa_reunion" required>
+                                                <option value="0">Selecciona una empresa</option>
+                                                <?php foreach ($empresasDisponibles as $empresaReunion): ?>
+                                                    <option value="<?= (int)($empresaReunion['id_empresa'] ?? 0) ?>">
+                                                        <?= h((string)($empresaReunion['razon_social'] ?? '')) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label">👤 Técnico</label>
+                                            <select class="form-select" id="clienteSelectTecnicoReunion" name="id_tecnico_reunion" disabled>
+                                                <option value="0">Sin asignar a técnico</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-2">
                                             <label class="form-label">📅 Fecha de la Reunión</label>
                                             <input class="form-control" type="date" name="fecha_reunion" required>
                                         </div>
-                                        <div class="col-12 col-md-3">
+                                        <div class="col-12 col-md-2">
                                             <label class="form-label">🕐 Hora</label>
                                             <input class="form-control" type="time" name="hora_reunion" required>
                                         </div>
-                                        <div class="col-12 col-md-5">
+                                        <div class="col-12 col-md-2">
                                             <label class="form-label">📝 Asunto</label>
                                             <input class="form-control" type="text" name="objetivo" maxlength="1000" placeholder="Asunto de la reunión">
                                         </div>
@@ -951,6 +1067,53 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                 });
 
                 calendar.render();
+            })();
+        </script>
+        <script>
+            (function() {
+                const selectEmpresa = document.getElementById('clienteSelectEmpresaReunion');
+                const selectTecnico = document.getElementById('clienteSelectTecnicoReunion');
+                if (!selectEmpresa || !selectTecnico) {
+                    return;
+                }
+
+                const tecnicos = <?= json_encode($clienteTecnicosEmpresa, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+                function renderTecnicos(idEmpresa) {
+                    selectTecnico.innerHTML = '';
+
+                    const optionDefault = document.createElement('option');
+                    optionDefault.value = '0';
+                    optionDefault.textContent = 'Sin asignar a técnico';
+                    selectTecnico.appendChild(optionDefault);
+
+                    if (!idEmpresa || idEmpresa === '0') {
+                        selectTecnico.disabled = true;
+                        return;
+                    }
+
+                    const filtrados = tecnicos.filter((t) => String(t.id_empresa) === String(idEmpresa));
+                    filtrados.forEach((t) => {
+                        const option = document.createElement('option');
+                        option.value = String(t.id_usuario || 0);
+                        const nombre = String(t.nombre_usuario || '').trim();
+                        const apellidos = String(t.apellidos || '').trim();
+                        const empresa = String(t.razon_social || '').trim();
+                        const nombreCompleto = (nombre + ' ' + apellidos).trim();
+                        option.textContent = empresa !== ''
+                            ? ((nombreCompleto !== '' ? nombreCompleto : 'Técnico') + ' - ' + empresa)
+                            : (nombreCompleto !== '' ? nombreCompleto : 'Técnico');
+                        selectTecnico.appendChild(option);
+                    });
+
+                    selectTecnico.disabled = false;
+                }
+
+                selectEmpresa.addEventListener('change', function() {
+                    renderTecnicos(this.value);
+                });
+
+                renderTecnicos(selectEmpresa.value);
             })();
         </script>
     <?php endif; ?>

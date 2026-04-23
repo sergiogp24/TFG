@@ -591,14 +591,23 @@ if ($idEmpresaSeleccionada > 0) {
                         </div>
                     <?php endif; ?>
 
-                    <div class="d-flex flex-wrap gap-2 mb-4">
-                        <a class="btn <?= $tab === 'bajas' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=bajas' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Bajas</a>
-                        <a class="btn <?= $tab === 'formacion' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=formacion' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Formacion</a>
-                        <a class="btn <?= $tab === 'excedencias' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=excedencias' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Excedencias</a>
-                        <a class="btn <?= $tab === 'permisos' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=permisos' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Permisos retributivos</a>
-                        <?php foreach ($cuestionarioTabs as $tabCuestionario => $configCuestionario): ?>
-                            <a class="btn <?= $tab === $tabCuestionario ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=' . urlencode($tabCuestionario) . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>"><?= h((string)($configCuestionario['label'] ?? $tabCuestionario)) ?></a>
-                        <?php endforeach; ?>
+                    <div class="mb-2">
+                        <h6 class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Datos Cuantitativos</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a class="btn <?= $tab === 'bajas' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=bajas' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Bajas</a>
+                            <a class="btn <?= $tab === 'formacion' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=formacion' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Formacion</a>
+                            <a class="btn <?= $tab === 'excedencias' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=excedencias' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Excedencias</a>
+                            <a class="btn <?= $tab === 'permisos' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=permisos' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Permisos retributivos</a>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 mt-3">
+                        <h6 class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Cuestionarios Cualitativos</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            <?php foreach ($cuestionarioTabs as $tabCuestionario => $configCuestionario): ?>
+                                <a class="btn <?= $tab === $tabCuestionario ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=' . urlencode($tabCuestionario) . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>"><?= h((string)($configCuestionario['label'] ?? $tabCuestionario)) ?></a>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
 
                     <?php if ($complementosBloqueados): ?>

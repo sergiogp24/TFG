@@ -256,8 +256,26 @@ if ($accion === 'crear') {
   try {
     $db->begin_transaction();
 
+    // Construir el objetivo con la lista de empresas asignadas
+    $empresasObjetivo = [];
+    if (!empty($empresaIds)) {
+      $stmtEmpresas = $db->prepare("SELECT razon_social FROM empresa WHERE id_empresa = ?");
+      foreach ($empresaIds as $idEmpresa) {
+        $stmtEmpresas->bind_param('i', $idEmpresa);
+        $stmtEmpresas->execute();
+        $res = $stmtEmpresas->get_result();
+        if ($row = $res->fetch_assoc()) {
+          $empresasObjetivo[] = trim((string)($row['razon_social'] ?? ''));
+        }
+      }
+      $stmtEmpresas->close();
+    }
+    $objetivoReunionFinal = 'Subir R.R';
+    if (!empty($empresasObjetivo)) {
+      $objetivoReunionFinal .= ' - ' . implode(', ', $empresasObjetivo);
+    }
     $stmtReunion = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion) VALUES (?, ?, ?)");
-    $stmtReunion->bind_param('sss', $objetivoReunion, $horaReunion, $fechaReunion);
+    $stmtReunion->bind_param('sss', $objetivoReunionFinal, $horaReunion, $fechaReunion);
     $stmtReunion->execute();
     $idReunion = (int)$stmtReunion->insert_id;
     $stmtReunion->close();
@@ -537,7 +555,7 @@ if ($accion === 'editar_reunion') {
   try {
     $objetivoDb = ($objetivo === '') ? null : $objetivo;
     $stmt = $db->prepare("UPDATE reuniones SET objetivo = ?, hora_reunion = ?, fecha_reunion = ? WHERE id_reunion = ?");
-    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idReunion);
+    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idEmpresa ,$idReunion);
     $stmt->execute();
     $stmt->close();
 

@@ -38,6 +38,12 @@ if ($token === '') {
                 $errorMsg = 'El enlace ha expirado. Solicita un nuevo enlace para establecer tu contraseña.';
                 $emailToken = (string)($tokenData['email'] ?? '');
 
+                try {
+                    delete_expired_password_reset_tokens();
+                } catch (Throwable $cleanupError) {
+                    error_log('Error limpiando tokens expirados: ' . $cleanupError->getMessage());
+                }
+
                 if ($emailToken !== '') {
                     try {
                         correo_enviar_recordatorio_rr_pendiente_por_token_expirado(db(), $emailToken);

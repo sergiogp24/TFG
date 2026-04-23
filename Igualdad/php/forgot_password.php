@@ -31,6 +31,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
             if ($user) {
                 try {
+                delete_expired_password_reset_tokens();
+
                     $email = (string)$user['email'];
                     $username = (string)$user['nombre_usuario'];
                     $token = bin2hex(random_bytes(32));

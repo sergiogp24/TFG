@@ -29,6 +29,19 @@ function log_internal_error_cliente(string $context, Throwable $e): void
   ));
 }
 
+function ensure_reuniones_empresa_column(mysqli $db): void
+{
+  $check = $db->query("\n    SELECT 1\n    FROM information_schema.COLUMNS\n    WHERE TABLE_SCHEMA = DATABASE()\n      AND TABLE_NAME = 'reuniones'\n      AND COLUMN_NAME = 'id_empresa'\n    LIMIT 1\n  ");
+  $exists = ($check instanceof mysqli_result) && ($check->num_rows > 0);
+  if ($check instanceof mysqli_result) {
+    $check->close();
+  }
+
+  if (!$exists) {
+    $db->query("ALTER TABLE reuniones ADD COLUMN id_empresa INT NULL");
+  }
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   http_response_code(405);
   exit('Metodo no permitido');
@@ -107,6 +120,8 @@ if ($accion === 'editar_perfil') {
 
 if ($accion === 'crear_reunion') {
   $clienteId = (int)($_SESSION['user']['id_usuario'] ?? 0);
+  $idEmpresaReunion = (int)($_POST['id_empresa_reunion'] ?? 0);
+  $idTecnicoReunion = (int)($_POST['id_tecnico_reunion'] ?? 0);
   $objetivo = trim((string)($_POST['objetivo'] ?? ''));
   $hora = trim((string)($_POST['hora_reunion'] ?? ''));
   $fecha = trim((string)($_POST['fecha_reunion'] ?? ''));
@@ -116,6 +131,9 @@ if ($accion === 'crear_reunion') {
   }
   if ($fecha === '') {
     redirect_cliente('reuniones', 'La fecha de la reunion es obligatoria');
+  }
+  if ($idEmpresaReunion <= 0) {
+    redirect_cliente('reuniones', 'Debes seleccionar una empresa');
   }
   if (!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $hora)) {
     redirect_cliente('reuniones', 'La hora de la reunion es invalida');
@@ -127,12 +145,78 @@ if ($accion === 'crear_reunion') {
   }
 
   $db = db();
+  ensure_reuniones_empresa_column($db);
+
+  $stmtEmpresaValida = $db->prepare('
+    SELECT 1
+    FROM (
+      SELECT ue.id_empresa
+      FROM usuario_empresa ue
+      WHERE ue.id_usuario = ?
+
+      UNION
+
+      SELECT e.id_empresa
+      FROM empresa e
+      WHERE e.id_usuario = ?
+    ) t
+    WHERE t.id_empresa = ?
+    LIMIT 1
+  ');
+  if (!$stmtEmpresaValida) {
+    redirect_cliente('reuniones', 'No se pudo validar la empresa seleccionada');
+  }
+  $stmtEmpresaValida->bind_param('iii', $clienteId, $clienteId, $idEmpresaReunion);
+  $stmtEmpresaValida->execute();
+  $empresaValida = (bool)$stmtEmpresaValida->get_result()->fetch_assoc();
+  $stmtEmpresaValida->close();
+
+  if (!$empresaValida) {
+    redirect_cliente('reuniones', 'La empresa seleccionada no es valida para tu usuario');
+  }
+
+  if ($idTecnicoReunion > 0) {
+    $stmtTecnicoValido = $db->prepare('
+      SELECT 1
+      FROM usuario u
+      INNER JOIN rol r ON r.id = u.rol_id
+      WHERE u.id_usuario = ?
+        AND UPPER(TRIM(r.nombre)) LIKE "TECNICO%"
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM usuario_empresa ue
+            WHERE ue.id_usuario = u.id_usuario
+              AND ue.id_empresa = ?
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM empresa e
+            WHERE e.id_empresa = ?
+              AND e.id_usuario = u.id_usuario
+          )
+        )
+      LIMIT 1
+    ');
+    if (!$stmtTecnicoValido) {
+      redirect_cliente('reuniones', 'No se pudo validar el tecnico seleccionado');
+    }
+    $stmtTecnicoValido->bind_param('iii', $idTecnicoReunion, $idEmpresaReunion, $idEmpresaReunion);
+    $stmtTecnicoValido->execute();
+    $tecnicoValido = (bool)$stmtTecnicoValido->get_result()->fetch_assoc();
+    $stmtTecnicoValido->close();
+
+    if (!$tecnicoValido) {
+      redirect_cliente('reuniones', 'El tecnico seleccionado no pertenece a la empresa indicada');
+    }
+  }
+
   try {
     $db->begin_transaction();
 
     $objetivoDb = ($objetivo === '') ? null : $objetivo;
-    $stmt = $db->prepare('INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion) VALUES (?, ?, ?)');
-    $stmt->bind_param('sss', $objetivoDb, $hora, $fecha);
+    $stmt = $db->prepare('INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion, id_empresa) VALUES (?, ?, ?, ?)');
+    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idEmpresaReunion);
     $stmt->execute();
     $idReunion = (int)$stmt->insert_id;
     $stmt->close();
@@ -142,8 +226,18 @@ if ($accion === 'crear_reunion') {
     $stmt2->execute();
     $stmt2->close();
 
+    if ($idTecnicoReunion > 0 && $idTecnicoReunion !== $clienteId) {
+      $stmt3 = $db->prepare('INSERT INTO usuario_reunion (id_usuario, id_reunion) VALUES (?, ?)');
+      $stmt3->bind_param('ii', $idTecnicoReunion, $idReunion);
+      $stmt3->execute();
+      $stmt3->close();
+    }
+
     $db->commit();
-    redirect_cliente('reuniones', 'Reunion creada correctamente');
+    $msg = ($idTecnicoReunion > 0)
+      ? 'Reunion creada y asignada al tecnico correctamente'
+      : 'Reunion creada correctamente';
+    redirect_cliente('reuniones', $msg);
   } catch (Throwable $e) {
     $db->rollback();
     log_internal_error_cliente('cliente.crear_reunion', $e);

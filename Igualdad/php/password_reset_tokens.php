@@ -34,6 +34,25 @@ function save_password_reset_token(string $email, string $token, string $expires
     $stmtToken->close();
 }
 
+function delete_expired_password_reset_tokens(): int
+{
+    $stmt = db()->prepare("DELETE FROM password_reset_token WHERE expires_at < NOW()");
+    if (!$stmt) {
+        throw new Exception('Error preparando limpieza de tokens expirados: ' . db()->error);
+    }
+
+    if (!$stmt->execute()) {
+        $error = $stmt->error;
+        $stmt->close();
+        throw new Exception('Error eliminando tokens expirados: ' . $error);
+    }
+
+    $deletedRows = $stmt->affected_rows;
+    $stmt->close();
+
+    return $deletedRows;
+}
+
 function find_password_reset_token(string $token): ?array
 {
     if ($token === '') {

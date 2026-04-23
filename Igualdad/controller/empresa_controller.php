@@ -451,7 +451,9 @@ if ($accion === 'add_empresas') {
       $mensajeFinal .= '. Errores de archivos: ' . implode('; ', $resultadoSubida['errores']);
     }
 
-    redirect_menu_empresas($mensajeFinal);
+    $to = 'http://localhost/Igualdad/model/empresa.php?view=add_contratos&id_empresa=' . $idEmpresaNueva;
+    header('Location: ' . $to);
+    exit;
   } catch (Throwable $e) {
     log_internal_error_empresa('empresa.crear', $e);
     redirect_view_empresas('add_empresas', 'No se pudo crear la empresa. Intentalo de nuevo.');

@@ -1033,13 +1033,13 @@ foreach ($names as $i => $originalName) {
 
 // ================== RESPUESTA FINAL ==================
 if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
-    // Eliminar la reunión "Subir R.R" cuando el cliente sube un registro retributivo exitosamente
+    // Actualizar la reunión "Subir R.R" quitando la empresa correspondiente del objetivo
     try {
         $stmtGetReunion = $db->prepare(
-            "SELECT r.id_reunion, u.email, u.nombre_usuario FROM reuniones r 
+            "SELECT r.id_reunion, r.objetivo, u.email, u.nombre_usuario FROM reuniones r 
              INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion 
              INNER JOIN usuario u ON u.id_usuario = ur.id_usuario
-             WHERE ur.id_usuario = ? AND UPPER(TRIM(r.objetivo)) = 'SUBIR R.R' 
+             WHERE ur.id_usuario = ? AND r.objetivo LIKE 'Subir R.R%' 
              LIMIT 1"
         );
         if ($stmtGetReunion) {
@@ -1047,37 +1047,70 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
             $stmtGetReunion->execute();
             $resultReunion = $stmtGetReunion->get_result();
             if ($rowReunion = $resultReunion->fetch_assoc()) {
-                $idReunionAEliminar = (int)$rowReunion['id_reunion'];
+                $idReunion = (int)$rowReunion['id_reunion'];
+                $objetivoActual = (string)$rowReunion['objetivo'];
                 $emailUsuario = $rowReunion['email'];
                 $nombreUsuario = $rowReunion['nombre_usuario'];
-                
-                // Eliminar primero de usuario_reunion
-                $stmtDelUserReunion = $db->prepare("DELETE FROM usuario_reunion WHERE id_reunion = ?");
-                if ($stmtDelUserReunion) {
-                    $stmtDelUserReunion->bind_param('i', $idReunionAEliminar);
-                    $stmtDelUserReunion->execute();
-                    $stmtDelUserReunion->close();
+
+                // Extraer empresas del objetivo
+                $empresas = [];
+                if (stripos($objetivoActual, ' - ') !== false) {
+                    $empresasStr = trim(substr($objetivoActual, stripos($objetivoActual, ' - ') + 3));
+                    $empresas = array_map('trim', explode(',', $empresasStr));
                 }
-                
-                // Luego eliminar de reuniones
-                $stmtDelReunion = $db->prepare("DELETE FROM reuniones WHERE id_reunion = ?");
-                if ($stmtDelReunion) {
-                    $stmtDelReunion->bind_param('i', $idReunionAEliminar);
-                    $stmtDelReunion->execute();
-                    $stmtDelReunion->close();
+
+                // Obtener el nombre de la empresa subida
+                $stmtEmpresa = $db->prepare("SELECT razon_social FROM empresa WHERE id_empresa = ? LIMIT 1");
+                $stmtEmpresa->bind_param('i', $id_empresa);
+                $stmtEmpresa->execute();
+                $resEmpresa = $stmtEmpresa->get_result();
+                $nombreEmpresaSubida = '';
+                if ($rowEmp = $resEmpresa->fetch_assoc()) {
+                    $nombreEmpresaSubida = trim((string)($rowEmp['razon_social'] ?? ''));
                 }
-                
-                                // Enviar email de confirmación
-                                try {
-                                        correo_enviar_confirmacion_registro_retributivo($emailUsuario, $nombreUsuario);
-                                } catch (\Throwable $mailError) {
+                $stmtEmpresa->close();
+
+                // Quitar la empresa subida del array
+                $empresas = array_filter($empresas, function($e) use ($nombreEmpresaSubida) {
+                    return mb_strtoupper($e) !== mb_strtoupper($nombreEmpresaSubida);
+                });
+
+                if (empty($empresas)) {
+                    // Si ya no quedan empresas, eliminar la reunión
+                    $stmtDelUserReunion = $db->prepare("DELETE FROM usuario_reunion WHERE id_reunion = ?");
+                    if ($stmtDelUserReunion) {
+                        $stmtDelUserReunion->bind_param('i', $idReunion);
+                        $stmtDelUserReunion->execute();
+                        $stmtDelUserReunion->close();
+                    }
+                    $stmtDelReunion = $db->prepare("DELETE FROM reuniones WHERE id_reunion = ?");
+                    if ($stmtDelReunion) {
+                        $stmtDelReunion->bind_param('i', $idReunion);
+                        $stmtDelReunion->execute();
+                        $stmtDelReunion->close();
+                    }
+                } else {
+                    // Si quedan empresas, actualizar el objetivo
+                    $nuevoObjetivo = 'Subir R.R - ' . implode(', ', $empresas);
+                    $stmtUpd = $db->prepare("UPDATE reuniones SET objetivo = ? WHERE id_reunion = ?");
+                    if ($stmtUpd) {
+                        $stmtUpd->bind_param('si', $nuevoObjetivo, $idReunion);
+                        $stmtUpd->execute();
+                        $stmtUpd->close();
+                    }
+                }
+
+                // Enviar email de confirmación
+                try {
+                    correo_enviar_confirmacion_registro_retributivo($emailUsuario, $nombreUsuario);
+                } catch (\Throwable $mailError) {
                     registrarLogProcesarRegistroRetributivo("Error al enviar email de recordatorio: " . $mailError->getMessage());
                 }
             }
             $stmtGetReunion->close();
         }
     } catch (\Throwable $e) {
-        registrarLogProcesarRegistroRetributivo("Error al eliminar reunión 'Subir R.R': " . $e->getMessage());
+        registrarLogProcesarRegistroRetributivo("Error al actualizar/eliminar reunión 'Subir R.R': " . $e->getMessage());
     }
     
     redirigirMenuSubida($urlMenuSubida, 'Subido con Exito', 1, $idEmpresaContexto);
