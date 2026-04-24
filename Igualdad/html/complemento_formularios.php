@@ -616,557 +616,556 @@ if ($idEmpresaSeleccionada > 0) {
                         </div>
                     <?php else: ?>
 
-                    <?php if ($tab === 'bajas'): ?>
-                        <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
-                            <input type="hidden" name="accion" value="bajas">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                        <?php if ($tab === 'bajas'): ?>
+                            <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
+                                <input type="hidden" name="accion" value="bajas">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
 
-                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
-                            <div>
-                                <label class="form-label">Tipo de baja</label>
-                                <select id="tipo_baja" name="tipo_baja" class="form-control" required>
-                                    <option value="">-- Selecciona tipo de baja --</option>
-                                    <option value="TEMPORALES">Temporales</option>
-                                    <option value="DEFINITIVAS">Definitivas</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="form-label" for="bajas_motivo">Motivo</label>
-                                <input id="bajas_motivo" type="text" name="motivo" class="form-control" maxlength="255">
-                            </div>
-
-                            <div id="bloque_temporales">
-                                <label class="form-label" for="tipo_temporal">Tipo temporal</label>
-                                <select id="tipo_temporal" name="tipo_temporal" class="form-control">
-                                    <option value="">-- Selecciona tipo temporal --</option>
-                                    <option value="Enfermedad Común">Enfermedad Común</option>
-                                    <option value="Accidente Laboral">Accidente Laboral</option>
-                                    <option value="Riesgo embarazo">Riesgo embarazo</option>
-                                    <option value="COVID">COVID</option>
-                                </select>
-                            </div>
-
-                            <div id="bloque_definitivas" class="d-none">
-                                <label class="form-label" for="tipo_definitiva">Tipo definitiva</label>
-                                <select id="tipo_definitiva" name="tipo_definitiva" class="form-control">
-                                    <option value="">-- Selecciona tipo definitiva --</option>
-                                    <option value="Despido">Despido</option>
-                                    <option value="Fallecimiento">Fallecimiento</option>
-                                    <option value="Jubilación">Jubilación</option>
-                                    <option value="Finalización contrato">Finalización contrato</option>
-                                    <option value="No superación de periodo de prueba">No superación de periodo de prueba</option>
-                                    <option value="Baja voluntaria">Baja voluntaria</option>
-                                </select>
-                            </div>
-
-                            <div class="row g-3">
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="bajas_num_mujeres">Numero de mujeres</label>
-                                    <input id="bajas_num_mujeres" type="number" min="0" name="num_mujeres" class="form-control" value="0" required>
+                                <div>
+                                    <label class="form-label">Tipo de baja</label>
+                                    <select id="tipo_baja" name="tipo_baja" class="form-control" required>
+                                        <option value="">-- Selecciona tipo de baja --</option>
+                                        <option value="TEMPORALES">Temporales</option>
+                                        <option value="DEFINITIVAS">Definitivas</option>
+                                    </select>
                                 </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="bajas_num_hombres">Numero de hombres</label>
-                                    <input id="bajas_num_hombres" type="number" min="0" name="num_hombres" class="form-control" value="0" required>
+
+                                <div>
+                                    <label class="form-label" for="bajas_motivo">Motivo</label>
+                                    <input id="bajas_motivo" type="text" name="motivo" class="form-control" maxlength="255">
                                 </div>
-                            </div>
 
-                            <div>
-                                <button type="submit" class="btn btn-primary">Guardar bajas</button>
-                            </div>
-                        </form>
-
-                        <hr class="my-4">
-                        <h6 class="mb-3">Bajas registradas</h6>
-
-                        <?php if ($idEmpresaSeleccionada <= 0): ?>
-                            <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
-                        <?php elseif (empty($bajasRows)): ?>
-                            <div class="alert alert-secondary py-2">No hay bajas registradas para esta empresa.</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Tipo</th>
-                                            <th>Detalle</th>
-                                            <th>Motivo</th>
-                                            <th>Mujeres</th>
-                                            <th>Hombres</th>
-                                            <th>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($bajasRows as $row): ?>
-                                            <?php
-                                            $tipoBaja = (string)($row['tipo_baja'] ?? '');
-                                            $tipoTemporal = (string)($row['tipo_temporal'] ?? '');
-                                            $tipoDefinitivaDb = (string)($row['tipo_definitiva'] ?? '');
-                                            $tipoDefinitiva = complemento_tipo_definitiva_db_a_ui($tipoDefinitivaDb);
-                                            $esTemporal = strtoupper($tipoBaja) === 'TEMPORALES';
-                                            ?>
-                                            <tr>
-                                                <td><?= (int)($row['id_bajas'] ?? 0) ?></td>
-                                                <td><?= h($tipoBaja) ?></td>
-                                                <td><?= h($esTemporal ? $tipoTemporal : $tipoDefinitiva) ?></td>
-                                                <td><?= h((string)($row['motivo'] ?? '')) ?></td>
-                                                <td><?= (int)($row['num_mujeres'] ?? 0) ?></td>
-                                                <td><?= (int)($row['num_hombres'] ?? 0) ?></td>
-                                                <td>
-                                                    <?php if ($puedeEditarTablas): ?>
-                                                        <details>
-                                                            <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                            <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                <input type="hidden" name="accion" value="editar_baja">
-                                                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                <input type="hidden" name="id_bajas" value="<?= (int)($row['id_bajas'] ?? 0) ?>">
-
-                                                                <select name="tipo_baja" class="form-control form-control-sm" required>
-                                                                    <option value="TEMPORALES" <?= $esTemporal ? 'selected' : '' ?>>Temporales</option>
-                                                                    <option value="DEFINITIVAS" <?= !$esTemporal ? 'selected' : '' ?>>Definitivas</option>
-                                                                </select>
-                                                                <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>" placeholder="Motivo">
-                                                                <select name="tipo_temporal" class="form-control form-control-sm">
-                                                                    <option value="">-- Tipo temporal --</option>
-                                                                    <option value="Enfermedad Común" <?= $tipoTemporal === 'Enfermedad Común' ? 'selected' : '' ?>>Enfermedad Común</option>
-                                                                    <option value="Accidente Laboral" <?= $tipoTemporal === 'Accidente Laboral' ? 'selected' : '' ?>>Accidente Laboral</option>
-                                                                    <option value="Riesgo embarazo" <?= $tipoTemporal === 'Riesgo embarazo' ? 'selected' : '' ?>>Riesgo embarazo</option>
-                                                                    <option value="COVID" <?= $tipoTemporal === 'COVID' ? 'selected' : '' ?>>COVID</option>
-                                                                </select>
-                                                                <select name="tipo_definitiva" class="form-control form-control-sm">
-                                                                    <option value="">-- Tipo definitiva --</option>
-                                                                    <option value="Despido" <?= $tipoDefinitiva === 'Despido' ? 'selected' : '' ?>>Despido</option>
-                                                                    <option value="Fallecimiento" <?= $tipoDefinitiva === 'Fallecimiento' ? 'selected' : '' ?>>Fallecimiento</option>
-                                                                    <option value="Jubilación" <?= $tipoDefinitiva === 'Jubilación' ? 'selected' : '' ?>>Jubilación</option>
-                                                                    <option value="Finalización contrato" <?= $tipoDefinitiva === 'Finalización contrato' ? 'selected' : '' ?>>Finalización contrato</option>
-                                                                    <option value="No superación de periodo de prueba" <?= $tipoDefinitiva === 'No superación de periodo de prueba' ? 'selected' : '' ?>>No superación de periodo de prueba</option>
-                                                                    <option value="Baja voluntaria" <?= $tipoDefinitiva === 'Baja voluntaria' ? 'selected' : '' ?>>Baja voluntaria</option>
-                                                                </select>
-                                                                <div class="row g-2">
-                                                                    <div class="col-6">
-                                                                        <input type="number" min="0" name="num_mujeres" class="form-control form-control-sm" value="<?= (int)($row['num_mujeres'] ?? 0) ?>" required>
-                                                                    </div>
-                                                                    <div class="col-6">
-                                                                        <input type="number" min="0" name="num_hombres" class="form-control form-control-sm" value="<?= (int)($row['num_hombres'] ?? 0) ?>" required>
-                                                                    </div>
-                                                                </div>
-                                                                <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                            </form>
-                                                        </details>
-                                                    <?php endif; ?>
-
-                                                    <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar esta baja?');">
-                                                        <input type="hidden" name="accion" value="eliminar_baja">
-                                                        <?= csrf_input() ?>
-                                                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                        <input type="hidden" name="id_bajas" value="<?= (int)($row['id_bajas'] ?? 0) ?>">
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if ($tab === 'formacion'): ?>
-                        <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
-                            <input type="hidden" name="accion" value="formacion">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-
-                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-
-                            <div>
-                                <label class="form-label" for="formacion_tipo">Tipo</label>
-                                <input id="formacion_tipo" type="text" name="tipo" class="form-control" maxlength="100">
-                            </div>
-
-                            <div class="row g-3">
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="formacion_n_mujeres">Numero de mujeres</label>
-                                    <input id="formacion_n_mujeres" type="number" min="0" name="n_mujeres" class="form-control" value="0" required>
+                                <div id="bloque_temporales">
+                                    <label class="form-label" for="tipo_temporal">Tipo temporal</label>
+                                    <select id="tipo_temporal" name="tipo_temporal" class="form-control">
+                                        <option value="">-- Selecciona tipo temporal --</option>
+                                        <option value="Enfermedad Común">Enfermedad Común</option>
+                                        <option value="Accidente Laboral">Accidente Laboral</option>
+                                        <option value="Riesgo embarazo">Riesgo embarazo</option>
+                                        <option value="COVID">COVID</option>
+                                    </select>
                                 </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="formacion_n_hombres">Numero de hombres</label>
-                                    <input id="formacion_n_hombres" type="number" min="0" name="n_hombres" class="form-control" value="0" required>
+
+                                <div id="bloque_definitivas" class="d-none">
+                                    <label class="form-label" for="tipo_definitiva">Tipo definitiva</label>
+                                    <select id="tipo_definitiva" name="tipo_definitiva" class="form-control">
+                                        <option value="">-- Selecciona tipo definitiva --</option>
+                                        <option value="Despido">Despido</option>
+                                        <option value="Fallecimiento">Fallecimiento</option>
+                                        <option value="Jubilación">Jubilación</option>
+                                        <option value="Finalización contrato">Finalización contrato</option>
+                                        <option value="No superación de periodo de prueba">No superación de periodo de prueba</option>
+                                        <option value="Baja voluntaria">Baja voluntaria</option>
+                                    </select>
                                 </div>
-                            </div>
 
-                            <div>
-                                <button type="submit" class="btn btn-primary">Guardar formacion</button>
-                            </div>
-                        </form>
-
-                        <hr class="my-4">
-                        <h6 class="mb-3">Formacion registrada</h6>
-                        <?php if ($idEmpresaSeleccionada <= 0): ?>
-                            <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
-                        <?php elseif (empty($formacionRows)): ?>
-                            <div class="alert alert-secondary py-2">No hay formacion registrada para esta empresa.</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Tipo</th>
-                                            <th>Mujeres</th>
-                                            <th>Hombres</th>
-                                            <th>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($formacionRows as $row): ?>
-                                            <tr>
-                                                <td><?= (int)($row['id_registro'] ?? 0) ?></td>
-                                                <td><?= h((string)($row['tipo'] ?? '')) ?></td>
-                                                <td><?= (int)($row['n_mujeres'] ?? 0) ?></td>
-                                                <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
-                                                <td>
-                                                    <?php if ($puedeEditarTablas): ?>
-                                                        <details>
-                                                            <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                            <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                <input type="hidden" name="accion" value="editar_formacion">
-                                                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                                <input type="text" name="tipo" class="form-control form-control-sm" value="<?= h((string)($row['tipo'] ?? '')) ?>" required>
-                                                                <div class="row g-2">
-                                                                    <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
-                                                                    <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
-                                                                </div>
-                                                                <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                            </form>
-                                                        </details>
-                                                    <?php endif; ?>
-                                                    <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este registro de formación?');">
-                                                        <input type="hidden" name="accion" value="eliminar_formacion">
-                                                        <?= csrf_input() ?>
-                                                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                        <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if ($tab === 'excedencias'): ?>
-                        <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
-                            <input type="hidden" name="accion" value="excedencias">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-
-                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-
-                            <div>
-                                <label class="form-label" for="excedencias_motivo">Motivo</label>
-                                <input id="excedencias_motivo" type="text" name="motivo" class="form-control" maxlength="100">
-                            </div>
-
-                            <div>
-                                <label class="form-label" for="excedencias_tipo">Tipo</label>
-                                <select id="excedencias_tipo" name="tipo" class="form-control" required>
-                                    <option value="">-- Selecciona tipo de excedencia --</option>
-                                    <option value="Excedencias Voluntarias">Excedencias Voluntarias</option>
-                                    <option value="Excedencias Cuidado Menores">Excedencias Cuidado Menores</option>
-                                    <option value="Excedencias Cuidado de Personas Mayores">Excedencias Cuidado de Personas Mayores</option>
-                                </select>
-                            </div>
-
-                            <div class="row g-3">
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="excedencias_n_mujeres">Numero de mujeres</label>
-                                    <input id="excedencias_n_mujeres" type="number" min="0" name="n_mujeres" class="form-control" value="0" required>
-                                </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="excedencias_n_hombres">Numero de hombres</label>
-                                    <input id="excedencias_n_hombres" type="number" min="0" name="n_hombres" class="form-control" value="0" required>
-                                </div>
-                            </div>
-
-                            <div>
-                                <button type="submit" class="btn btn-primary">Guardar excedencias</button>
-                            </div>
-                        </form>
-
-                        <hr class="my-4">
-                        <h6 class="mb-3">Excedencias registradas</h6>
-                        <?php if ($idEmpresaSeleccionada <= 0): ?>
-                            <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
-                        <?php elseif (empty($excedenciasRows)): ?>
-                            <div class="alert alert-secondary py-2">No hay excedencias registradas para esta empresa.</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Motivo</th>
-                                            <th>Tipo</th>
-                                            <th>Mujeres</th>
-                                            <th>Hombres</th>
-                                            <th>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($excedenciasRows as $row): ?>
-                                            <tr>
-                                                <td><?= (int)($row['id_registro'] ?? 0) ?></td>
-                                                <td><?= h((string)($row['motivo'] ?? '')) ?></td>
-                                                <td><?= h((string)($row['tipo'] ?? '')) ?></td>
-                                                <td><?= (int)($row['n_mujeres'] ?? 0) ?></td>
-                                                <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
-                                                <td>
-                                                    <?php if ($puedeEditarTablas): ?>
-                                                        <details>
-                                                            <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                            <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                <input type="hidden" name="accion" value="editar_excedencia">
-                                                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                                <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>">
-                                                                <select name="tipo" class="form-control form-control-sm" required>
-                                                                    <option value="Excedencias Voluntarias" <?= (string)($row['tipo'] ?? '') === 'Excedencias Voluntarias' ? 'selected' : '' ?>>Excedencias Voluntarias</option>
-                                                                    <option value="Excedencias Cuidado Menores" <?= (string)($row['tipo'] ?? '') === 'Excedencias Cuidado Menores' ? 'selected' : '' ?>>Excedencias Cuidado Menores</option>
-                                                                    <option value="Excedencias Cuidado de Personas Mayores" <?= (string)($row['tipo'] ?? '') === 'Excedencias Cuidado de Personas Mayores' ? 'selected' : '' ?>>Excedencias Cuidado de Personas Mayores</option>
-                                                                </select>
-                                                                <div class="row g-2">
-                                                                    <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
-                                                                    <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
-                                                                </div>
-                                                                <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                            </form>
-                                                        </details>
-                                                    <?php endif; ?>
-                                                    <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este registro de excedencia?');">
-                                                        <input type="hidden" name="accion" value="eliminar_excedencia">
-                                                        <?= csrf_input() ?>
-                                                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                        <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if ($tab === 'permisos'): ?>
-                        <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
-                            <input type="hidden" name="accion" value="permisos_retribuidos">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-
-                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-
-                            <div>
-                                <label class="form-label" for="permisos_motivo">Motivo</label>
-                                <input id="permisos_motivo" type="text" name="motivo" class="form-control" maxlength="100">
-                            </div>
-
-                            <div>
-                                <label class="form-label" for="permisos_tipo">Tipo</label>
-                                <select id="permisos_tipo" name="tipo" class="form-control" required>
-                                    <option value="">-- Selecciona tipo de permiso --</option>
-                                    <option value="Lactancia">Lactancia</option>
-                                    <option value="Nacimiento">Nacimiento</option>
-                                </select>
-                            </div>
-
-                            <div class="row g-3">
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="permisos_n_mujeres">Numero de mujeres</label>
-                                    <input id="permisos_n_mujeres" type="number" min="0" name="n_mujeres" class="form-control" value="0" required>
-                                </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="permisos_n_hombres">Numero de hombres</label>
-                                    <input id="permisos_n_hombres" type="number" min="0" name="n_hombres" class="form-control" value="0" required>
-                                </div>
-                            </div>
-
-                            <div>
-                                <button type="submit" class="btn btn-primary">Guardar permisos retributivos</button>
-                            </div>
-                        </form>
-
-                        <hr class="my-4">
-                        <h6 class="mb-3">Permisos retributivos registrados</h6>
-                        <?php if ($idEmpresaSeleccionada <= 0): ?>
-                            <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
-                        <?php elseif (empty($permisosRows)): ?>
-                            <div class="alert alert-secondary py-2">No hay permisos retributivos registrados para esta empresa.</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Motivo</th>
-                                            <th>Tipo</th>
-                                            <th>Mujeres</th>
-                                            <th>Hombres</th>
-                                            <th>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($permisosRows as $row): ?>
-                                            <tr>
-                                                <td><?= (int)($row['id_registro'] ?? 0) ?></td>
-                                                <td><?= h((string)($row['motivo'] ?? '')) ?></td>
-                                                <td><?= h((string)($row['tipo'] ?? '')) ?></td>
-                                                <td><?= (int)($row['n_mujeres'] ?? 0) ?></td>
-                                                <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
-                                                <td>
-                                                    <?php if ($puedeEditarTablas): ?>
-                                                        <details>
-                                                            <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                            <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                <input type="hidden" name="accion" value="editar_permiso">
-                                                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                                <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>">
-                                                                <select name="tipo" class="form-control form-control-sm" required>
-                                                                    <option value="Lactancia" <?= (string)($row['tipo'] ?? '') === 'Lactancia' ? 'selected' : '' ?>>Lactancia</option>
-                                                                    <option value="Nacimiento" <?= (string)($row['tipo'] ?? '') === 'Nacimiento' ? 'selected' : '' ?>>Nacimiento</option>
-                                                                </select>
-                                                                <div class="row g-2">
-                                                                    <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
-                                                                    <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
-                                                                </div>
-                                                                <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                            </form>
-                                                        </details>
-                                                    <?php endif; ?>
-                                                    <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este permiso retributivo?');">
-                                                        <input type="hidden" name="accion" value="eliminar_permiso">
-                                                        <?= csrf_input() ?>
-                                                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                        <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-
-                    <?php if (isset($cuestionarioTabs[$tab])): ?>
-                        <?php
-                        $configCuestionarioActivo = $cuestionarioTabs[$tab];
-                        $filasCuestionarioActivo = $cuestionarioRows[$tab] ?? [];
-                        $camposCuestionarioActivo = $configCuestionarioActivo['fields'] ?? [];
-                        ?>
-                        <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
-                            <input type="hidden" name="accion" value="<?= h($tab) ?>">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-
-                            <div class="row g-3">
-                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                <div class="row g-3">
                                     <div class="col-12 col-md-6">
-                                        <label class="form-label"><?= h((string)($campo['label'] ?? 'Campo')) ?></label>
-                                        <input type="text" name="<?= h((string)($campo['name'] ?? '')) ?>" class="form-control">
+                                        <label class="form-label" for="bajas_num_mujeres">Numero de mujeres</label>
+                                        <input id="bajas_num_mujeres" type="number" min="0" name="num_mujeres" class="form-control" value="0" required>
                                     </div>
-                                <?php endforeach; ?>
-                            </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="bajas_num_hombres">Numero de hombres</label>
+                                        <input id="bajas_num_hombres" type="number" min="0" name="num_hombres" class="form-control" value="0" required>
+                                    </div>
+                                </div>
 
-                            <div>
-                                <button type="submit" class="btn btn-primary">Guardar cuestionario</button>
-                            </div>
-                        </form>
+                                <div>
+                                    <button type="submit" class="btn btn-primary">Guardar bajas</button>
+                                </div>
+                            </form>
 
-                        <hr class="my-4">
-                        <h6 class="mb-3">Registros de <?= h((string)($configCuestionarioActivo['title'] ?? $tab)) ?></h6>
+                            <hr class="my-4">
+                            <h6 class="mb-3">Bajas registradas</h6>
 
-                        <?php if ($idEmpresaSeleccionada <= 0): ?>
-                            <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
-                        <?php elseif (empty($filasCuestionarioActivo)): ?>
-                            <div class="alert alert-secondary py-2">No hay registros para esta empresa.</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <?php foreach ($camposCuestionarioActivo as $campo): ?>
-                                                <th><?= h((string)($campo['label'] ?? 'Campo')) ?></th>
-                                            <?php endforeach; ?>
-                                            <th>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($filasCuestionarioActivo as $fila): ?>
+                            <?php if ($idEmpresaSeleccionada <= 0): ?>
+                                <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
+                            <?php elseif (empty($bajasRows)): ?>
+                                <div class="alert alert-secondary py-2">No hay bajas registradas para esta empresa.</div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <thead>
                                             <tr>
-                                                <td><?= (int)($fila['id_registro'] ?? 0) ?></td>
-                                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
-                                                    <td><?= h((string)($fila[(string)($campo['name'] ?? '')] ?? '')) ?></td>
-                                                <?php endforeach; ?>
-                                                <td>
-                                                    <?php if ($puedeEditarTablas): ?>
-                                                        <details>
-                                                            <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                            <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                <input type="hidden" name="accion" value="<?= h('editar_' . $tab) ?>">
-                                                                <?= csrf_input() ?>
-                                                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                <input type="hidden" name="id_registro" value="<?= (int)($fila['id_registro'] ?? 0) ?>">
-                                                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
-                                                                    <?php $nombreCampo = (string)($campo['name'] ?? ''); ?>
-                                                                    <input
-                                                                        type="text"
-                                                                        name="<?= h($nombreCampo) ?>"
-                                                                        class="form-control form-control-sm"
-                                                                        placeholder="<?= h((string)($campo['label'] ?? $nombreCampo)) ?>"
-                                                                        value="<?= h((string)($fila[$nombreCampo] ?? '')) ?>"
-                                                                    >
-                                                                <?php endforeach; ?>
-                                                                <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                            </form>
-                                                        </details>
-                                                    <?php endif; ?>
-                                                    <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este cuestionario?');">
-                                                        <input type="hidden" name="accion" value="<?= h('eliminar_' . $tab) ?>">
-                                                        <?= csrf_input() ?>
-                                                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                        <input type="hidden" name="id_registro" value="<?= (int)($fila['id_registro'] ?? 0) ?>">
-                                                        <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
-                                                    </form>
-                                                </td>
+                                                <th>ID</th>
+                                                <th>Tipo</th>
+                                                <th>Detalle</th>
+                                                <th>Motivo</th>
+                                                <th>Mujeres</th>
+                                                <th>Hombres</th>
+                                                <th>Acciones</th>
                                             </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($bajasRows as $row): ?>
+                                                <?php
+                                                $tipoBaja = (string)($row['tipo_baja'] ?? '');
+                                                $tipoTemporal = (string)($row['tipo_temporal'] ?? '');
+                                                $tipoDefinitivaDb = (string)($row['tipo_definitiva'] ?? '');
+                                                $tipoDefinitiva = complemento_tipo_definitiva_db_a_ui($tipoDefinitivaDb);
+                                                $esTemporal = strtoupper($tipoBaja) === 'TEMPORALES';
+                                                ?>
+                                                <tr>
+                                                    <td><?= (int)($row['id_bajas'] ?? 0) ?></td>
+                                                    <td><?= h($tipoBaja) ?></td>
+                                                    <td><?= h($esTemporal ? $tipoTemporal : $tipoDefinitiva) ?></td>
+                                                    <td><?= h((string)($row['motivo'] ?? '')) ?></td>
+                                                    <td><?= (int)($row['num_mujeres'] ?? 0) ?></td>
+                                                    <td><?= (int)($row['num_hombres'] ?? 0) ?></td>
+                                                    <td>
+                                                        <?php if ($puedeEditarTablas): ?>
+                                                            <details>
+                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
+                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
+                                                                    <input type="hidden" name="accion" value="editar_baja">
+                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                                    <input type="hidden" name="id_bajas" value="<?= (int)($row['id_bajas'] ?? 0) ?>">
+
+                                                                    <select name="tipo_baja" class="form-control form-control-sm" required>
+                                                                        <option value="TEMPORALES" <?= $esTemporal ? 'selected' : '' ?>>Temporales</option>
+                                                                        <option value="DEFINITIVAS" <?= !$esTemporal ? 'selected' : '' ?>>Definitivas</option>
+                                                                    </select>
+                                                                    <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>" placeholder="Motivo">
+                                                                    <select name="tipo_temporal" class="form-control form-control-sm">
+                                                                        <option value="">-- Tipo temporal --</option>
+                                                                        <option value="Enfermedad Común" <?= $tipoTemporal === 'Enfermedad Común' ? 'selected' : '' ?>>Enfermedad Común</option>
+                                                                        <option value="Accidente Laboral" <?= $tipoTemporal === 'Accidente Laboral' ? 'selected' : '' ?>>Accidente Laboral</option>
+                                                                        <option value="Riesgo embarazo" <?= $tipoTemporal === 'Riesgo embarazo' ? 'selected' : '' ?>>Riesgo embarazo</option>
+                                                                        <option value="COVID" <?= $tipoTemporal === 'COVID' ? 'selected' : '' ?>>COVID</option>
+                                                                    </select>
+                                                                    <select name="tipo_definitiva" class="form-control form-control-sm">
+                                                                        <option value="">-- Tipo definitiva --</option>
+                                                                        <option value="Despido" <?= $tipoDefinitiva === 'Despido' ? 'selected' : '' ?>>Despido</option>
+                                                                        <option value="Fallecimiento" <?= $tipoDefinitiva === 'Fallecimiento' ? 'selected' : '' ?>>Fallecimiento</option>
+                                                                        <option value="Jubilación" <?= $tipoDefinitiva === 'Jubilación' ? 'selected' : '' ?>>Jubilación</option>
+                                                                        <option value="Finalización contrato" <?= $tipoDefinitiva === 'Finalización contrato' ? 'selected' : '' ?>>Finalización contrato</option>
+                                                                        <option value="No superación de periodo de prueba" <?= $tipoDefinitiva === 'No superación de periodo de prueba' ? 'selected' : '' ?>>No superación de periodo de prueba</option>
+                                                                        <option value="Baja voluntaria" <?= $tipoDefinitiva === 'Baja voluntaria' ? 'selected' : '' ?>>Baja voluntaria</option>
+                                                                    </select>
+                                                                    <div class="row g-2">
+                                                                        <div class="col-6">
+                                                                            <input type="number" min="0" name="num_mujeres" class="form-control form-control-sm" value="<?= (int)($row['num_mujeres'] ?? 0) ?>" required>
+                                                                        </div>
+                                                                        <div class="col-6">
+                                                                            <input type="number" min="0" name="num_hombres" class="form-control form-control-sm" value="<?= (int)($row['num_hombres'] ?? 0) ?>" required>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
+                                                                </form>
+                                                            </details>
+                                                        <?php endif; ?>
+
+                                                        <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar esta baja?');">
+                                                            <input type="hidden" name="accion" value="eliminar_baja">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                            <input type="hidden" name="id_bajas" value="<?= (int)($row['id_bajas'] ?? 0) ?>">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
-                    <?php endif; ?>
+
+                        <?php if ($tab === 'formacion'): ?>
+                            <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
+                                <input type="hidden" name="accion" value="formacion">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+
+                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+
+                                <div>
+                                    <label class="form-label" for="formacion_tipo">Tipo</label>
+                                    <input id="formacion_tipo" type="text" name="tipo" class="form-control" maxlength="100">
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="formacion_n_mujeres">Numero de mujeres</label>
+                                        <input id="formacion_n_mujeres" type="number" min="0" name="n_mujeres" class="form-control" value="0" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="formacion_n_hombres">Numero de hombres</label>
+                                        <input id="formacion_n_hombres" type="number" min="0" name="n_hombres" class="form-control" value="0" required>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <button type="submit" class="btn btn-primary">Guardar formacion</button>
+                                </div>
+                            </form>
+
+                            <hr class="my-4">
+                            <h6 class="mb-3">Formacion registrada</h6>
+                            <?php if ($idEmpresaSeleccionada <= 0): ?>
+                                <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
+                            <?php elseif (empty($formacionRows)): ?>
+                                <div class="alert alert-secondary py-2">No hay formacion registrada para esta empresa.</div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Tipo</th>
+                                                <th>Mujeres</th>
+                                                <th>Hombres</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($formacionRows as $row): ?>
+                                                <tr>
+                                                    <td><?= (int)($row['id_registro'] ?? 0) ?></td>
+                                                    <td><?= h((string)($row['tipo'] ?? '')) ?></td>
+                                                    <td><?= (int)($row['n_mujeres'] ?? 0) ?></td>
+                                                    <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
+                                                    <td>
+                                                        <?php if ($puedeEditarTablas): ?>
+                                                            <details>
+                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
+                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
+                                                                    <input type="hidden" name="accion" value="editar_formacion">
+                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                                    <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
+                                                                    <input type="text" name="tipo" class="form-control form-control-sm" value="<?= h((string)($row['tipo'] ?? '')) ?>" required>
+                                                                    <div class="row g-2">
+                                                                        <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
+                                                                        <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
+                                                                    </div>
+                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
+                                                                </form>
+                                                            </details>
+                                                        <?php endif; ?>
+                                                        <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este registro de formación?');">
+                                                            <input type="hidden" name="accion" value="eliminar_formacion">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                            <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php if ($tab === 'excedencias'): ?>
+                            <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
+                                <input type="hidden" name="accion" value="excedencias">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+
+                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+
+                                <div>
+                                    <label class="form-label" for="excedencias_motivo">Motivo</label>
+                                    <input id="excedencias_motivo" type="text" name="motivo" class="form-control" maxlength="100">
+                                </div>
+
+                                <div>
+                                    <label class="form-label" for="excedencias_tipo">Tipo</label>
+                                    <select id="excedencias_tipo" name="tipo" class="form-control" required>
+                                        <option value="">-- Selecciona tipo de excedencia --</option>
+                                        <option value="Excedencias Voluntarias">Excedencias Voluntarias</option>
+                                        <option value="Excedencias Cuidado Menores">Excedencias Cuidado Menores</option>
+                                        <option value="Excedencias Cuidado de Personas Mayores">Excedencias Cuidado de Personas Mayores</option>
+                                    </select>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="excedencias_n_mujeres">Numero de mujeres</label>
+                                        <input id="excedencias_n_mujeres" type="number" min="0" name="n_mujeres" class="form-control" value="0" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="excedencias_n_hombres">Numero de hombres</label>
+                                        <input id="excedencias_n_hombres" type="number" min="0" name="n_hombres" class="form-control" value="0" required>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <button type="submit" class="btn btn-primary">Guardar excedencias</button>
+                                </div>
+                            </form>
+
+                            <hr class="my-4">
+                            <h6 class="mb-3">Excedencias registradas</h6>
+                            <?php if ($idEmpresaSeleccionada <= 0): ?>
+                                <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
+                            <?php elseif (empty($excedenciasRows)): ?>
+                                <div class="alert alert-secondary py-2">No hay excedencias registradas para esta empresa.</div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Motivo</th>
+                                                <th>Tipo</th>
+                                                <th>Mujeres</th>
+                                                <th>Hombres</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($excedenciasRows as $row): ?>
+                                                <tr>
+                                                    <td><?= (int)($row['id_registro'] ?? 0) ?></td>
+                                                    <td><?= h((string)($row['motivo'] ?? '')) ?></td>
+                                                    <td><?= h((string)($row['tipo'] ?? '')) ?></td>
+                                                    <td><?= (int)($row['n_mujeres'] ?? 0) ?></td>
+                                                    <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
+                                                    <td>
+                                                        <?php if ($puedeEditarTablas): ?>
+                                                            <details>
+                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
+                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
+                                                                    <input type="hidden" name="accion" value="editar_excedencia">
+                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                                    <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
+                                                                    <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>">
+                                                                    <select name="tipo" class="form-control form-control-sm" required>
+                                                                        <option value="Excedencias Voluntarias" <?= (string)($row['tipo'] ?? '') === 'Excedencias Voluntarias' ? 'selected' : '' ?>>Excedencias Voluntarias</option>
+                                                                        <option value="Excedencias Cuidado Menores" <?= (string)($row['tipo'] ?? '') === 'Excedencias Cuidado Menores' ? 'selected' : '' ?>>Excedencias Cuidado Menores</option>
+                                                                        <option value="Excedencias Cuidado de Personas Mayores" <?= (string)($row['tipo'] ?? '') === 'Excedencias Cuidado de Personas Mayores' ? 'selected' : '' ?>>Excedencias Cuidado de Personas Mayores</option>
+                                                                    </select>
+                                                                    <div class="row g-2">
+                                                                        <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
+                                                                        <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
+                                                                    </div>
+                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
+                                                                </form>
+                                                            </details>
+                                                        <?php endif; ?>
+                                                        <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este registro de excedencia?');">
+                                                            <input type="hidden" name="accion" value="eliminar_excedencia">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                            <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php if ($tab === 'permisos'): ?>
+                            <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
+                                <input type="hidden" name="accion" value="permisos_retribuidos">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+
+                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+
+                                <div>
+                                    <label class="form-label" for="permisos_motivo">Motivo</label>
+                                    <input id="permisos_motivo" type="text" name="motivo" class="form-control" maxlength="100">
+                                </div>
+
+                                <div>
+                                    <label class="form-label" for="permisos_tipo">Tipo</label>
+                                    <select id="permisos_tipo" name="tipo" class="form-control" required>
+                                        <option value="">-- Selecciona tipo de permiso --</option>
+                                        <option value="Lactancia">Lactancia</option>
+                                        <option value="Nacimiento">Nacimiento</option>
+                                    </select>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="permisos_n_mujeres">Numero de mujeres</label>
+                                        <input id="permisos_n_mujeres" type="number" min="0" name="n_mujeres" class="form-control" value="0" required>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="permisos_n_hombres">Numero de hombres</label>
+                                        <input id="permisos_n_hombres" type="number" min="0" name="n_hombres" class="form-control" value="0" required>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <button type="submit" class="btn btn-primary">Guardar permisos retributivos</button>
+                                </div>
+                            </form>
+
+                            <hr class="my-4">
+                            <h6 class="mb-3">Permisos retributivos registrados</h6>
+                            <?php if ($idEmpresaSeleccionada <= 0): ?>
+                                <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
+                            <?php elseif (empty($permisosRows)): ?>
+                                <div class="alert alert-secondary py-2">No hay permisos retributivos registrados para esta empresa.</div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Motivo</th>
+                                                <th>Tipo</th>
+                                                <th>Mujeres</th>
+                                                <th>Hombres</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($permisosRows as $row): ?>
+                                                <tr>
+                                                    <td><?= (int)($row['id_registro'] ?? 0) ?></td>
+                                                    <td><?= h((string)($row['motivo'] ?? '')) ?></td>
+                                                    <td><?= h((string)($row['tipo'] ?? '')) ?></td>
+                                                    <td><?= (int)($row['n_mujeres'] ?? 0) ?></td>
+                                                    <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
+                                                    <td>
+                                                        <?php if ($puedeEditarTablas): ?>
+                                                            <details>
+                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
+                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
+                                                                    <input type="hidden" name="accion" value="editar_permiso">
+                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                                    <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
+                                                                    <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>">
+                                                                    <select name="tipo" class="form-control form-control-sm" required>
+                                                                        <option value="Lactancia" <?= (string)($row['tipo'] ?? '') === 'Lactancia' ? 'selected' : '' ?>>Lactancia</option>
+                                                                        <option value="Nacimiento" <?= (string)($row['tipo'] ?? '') === 'Nacimiento' ? 'selected' : '' ?>>Nacimiento</option>
+                                                                    </select>
+                                                                    <div class="row g-2">
+                                                                        <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
+                                                                        <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
+                                                                    </div>
+                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
+                                                                </form>
+                                                            </details>
+                                                        <?php endif; ?>
+                                                        <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este permiso retributivo?');">
+                                                            <input type="hidden" name="accion" value="eliminar_permiso">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                            <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php if (isset($cuestionarioTabs[$tab])): ?>
+                            <?php
+                            $configCuestionarioActivo = $cuestionarioTabs[$tab];
+                            $filasCuestionarioActivo = $cuestionarioRows[$tab] ?? [];
+                            $camposCuestionarioActivo = $configCuestionarioActivo['fields'] ?? [];
+                            ?>
+                            <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
+                                <input type="hidden" name="accion" value="<?= h($tab) ?>">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+
+                                <div class="row g-3">
+                                    <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label"><?= h((string)($campo['label'] ?? 'Campo')) ?></label>
+                                            <input type="text" name="<?= h((string)($campo['name'] ?? '')) ?>" class="form-control">
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+
+                                <div>
+                                    <button type="submit" class="btn btn-primary">Guardar cuestionario</button>
+                                </div>
+                            </form>
+
+                            <hr class="my-4">
+                            <h6 class="mb-3">Registros de <?= h((string)($configCuestionarioActivo['title'] ?? $tab)) ?></h6>
+
+                            <?php if ($idEmpresaSeleccionada <= 0): ?>
+                                <div class="alert alert-secondary py-2">Selecciona una empresa para ver el listado.</div>
+                            <?php elseif (empty($filasCuestionarioActivo)): ?>
+                                <div class="alert alert-secondary py-2">No hay registros para esta empresa.</div>
+                            <?php else: ?>
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                    <th><?= h((string)($campo['label'] ?? 'Campo')) ?></th>
+                                                <?php endforeach; ?>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($filasCuestionarioActivo as $fila): ?>
+                                                <tr>
+                                                    <td><?= (int)($fila['id_registro'] ?? 0) ?></td>
+                                                    <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                        <td><?= h((string)($fila[(string)($campo['name'] ?? '')] ?? '')) ?></td>
+                                                    <?php endforeach; ?>
+                                                    <td>
+                                                        <?php if ($puedeEditarTablas): ?>
+                                                            <details>
+                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
+                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
+                                                                    <input type="hidden" name="accion" value="<?= h('editar_' . $tab) ?>">
+                                                                    <?= csrf_input() ?>
+                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                                    <input type="hidden" name="id_registro" value="<?= (int)($fila['id_registro'] ?? 0) ?>">
+                                                                    <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                                        <?php $nombreCampo = (string)($campo['name'] ?? ''); ?>
+                                                                        <input
+                                                                            type="text"
+                                                                            name="<?= h($nombreCampo) ?>"
+                                                                            class="form-control form-control-sm"
+                                                                            placeholder="<?= h((string)($campo['label'] ?? $nombreCampo)) ?>"
+                                                                            value="<?= h((string)($fila[$nombreCampo] ?? '')) ?>">
+                                                                    <?php endforeach; ?>
+                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
+                                                                </form>
+                                                            </details>
+                                                        <?php endif; ?>
+                                                        <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este cuestionario?');">
+                                                            <input type="hidden" name="accion" value="<?= h('eliminar_' . $tab) ?>">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                                            <input type="hidden" name="id_registro" value="<?= (int)($fila['id_registro'] ?? 0) ?>">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
 
                     <?php endif; ?>
                 </div>

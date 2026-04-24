@@ -131,7 +131,7 @@ if ($fromPanel === 'tecnico') {
                                     <span>Usuarios</span>
                                 </a>
 
-                                <a class="nav-subbutton" href="admin.php?view=ver_empresas">
+                                <a class="nav-subbutton" href="../model/empresa.php?view=ver_empresas&from=admin">
                                     <span class="nav-icon">🏢</span>
                                     <span>Directorio de Empresas</span>
                                 </a>
@@ -405,6 +405,10 @@ if ($fromPanel === 'tecnico') {
                                                 <div class="ge-info-value"><?= h($detalleEmpresa['sector'] ?? '') ?></div>
                                             </div>
                                             <div class="ge-info-item">
+                                                <div class="ge-info-label">🏷 CNAE</div>
+                                                <div class="ge-info-value"><?= h(!empty($detalleEmpresa['cnae_list']) ? implode(', ', (array)$detalleEmpresa['cnae_list']) : '-') ?></div>
+                                            </div>
+                                            <div class="ge-info-item">
                                                 <div class="ge-info-label">📧 Email</div>
                                                 <div class="ge-info-value"><?= h($detalleEmpresa['email'] ?? '') ?></div>
                                             </div>
@@ -417,8 +421,19 @@ if ($fromPanel === 'tecnico') {
                                 </div>
 
                                 <div class="ge-tech-box mb-3">
-                                    <span class="ge-tech-label">Técnico asignado</span>
-                                    <strong class="ge-tech-value"><?= h($detalleUsuario['nombre_usuario'] ?? 'Sin técnico asignado') ?></strong>
+                                    <span class="ge-tech-label">Técnicos asignados</span>
+                                    <?php if (empty($detalleTecnicos)): ?>
+                                        <strong class="ge-tech-value">Sin técnico asignado</strong>
+                                    <?php else: ?>
+                                        <div class="d-flex flex-wrap gap-2 mt-2">
+                                            <?php foreach (($detalleTecnicos ?? []) as $tecnicoDetalle): ?>
+                                                <span class="badge text-bg-primary-subtle border text-primary-emphasis text-start">
+                                                    <span class="d-block"><?= h((string)($tecnicoDetalle['nombre_usuario'] ?? 'Técnico')) ?></span>
+                                                    <small class="d-block text-body-secondary">Servicio: <?= h((string)($tecnicoDetalle['servicio_asignado'] ?? 'Sin contrato')) ?></small>
+                                                </span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <h6 class="mb-2 ge-areas-title">Áreas contratadas</h6>
@@ -558,7 +573,15 @@ if ($fromPanel === 'tecnico') {
 
                                 <div>
                                     <label class="form-label">CNAE</label>
-                                    <input class="form-control" name="cnae">
+                                    <div class="border rounded p-3 bg-white" data-cnae-widget>
+                                        <div class="input-group">
+                                            <input class="form-control js-cnae-input" type="text" placeholder="Escribe un CNAE y pulsa Añadir">
+                                            <button class="btn btn-outline-primary js-cnae-add" type="button">Añadir</button>
+                                        </div>
+                                        <div class="form-text">Pulsa Añadir o Enter para crear tarjetas. Puedes quitarlas pulsando la x.</div>
+                                        <div class="d-flex flex-wrap gap-2 mt-2 js-cnae-list"></div>
+                                        <textarea class="d-none js-cnae-hidden" name="cnae"></textarea>
+                                    </div>
                                 </div>
 
                                 <div>
@@ -724,7 +747,15 @@ if ($fromPanel === 'tecnico') {
 
                                         <div class="col-12 col-md-4">
                                             <label class="form-label text-center w-100">CNAE</label>
-                                            <input class="form-control edit-input" name="cnae" value="<?= h($selectedEmpresa['cnae'] ?? '') ?>">
+                                            <div class="border rounded p-3 bg-white" data-cnae-widget>
+                                                <div class="input-group">
+                                                    <input class="form-control js-cnae-input" type="text" placeholder="Escribe un CNAE y pulsa Añadir">
+                                                    <button class="btn btn-outline-primary js-cnae-add" type="button">Añadir</button>
+                                                </div>
+                                                <div class="form-text">Pulsa Añadir o Enter para crear tarjetas. Puedes quitar cada CNAE con la x.</div>
+                                                <div class="d-flex flex-wrap gap-2 mt-2 js-cnae-list"></div>
+                                                <textarea class="d-none js-cnae-hidden" name="cnae"><?= h($selectedEmpresa['cnae'] ?? '') ?></textarea>
+                                            </div>
                                         </div>
 
                                         <div class="col-12 col-md-8">
@@ -924,7 +955,7 @@ if ($fromPanel === 'tecnico') {
                                 </thead>
                                 <tbody>
                                     <?php $i = 1 + (((int)($currentPagePlanes ?? 1) - 1) * 10); ?>
-                                    <?php foreach ($planes as $p): ?>
+                                     <?php foreach ($planes as $p): ?>
                                         <tr>
                                             <td><?= $i++ ?></td>
                                             <td><?= h($p['razon_social']) ?></td>
@@ -934,9 +965,13 @@ if ($fromPanel === 'tecnico') {
                                             <?php if ($canEditPlanes): ?>
                                                 <td class="col-actions">
                                                     <div class="actions-nowrap">
-                                                        <a class="btn btn-success btn-sm shared-table-action-btn"
-                                                            href="?view=edit_plan&id_empresa=<?= (int)$p['id_empresa'] ?>"
-                                                            title="Editar">Editar</a>
+                                                        <?php if (!empty($p['id_contrato_empresa'])): ?>
+                                                            <a class="btn btn-success btn-sm shared-table-action-btn"
+                                                                href="../model/empresa.php?view=edit_contratos&id_contrato=<?= (int)$p['id_contrato_empresa'] ?>&id_empresa=<?= (int)$p['id_empresa'] ?>&tipo_contrato=PLAN%20IGUALDAD"
+                                                                title="Editar plan de igualdad">Editar</a>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">Sin contrato</span>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                             <?php endif; ?>
@@ -1261,6 +1296,7 @@ if ($fromPanel === 'tecnico') {
                                         <th class="w-50px">#</th>
                                         <th>Empresa</th>
                                         <th>Tipo</th>
+                                        <th>Técnico</th>
                                         <th>Inicio contratación</th>
                                         <th>Fin contratación</th>
                                         <th class="col-actions">Acciones</th>
@@ -1273,6 +1309,7 @@ if ($fromPanel === 'tecnico') {
                                             <td><?= $i++ ?></td>
                                             <td><?= h($c['razon_social'] ?? '') ?></td>
                                             <td><?= h($c['tipo_contrato'] ?? '') ?></td>
+                                            <td><?= h((string)($c['tecnico_nombre'] ?? 'Sin técnico')) ?></td>
                                             <td><?= h($c['inicio_contratacion'] ?? '') ?></td>
                                             <td><?= h($c['fin_contratacion'] ?? '') ?></td>
                                             <td class="col-actions">
@@ -1308,7 +1345,7 @@ if ($fromPanel === 'tecnico') {
 
                                     <?php if (empty($contratos)): ?>
                                         <tr>
-                                            <td colspan="6" class="text-muted">No hay contratos.</td>
+                                            <td colspan="7" class="text-muted">No hay contratos.</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
@@ -1390,6 +1427,24 @@ if ($fromPanel === 'tecnico') {
                             <div>
                                 <label class="form-label">Empresa</label>
                                 <input class="form-control" type="text" value="<?= h((string)($selectedContrato['empresa_nombre'] ?? '')) ?>" readonly>
+                            </div>
+
+                            <div>
+                                <label class="form-label">Técnico asignado al servicio</label>
+                                <?php if ($isTecnico): ?>
+                                    <input type="hidden" name="id_usuario" value="<?= (int)($_SESSION['user']['id_usuario'] ?? 0) ?>">
+                                    <input class="form-control" type="text" value="<?= h((string)($_SESSION['user']['nombre_usuario'] ?? 'Técnico')) ?>" readonly>
+                                <?php else: ?>
+                                    <select class="form-select" name="id_usuario" required>
+                                        <option value="">-- seleccionar Técnico --</option>
+                                        <?php foreach (($tecnicosDisponibles ?? []) as $tecnicoContrato): ?>
+                                            <?php $idTecnicoContrato = (int)($tecnicoContrato['id_usuario'] ?? 0); ?>
+                                            <option value="<?= $idTecnicoContrato ?>" <?= ((int)($selectedContrato['id_usuario'] ?? 0) === $idTecnicoContrato) ? 'selected' : '' ?>>
+                                                <?= h((string)($tecnicoContrato['nombre_usuario'] ?? '')) ?><?= !empty($tecnicoContrato['email']) ? ' (' . h((string)$tecnicoContrato['email']) . ')' : '' ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
                             </div>
 
                             <div>
@@ -1536,6 +1591,24 @@ if ($fromPanel === 'tecnico') {
                                     <?php foreach (($tiposContrato ?? []) as $tipo): ?>
                                         <option value="<?= h($tipo) ?>" <?= (($addContratoOld['tipo_contrato'] ?? 'PLAN IGUALDAD') === $tipo) ? 'selected' : '' ?>>
                                             <?= h($tipo) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+                        </div>
+
+                        <div>
+                            <label class="form-label">Técnico asignado al servicio</label>
+                            <?php if ($isTecnico): ?>
+                                <input type="hidden" name="id_usuario" value="<?= (int)($_SESSION['user']['id_usuario'] ?? 0) ?>">
+                                <input class="form-control" type="text" value="<?= h((string)($_SESSION['user']['nombre_usuario'] ?? 'Técnico')) ?>" readonly>
+                            <?php else: ?>
+                                <select class="form-select" name="id_usuario" required>
+                                    <option value="">-- seleccionar Técnico --</option>
+                                    <?php foreach (($tecnicosDisponibles ?? []) as $tecnicoContrato): ?>
+                                        <?php $idTecnicoContrato = (int)($tecnicoContrato['id_usuario'] ?? 0); ?>
+                                        <option value="<?= $idTecnicoContrato ?>" <?= ((int)($addContratoOld['id_usuario'] ?? 0) === $idTecnicoContrato) ? 'selected' : '' ?>>
+                                            <?= h((string)($tecnicoContrato['nombre_usuario'] ?? '')) ?><?= !empty($tecnicoContrato['email']) ? ' (' . h((string)$tecnicoContrato['email']) . ')' : '' ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -1798,6 +1871,125 @@ if ($fromPanel === 'tecnico') {
         }
 
         initTecnicosFilter('tecnicosFilterAdd', 'tecnicosListAdd');
+
+        function parseCnaeValue(raw) {
+            return String(raw || '')
+                .split(/[\r\n,;]+/)
+                .map(function(item) {
+                    return item.trim();
+                })
+                .filter(function(item) {
+                    return item !== '';
+                });
+        }
+
+        function uniqueCnaeValues(values) {
+            var seen = {};
+            var result = [];
+
+            values.forEach(function(value) {
+                var key = value.toLowerCase();
+                if (seen[key]) {
+                    return;
+                }
+                seen[key] = true;
+                result.push(value);
+            });
+
+            return result;
+        }
+
+        function syncCnaeWidget(widget) {
+            var list = widget.querySelector('.js-cnae-list');
+            var hidden = widget.querySelector('.js-cnae-hidden');
+            if (!list || !hidden) {
+                return [];
+            }
+
+            var values = [];
+            list.querySelectorAll('[data-cnae-value]').forEach(function(card) {
+                values.push(String(card.getAttribute('data-cnae-value') || '').trim());
+            });
+
+            hidden.value = values.join('\n');
+            return values;
+        }
+
+        function renderCnaeCard(widget, value) {
+            var list = widget.querySelector('.js-cnae-list');
+            if (!list || !value) {
+                return;
+            }
+
+            var exists = Array.from(list.querySelectorAll('[data-cnae-value]')).some(function(card) {
+                return String(card.getAttribute('data-cnae-value') || '').toLowerCase() === value.toLowerCase();
+            });
+
+            if (exists) {
+                return;
+            }
+
+            var card = document.createElement('span');
+            card.className = 'badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-2 px-3 py-2';
+            card.setAttribute('data-cnae-value', value);
+
+            var label = document.createElement('span');
+            label.textContent = value;
+
+            var remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn-close btn-close-dark ms-1';
+            remove.setAttribute('aria-label', 'Eliminar CNAE');
+            remove.addEventListener('click', function() {
+                card.remove();
+                syncCnaeWidget(widget);
+            });
+
+            card.appendChild(label);
+            card.appendChild(remove);
+            list.appendChild(card);
+            syncCnaeWidget(widget);
+        }
+
+        function initCnaeWidget(widget) {
+            var input = widget.querySelector('.js-cnae-input');
+            var addButton = widget.querySelector('.js-cnae-add');
+            var hidden = widget.querySelector('.js-cnae-hidden');
+
+            if (!input || !addButton || !hidden) {
+                return;
+            }
+
+            var initialValues = uniqueCnaeValues(parseCnaeValue(hidden.value));
+            hidden.value = '';
+
+            initialValues.forEach(function(value) {
+                renderCnaeCard(widget, value);
+            });
+
+            function addCurrentValue() {
+                var value = input.value.trim();
+                if (!value) {
+                    return;
+                }
+
+                renderCnaeCard(widget, value);
+                input.value = '';
+                input.focus();
+            }
+
+            addButton.addEventListener('click', addCurrentValue);
+            input.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addCurrentValue();
+                }
+            });
+        }
+
+        document.querySelectorAll('[data-cnae-widget]').forEach(function(widget) {
+            initCnaeWidget(widget);
+        });
 
         var flashMsg = document.querySelector('.js-flash-msg');
         if (flashMsg && typeof bootstrap !== 'undefined') {

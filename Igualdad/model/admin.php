@@ -219,7 +219,9 @@ if ($view === 'seguimiento_tecnicos') {
         $seguimientoTecnicoEmpresas[] = [
           'id_empresa' => (int)($rowEmpresaSeg['id_empresa'] ?? 0),
           'razon_social' => trim((string)($rowEmpresaSeg['razon_social'] ?? '')),
+          'empresa_asignada' => trim((string)($rowEmpresaSeg['razon_social'] ?? '')),
           'plan' => $tipoContratoLabel,
+          'servicio' => $tipoContratoLabel,
           'estado' => $estado,
           'progreso' => $progreso,
         ];

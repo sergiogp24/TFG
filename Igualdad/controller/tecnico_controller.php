@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 session_start();
@@ -65,8 +66,8 @@ if ($accion === 'contactar_empresa') {
     redirect_tecnico('contacto_empresa', 'Debes completar empresa, asunto y mensaje.');
   }
 
-  $stmtEmpresa = db()->prepare("\n    SELECT\n      e.id_empresa,\n      e.razon_social,\n      TRIM(COALESCE(e.email, '')) AS email\n    FROM empresa e\n    WHERE e.id_empresa = ?\n      AND (\n        EXISTS (\n          SELECT 1\n          FROM usuario_empresa ue\n          WHERE ue.id_empresa = e.id_empresa\n            AND ue.id_usuario = ?\n        )\n        OR e.id_usuario = ?\n      )\n    LIMIT 1\n  ");
-  $stmtEmpresa->bind_param('iii', $idEmpresa, $tecnicoId, $tecnicoId);
+  $stmtEmpresa = db()->prepare("\n    SELECT\n      e.id_empresa,\n      e.razon_social,\n      TRIM(COALESCE(e.email, '')) AS email\n    FROM empresa e\n    WHERE e.id_empresa = ?\n      AND (\n        EXISTS (\n          SELECT 1\n          FROM usuario_empresa ue\n          WHERE ue.id_empresa = e.id_empresa\n            AND ue.id_usuario = ?\n        )\n        OR e.id_usuario = ?\n        OR EXISTS (\n          SELECT 1\n          FROM contrato_empresa ce\n          WHERE ce.id_empresa = e.id_empresa\n            AND ce.id_usuario = ?\n        )\n      )\n    LIMIT 1\n  ");
+  $stmtEmpresa->bind_param('iiii', $idEmpresa, $tecnicoId, $tecnicoId, $tecnicoId);
   $stmtEmpresa->execute();
   $empresa = $stmtEmpresa->get_result()->fetch_assoc();
   $stmtEmpresa->close();
@@ -212,14 +213,18 @@ if ($accion === 'crear_reunion') {
             WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?
           )
           OR e.id_usuario = ?
+          OR EXISTS (
+            SELECT 1 FROM contrato_empresa ce
+            WHERE ce.id_empresa = e.id_empresa AND ce.id_usuario = ?
+          )
         )
       LIMIT 1
     ");
-    $stmtEmpresa->bind_param('iii', $idEmpresa, $tecnicoId, $tecnicoId);
+    $stmtEmpresa->bind_param('iiii', $idEmpresa, $tecnicoId, $tecnicoId, $tecnicoId);
     $stmtEmpresa->execute();
     $empresaValida = (bool)$stmtEmpresa->get_result()->fetch_assoc();
     $stmtEmpresa->close();
-    
+
     if (!$empresaValida) {
       redirect_tecnico('reuniones', 'La empresa seleccionada no es valida');
     }

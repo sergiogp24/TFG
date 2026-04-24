@@ -226,10 +226,10 @@ if ($accion === 'crear') {
   $newUserId = (int)$stmt->insert_id;
   $stmt->close();
 
-  // Generar token temporal (válido por 24 horas)(email maki)
+  // Generar token temporal (válido por 7 días)
   $token = bin2hex(random_bytes(32)); // Token seguro de 64 caracteres
-  $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // 24 horas desde ahora
-  $fechaReunion = date('Y-m-d', strtotime('+15 day')); // TODO: Cambiar a 15 dias cuando se testee
+  $expiresAt = date('Y-m-d H:i:s', time() + (7 * 24 * 60 * 60)); // 7 días desde ahora misma hora Si bug swaping a (168*60*60)
+  $fechaReunion = date('Y-m-d', strtotime('+15 day')); // TODO: Cambiar a 15 dias cuando fin test
   $horaReunion = '9:00';
   $objetivoReunion = 'Subir R.R';
 

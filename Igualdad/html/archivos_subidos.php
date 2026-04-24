@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
@@ -17,6 +18,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
 ?>
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -25,6 +27,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
   <link rel="stylesheet" href="../css/global.css">
   <link rel="stylesheet" href="<?= $panelCss ?>">
 </head>
+
 <body class="bg-light">
   <div class="container-fluid py-4">
     <div class="row g-3">
@@ -203,4 +206,5 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

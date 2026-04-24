@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require __DIR__ . '/auth.php';
@@ -125,6 +126,7 @@ if ($method === 'POST' && $tokenValid) {
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -132,10 +134,11 @@ if ($method === 'POST' && $tokenValid) {
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/login.css">
 </head>
+
 <body>
     <div class="login-container">
         <div class="login-card">
-            
+
             <!-- Encabezado con logo -->
             <div class="login-header">
                 <div class="login-logo">CI</div>
@@ -165,83 +168,77 @@ if ($method === 'POST' && $tokenValid) {
                 <form method="POST">
                     <?= csrf_input() ?>
                     <input type="hidden" name="token" value="<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?>">
-                    
+
                     <div class="form-group">
                         <label for="email">Email</label>
-                        <input 
-                            type="email" 
-                            id="email" 
-                            class="form-control" 
-                            value="<?= htmlspecialchars($userEmail, ENT_QUOTES, 'UTF-8') ?>" 
-                            readonly
-                        >
+                        <input
+                            type="email"
+                            id="email"
+                            class="form-control"
+                            value="<?= htmlspecialchars($userEmail, ENT_QUOTES, 'UTF-8') ?>"
+                            readonly>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="username">Usuario</label>
-                        <input 
-                            type="text" 
-                            id="username" 
-                            class="form-control" 
-                            value="<?= htmlspecialchars($userName, ENT_QUOTES, 'UTF-8') ?>" 
-                            readonly
-                        >
+                        <input
+                            type="text"
+                            id="username"
+                            class="form-control"
+                            value="<?= htmlspecialchars($userName, ENT_QUOTES, 'UTF-8') ?>"
+                            readonly>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="password">Contraseña</label>
                         <div style="position: relative;">
-                            <input 
-                                type="password" 
-                                id="password" 
-                                name="password" 
-                                class="form-control" 
-                                required 
-                                minlength="6" 
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                class="form-control"
+                                required
+                                minlength="6"
                                 placeholder="Mínimo 6 caracteres"
-                                style="padding-right: 44px;"
-                            >
-                            <button 
-                                type="button" 
-                                id="toggle-password" 
+                                style="padding-right: 44px;">
+                            <button
+                                type="button"
+                                id="toggle-password"
                                 aria-label="Mostrar u ocultar contraseña"
                                 aria-pressed="false"
-                                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 1px solid #d0d7de; background: #fff; cursor: pointer; font-size: 12px; line-height: 1; padding: 6px 10px; border-radius: 6px;"
-                            >
+                                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 1px solid #d0d7de; background: #fff; cursor: pointer; font-size: 12px; line-height: 1; padding: 6px 10px; border-radius: 6px;">
                                 Mostrar
                             </button>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="password_confirm">Confirmar Contraseña</label>
                         <div style="position: relative;">
-                            <input 
-                                type="password" 
-                                id="password_confirm" 
-                                name="password_confirm" 
-                                class="form-control" 
-                                required 
-                                minlength="6" 
+                            <input
+                                type="password"
+                                id="password_confirm"
+                                name="password_confirm"
+                                class="form-control"
+                                required
+                                minlength="6"
                                 placeholder="Repite tu contraseña"
-                                style="padding-right: 44px;"
-                            >
-                            <button 
-                                type="button" 
-                                id="toggle-password-confirm" 
+                                style="padding-right: 44px;">
+                            <button
+                                type="button"
+                                id="toggle-password-confirm"
                                 aria-label="Mostrar u ocultar confirmación de contraseña"
                                 aria-pressed="false"
-                                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 1px solid #d0d7de; background: #fff; cursor: pointer; font-size: 12px; line-height: 1; padding: 6px 10px; border-radius: 6px;"
-                            >
+                                style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 1px solid #d0d7de; background: #fff; cursor: pointer; font-size: 12px; line-height: 1; padding: 6px 10px; border-radius: 6px;">
                                 Mostrar
                             </button>
                         </div>
                     </div>
-                    
+
                     <button type="submit" class="login-button">Establecer Contraseña</button>
                 </form>
                 <script>
-                    (function () {
+                    (function() {
                         function setupToggle(buttonId, inputId) {
                             var button = document.getElementById(buttonId);
                             var input = document.getElementById(inputId);
@@ -250,7 +247,7 @@ if ($method === 'POST' && $tokenValid) {
                                 return;
                             }
 
-                            button.addEventListener('click', function () {
+                            button.addEventListener('click', function() {
                                 var isPassword = input.type === 'password';
                                 input.type = isPassword ? 'text' : 'password';
                                 button.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
@@ -276,4 +273,5 @@ if ($method === 'POST' && $tokenValid) {
         </div>
     </div>
 </body>
+
 </html>

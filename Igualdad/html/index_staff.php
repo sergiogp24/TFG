@@ -319,7 +319,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                     <?php endif; ?>
 
                     <form action="../php/procesar_registro_retributivo.php" method="POST" enctype="multipart/form-data">
-                      <?= csrf_input() ?>
+                        <?= csrf_input() ?>
                         <label for="nombre_empresa_staff">Empresa / Referencia:</label>
                         <?php if (!$sinEmpresaFormulario): ?>
                             <select id="nombre_empresa_staff" name="id_empresa" class="form-control mb-3" required>

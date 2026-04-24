@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -31,8 +32,8 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         }
 
         $nombreArchivoEmpresa = normalizarNombreArchivoEmpresa($razonSocial);
-        $nombreArchivoEmpresa = ($anioRegistro !== null && $anioRegistro !== '') 
-            ? $nombreArchivoEmpresa . '_' . $anioRegistro 
+        $nombreArchivoEmpresa = ($anioRegistro !== null && $anioRegistro !== '')
+            ? $nombreArchivoEmpresa . '_' . $anioRegistro
             : $nombreArchivoEmpresa;
         $rutaWordFinal = $destDirWord . DIRECTORY_SEPARATOR . $nombreArchivoEmpresa . '_PLAN_IGUALDAD.docx';
 
@@ -49,7 +50,7 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         if (function_exists('db')) {
             $dbConn = db();
             if ($dbConn instanceof mysqli) {
-                $reemplazosEmpresa = obtenerReemplazosEmpresaDesdeBD($dbConn, $razonSocial);
+                $reemplazosEmpresa = obtenerReemplazosEmpresaDesdeBD($dbConn, $razonSocial, $idEmpresa);
             }
         }
 
@@ -143,7 +144,6 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         }
 
         return $rutaWordFinal;
-
     } catch (\Throwable $e) {
         throw new RuntimeException('Error al generar Word: ' . $e->getMessage());
     }
@@ -224,18 +224,81 @@ function esCeroNumerico($valor): bool
 /**
  * DATOS EMPRESA
  */
-function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial): array
+function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial, ?int $idEmpresa = null): array
 {
-    $stmt = $db->prepare("\n        SELECT * FROM empresa\n        WHERE UPPER(TRIM(razon_social)) = ?\n        LIMIT 1\n    ");
+    $empresa = [];
 
-    $razonSocial = mb_strtoupper(trim($razonSocial));
-    $stmt->bind_param('s', $razonSocial);
-    $stmt->execute();
+    if ($idEmpresa !== null && $idEmpresa > 0) {
+        $stmt = $db->prepare("SELECT * FROM empresa WHERE id_empresa = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('i', $idEmpresa);
+            $stmt->execute();
+            $empresa = $stmt->get_result()->fetch_assoc() ?: [];
+            $stmt->close();
+        }
+    }
 
-    $empresa = $stmt->get_result()->fetch_assoc() ?: [];
-    $stmt->close();
+    if ($empresa === []) {
+        $stmt = $db->prepare("\n        SELECT * FROM empresa\n        WHERE UPPER(TRIM(razon_social)) = ?\n        LIMIT 1\n    ");
+
+        if ($stmt) {
+            $razonSocial = mb_strtoupper(trim($razonSocial));
+            $stmt->bind_param('s', $razonSocial);
+            $stmt->execute();
+
+            $empresa = $stmt->get_result()->fetch_assoc() ?: [];
+            $stmt->close();
+        }
+    }
+
+    if ($empresa === []) {
+        return [];
+    }
+
+    $idEmpresaReal = (int)($empresa['id_empresa'] ?? 0);
+    if ($idEmpresaReal > 0) {
+        $cnaes = obtenerCnaesEmpresaDesdeBD($db, $idEmpresaReal);
+        if (!empty($cnaes)) {
+            $empresa['cnae_list'] = $cnaes;
+            $empresa['cnae'] = implode(', ', $cnaes);
+        } elseif (isset($empresa['cnae'])) {
+            $cnaeLegacy = trim((string)$empresa['cnae']);
+            if ($cnaeLegacy !== '') {
+                $empresa['cnae_list'] = [$cnaeLegacy];
+                $empresa['cnae'] = $cnaeLegacy;
+            }
+        }
+    }
 
     return $empresa;
+}
+
+function obtenerCnaesEmpresaDesdeBD(mysqli $db, int $idEmpresa): array
+{
+    if ($idEmpresa <= 0) {
+        return [];
+    }
+
+    $stmt = $db->prepare("SELECT nombre FROM cnae WHERE id_empresa = ? ORDER BY id ASC");
+    if (!$stmt) {
+        return [];
+    }
+
+    $stmt->bind_param('i', $idEmpresa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $cnaes = [];
+    while ($fila = $result->fetch_assoc()) {
+        $nombre = trim((string)($fila['nombre'] ?? ''));
+        if ($nombre !== '') {
+            $cnaes[] = $nombre;
+        }
+    }
+
+    $stmt->close();
+
+    return $cnaes;
 }
 
 /**

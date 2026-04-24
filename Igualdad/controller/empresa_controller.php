@@ -44,6 +44,16 @@ function tecnico_tiene_empresa(int $idEmpresa, int $idUsuario): bool
   $ok = (bool)$stmt->get_result()->fetch_assoc();
   $stmt->close();
 
+  if ($ok) {
+    return true;
+  }
+
+  $stmt = $db->prepare("SELECT 1 FROM contrato_empresa WHERE id_empresa = ? AND id_usuario = ? LIMIT 1");
+  $stmt->bind_param('ii', $idEmpresa, $idUsuario);
+  $stmt->execute();
+  $ok = (bool)$stmt->get_result()->fetch_assoc();
+  $stmt->close();
+
   return $ok;
 }
 
@@ -133,6 +143,84 @@ function obtener_tecnicos_validos(array $idsTecnicos): array
   }
 
   return $validos;
+}
+
+function tabla_cnae_disponible(): bool
+{
+  static $checked = false;
+  static $exists = false;
+
+  if ($checked) {
+    return $exists;
+  }
+
+  $checked = true;
+  $res = db()->query("SHOW TABLES LIKE 'cnae'");
+  $exists = ($res instanceof mysqli_result && $res->num_rows > 0);
+
+  return $exists;
+}
+
+function parsear_cnaes(string $raw): array
+{
+  $parts = preg_split('/[\r\n,;]+/u', $raw);
+  if (!is_array($parts)) {
+    return [];
+  }
+
+  $result = [];
+  foreach ($parts as $item) {
+    $value = trim((string)$item);
+    if ($value === '') {
+      continue;
+    }
+
+    $key = function_exists('mb_strtolower')
+      ? mb_strtolower($value, 'UTF-8')
+      : strtolower($value);
+
+    if (!isset($result[$key])) {
+      $result[$key] = $value;
+    }
+  }
+
+  return array_values($result);
+}
+
+function guardar_cnaes_empresa(int $idEmpresa, array $cnaes): void
+{
+  if ($idEmpresa <= 0 || !tabla_cnae_disponible()) {
+    return;
+  }
+
+  $db = db();
+
+  $stmtDelete = $db->prepare('DELETE FROM cnae WHERE id_empresa = ?');
+  if ($stmtDelete) {
+    $stmtDelete->bind_param('i', $idEmpresa);
+    $stmtDelete->execute();
+    $stmtDelete->close();
+  }
+
+  if (empty($cnaes)) {
+    return;
+  }
+
+  $stmtInsert = $db->prepare('INSERT INTO cnae (nombre, id_empresa) VALUES (?, ?)');
+  if (!$stmtInsert) {
+    return;
+  }
+
+  foreach ($cnaes as $cnaeNombre) {
+    $nombre = trim((string)$cnaeNombre);
+    if ($nombre === '') {
+      continue;
+    }
+    $stmtInsert->bind_param('si', $nombre, $idEmpresa);
+    $stmtInsert->execute();
+  }
+
+  $stmtInsert->close();
 }
 
 function sincronizar_tecnico_empresa(int $idEmpresa, array $idsTecnicos): void
@@ -354,7 +442,8 @@ if ($accion === 'add_empresas') {
   $contacto = trim((string)($_POST['contacto'] ?? ''));
   $email = trim((string)($_POST['email'] ?? ''));
   $telefono = trim((string)($_POST['telefono'] ?? ''));
-  $cnae = trim((string)($_POST['cnae'] ?? ''));
+  $cnaeRaw = trim((string)($_POST['cnae'] ?? ''));
+  $cnaes = parsear_cnaes($cnaeRaw);
   $convenio = trim((string)($_POST['convenio'] ?? ''));
   $personas_mujeres = trim((string)($_POST['personas_mujeres'] ?? ''));
   $personas_hombres = trim((string)($_POST['personas_hombres'] ?? ''));
@@ -393,7 +482,6 @@ if ($accion === 'add_empresas') {
   $ano_constitucional = ($ano_constitucional === '') ? null : $ano_constitucional;
   $cargo = ($cargo === '') ? null : $cargo;
   $contacto = ($contacto === '') ? null : $contacto;
-  $cnae = ($cnae === '') ? null : $cnae;
   $convenio = ($convenio === '') ? null : $convenio;
   $personas_mujeres = ($personas_mujeres === '') ? null : (int)$personas_mujeres;
   $personas_hombres = ($personas_hombres === '') ? null : (int)$personas_hombres;
@@ -406,14 +494,14 @@ if ($accion === 'add_empresas') {
     $stmt = db()->prepare("INSERT INTO empresa(
         razon_social, nif, domicilio_social, forma_juridica, ano_constitucional,
         responsable, cargo, contacto, email, telefono,
-        sector, cnae, convenio,
+        sector, convenio,
         personas_mujeres, personas_hombres, personas_total, centros_trabajo,
         recogida_informacion, vigencia_plan, id_usuario
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ");
 
     $stmt->bind_param(
-      'sssssssssssssiiiissi',
+      'ssssssssssssiiiissi',
       $razon_social,
       $nif,
       $domicilio_social,
@@ -425,7 +513,6 @@ if ($accion === 'add_empresas') {
       $email,
       $telefono,
       $sector,
-      $cnae,
       $convenio,
       $personas_mujeres,
       $personas_hombres,
@@ -439,6 +526,8 @@ if ($accion === 'add_empresas') {
     $stmt->execute();
     $idEmpresaNueva = (int)$stmt->insert_id;
     $stmt->close();
+
+    guardar_cnaes_empresa($idEmpresaNueva, $cnaes);
 
     sincronizar_tecnico_empresa($idEmpresaNueva, $tecnicosSeleccionados);
 
@@ -490,7 +579,8 @@ if ($accion === 'editar_empresas') {
   $contacto = trim((string)($_POST['contacto'] ?? ''));
   $email = trim((string)($_POST['email'] ?? ''));
   $telefono = trim((string)($_POST['telefono'] ?? ''));
-  $cnae = trim((string)($_POST['cnae'] ?? ''));
+  $cnaeRaw = trim((string)($_POST['cnae'] ?? ''));
+  $cnaes = parsear_cnaes($cnaeRaw);
   $convenio = trim((string)($_POST['convenio'] ?? ''));
   $personas_mujeres = trim((string)($_POST['personas_mujeres'] ?? ''));
   $personas_hombres = trim((string)($_POST['personas_hombres'] ?? ''));
@@ -544,7 +634,6 @@ if ($accion === 'editar_empresas') {
   $contacto = ($contacto === '') ? null : $contacto;
   $email = ($email === '') ? null : $email;
   $telefono = ($telefono === '') ? null : $telefono;
-  $cnae = ($cnae === '') ? null : $cnae;
   $convenio = ($convenio === '') ? null : $convenio;
 
   $personas_mujeres = ($personas_mujeres === '') ? null : (int)$personas_mujeres;
@@ -555,8 +644,8 @@ if ($accion === 'editar_empresas') {
   $recogida_informacion = ($recogida_informacion === '') ? null : $recogida_informacion;
   $vigencia_plan = ($vigencia_plan === '') ? null : $vigencia_plan;
 
-try {
-  $stmt = db()->prepare("
+  try {
+    $stmt = db()->prepare("
     UPDATE empresa SET
       razon_social = ?,
       nif = ?,
@@ -569,7 +658,6 @@ try {
       contacto = ?,
       email = ?,
       telefono = ?,
-      cnae = ?,
       convenio = ?,
       personas_mujeres = ?,
       personas_hombres = ?,
@@ -581,57 +669,57 @@ try {
     WHERE id_empresa = ?
   ");
 
-  if ($stmt === false) {
-    redirect_view_empresas('edit_empresas', 'Error: no se pudo preparar la consulta (db()->prepare falló)');
+    if ($stmt === false) {
+      redirect_view_empresas('edit_empresas', 'Error: no se pudo preparar la consulta (db()->prepare falló)');
+    }
+
+    $stmt->bind_param(
+      'ssssssssssssiiiissii',
+      $razon_social,
+      $nif,
+      $sector,
+      $domicilio_social,
+      $forma_juridica,
+      $ano_constitucional,
+      $responsable,
+      $cargo,
+      $contacto,
+      $email,
+      $telefono,
+      $convenio,
+      $personas_mujeres,
+      $personas_hombres,
+      $personas_totales,
+      $centros_trabajo,
+      $recogida_informacion,
+      $vigencia_plan,
+      $id_usuario,
+      $id_empresa
+    );
+
+    $stmt->execute();
+    $stmt->close();
+
+    guardar_cnaes_empresa($id_empresa, $cnaes);
+
+    if (!$esTecnico) {
+      sincronizar_tecnico_empresa($id_empresa, $tecnicosSeleccionados);
+    }
+
+    $resultadoSubida = guardar_archivos_empresa($id_empresa, $_FILES['archivos_empresa'] ?? null);
+    $mensajeFinal = 'Empresa actualizada';
+    if ($resultadoSubida['ok'] > 0) {
+      $mensajeFinal .= ' y ' . (int)$resultadoSubida['ok'] . ' archivo(s) guardado(s)';
+    }
+    if (!empty($resultadoSubida['errores'])) {
+      $mensajeFinal .= '. Errores de archivos: ' . implode('; ', $resultadoSubida['errores']);
+    }
+
+    redirect_menu_empresas($mensajeFinal);
+  } catch (Throwable $e) {
+    log_internal_error_empresa('empresa.editar', $e);
+    redirect_view_empresas('edit_empresas', 'No se pudo actualizar la empresa. Intentalo de nuevo.');
   }
-
-  $stmt->bind_param(
-    'sssssssssssssiiiissii',
-    $razon_social,
-    $nif,
-    $sector,
-    $domicilio_social,
-    $forma_juridica,
-    $ano_constitucional,
-    $responsable,
-    $cargo,
-    $contacto,
-    $email,
-    $telefono,
-    $cnae,
-    $convenio,
-    $personas_mujeres,
-    $personas_hombres,
-    $personas_totales,
-    $centros_trabajo,
-    $recogida_informacion,
-    $vigencia_plan,
-    $id_usuario,
-    $id_empresa
-  );
-
-  $stmt->execute();
-  $stmt->close();
-
-  if (!$esTecnico) {
-    sincronizar_tecnico_empresa($id_empresa, $tecnicosSeleccionados);
-  }
-
-  $resultadoSubida = guardar_archivos_empresa($id_empresa, $_FILES['archivos_empresa'] ?? null);
-  $mensajeFinal = 'Empresa actualizada';
-  if ($resultadoSubida['ok'] > 0) {
-    $mensajeFinal .= ' y ' . (int)$resultadoSubida['ok'] . ' archivo(s) guardado(s)';
-  }
-  if (!empty($resultadoSubida['errores'])) {
-    $mensajeFinal .= '. Errores de archivos: ' . implode('; ', $resultadoSubida['errores']);
-  }
-
-  redirect_menu_empresas($mensajeFinal);
-} catch (Throwable $e) {
-  log_internal_error_empresa('empresa.editar', $e);
-  redirect_view_empresas('edit_empresas', 'No se pudo actualizar la empresa. Intentalo de nuevo.');
-}
-
 }
 
 
@@ -664,6 +752,9 @@ if ($accion === 'eliminar_empresas') {
 if ($accion === 'add_contratos') {
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
   $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
+  $idUsuarioServicio = $esTecnico
+    ? $currentUserId
+    : (int)($_POST['id_usuario'] ?? 0);
 
   if ($esTecnico && !tecnico_tiene_empresa($idEmpresa, $currentUserId)) {
     redirect_view_empresas('ver_contratos', 'No tienes permiso para usar esta empresa');
@@ -686,6 +777,7 @@ if ($accion === 'add_contratos') {
 
   $_SESSION['add_contrato_old'] = [
     'id_empresa' => $idEmpresa,
+    'id_usuario' => $idUsuarioServicio,
     'tipo_contrato' => $tipoContrato,
     'inicio_plan' => $inicioPlan,
     'fin_plan' => $finPlan,
@@ -702,6 +794,7 @@ if ($accion === 'add_contratos') {
   };
 
   if ($idEmpresa <= 0) $errorContrato('Selecciona una empresa.');
+  if ($idUsuarioServicio <= 0) $errorContrato('Selecciona un tecnico para el servicio.');
   if ($tipoContrato === '' || $inicioContratacion === '' || $finContratacion === '') {
     $errorContrato('Completa todos los campos del contrato.');
   }
@@ -752,6 +845,17 @@ if ($accion === 'add_contratos') {
       $errorContrato('La empresa seleccionada no existe.');
     }
 
+    if (!$esTecnico) {
+      $stmtTecnico = $db->prepare("\n        SELECT 1\n        FROM usuario u\n        INNER JOIN rol r ON r.id = u.rol_id\n        WHERE u.id_usuario = ?\n          AND UPPER(TRIM(COALESCE(r.nombre, ''))) IN ('TECNICO', 'TÉCNICO')\n        LIMIT 1\n      ");
+      $stmtTecnico->bind_param('i', $idUsuarioServicio);
+      $stmtTecnico->execute();
+      $tecnicoValido = (bool)$stmtTecnico->get_result()->fetch_assoc();
+      $stmtTecnico->close();
+      if (!$tecnicoValido) {
+        $errorContrato('El tecnico seleccionado no es válido.');
+      }
+    }
+
     if ($usaPlanYMedidas) {
       $stmtArea = $db->prepare("SELECT id_plan FROM area_plan WHERE id_plan = ? LIMIT 1");
       foreach ($areas as $idPlanArea) {
@@ -767,8 +871,8 @@ if ($accion === 'add_contratos') {
 
     $db->begin_transaction();
 
-    $stmt = $db->prepare("INSERT INTO contrato_empresa (tipo_contrato, inicio_contratacion, fin_contratacion, id_empresa) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param('sssi', $tipoContrato, $inicioContratacion, $finContratacion, $idEmpresa);
+    $stmt = $db->prepare("INSERT INTO contrato_empresa (tipo_contrato, inicio_contratacion, fin_contratacion, id_empresa, id_usuario) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param('sssii', $tipoContrato, $inicioContratacion, $finContratacion, $idEmpresa, $idUsuarioServicio);
     $stmt->execute();
     $stmt->close();
 
@@ -838,6 +942,9 @@ if ($accion === 'edit_contratos') {
   $idContrato = (int)($_POST['id_contrato_empresa'] ?? 0);
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
   $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
+  $idUsuarioServicio = $esTecnico
+    ? $currentUserId
+    : (int)($_POST['id_usuario'] ?? 0);
   $tipoContrato = strtoupper(trim((string)($_POST['tipo_contrato'] ?? '')));
   $inicioPlan = trim((string)($_POST['inicio_plan'] ?? ''));
   $finPlan = trim((string)($_POST['fin_plan'] ?? ''));
@@ -856,6 +963,7 @@ if ($accion === 'edit_contratos') {
   $_SESSION['edit_contrato_old'] = [
     'id_contrato_empresa' => $idContrato,
     'id_empresa' => $idEmpresa,
+    'id_usuario' => $idUsuarioServicio,
     'tipo_contrato' => $tipoContrato,
     'inicio_plan' => $inicioPlan,
     'fin_plan' => $finPlan,
@@ -887,6 +995,7 @@ if ($accion === 'edit_contratos') {
 
   if ($idContrato <= 0) $errorEditContrato('Contrato inválido.');
   if ($idEmpresa <= 0) $errorEditContrato('Selecciona una empresa.');
+  if ($idUsuarioServicio <= 0) $errorEditContrato('Selecciona un tecnico para el servicio.');
   if ($tipoContrato === '' || $inicioContratacion === '' || $finContratacion === '') {
     $errorEditContrato('Completa todos los campos del contrato.');
   }
@@ -952,6 +1061,17 @@ if ($accion === 'edit_contratos') {
     }
     $stmtE->close();
 
+    if (!$esTecnico) {
+      $stmtTecnico = $db->prepare("\n        SELECT 1\n        FROM usuario u\n        INNER JOIN rol r ON r.id = u.rol_id\n        WHERE u.id_usuario = ?\n          AND UPPER(TRIM(COALESCE(r.nombre, ''))) IN ('TECNICO', 'TÉCNICO')\n        LIMIT 1\n      ");
+      $stmtTecnico->bind_param('i', $idUsuarioServicio);
+      $stmtTecnico->execute();
+      $tecnicoValido = (bool)$stmtTecnico->get_result()->fetch_assoc();
+      $stmtTecnico->close();
+      if (!$tecnicoValido) {
+        $errorEditContrato('El tecnico seleccionado no es válido.');
+      }
+    }
+
     if ($usaPlanYMedidas) {
       $stmtArea = $db->prepare("SELECT id_plan FROM area_plan WHERE id_plan = ? LIMIT 1");
       foreach ($areas as $idPlanArea) {
@@ -967,8 +1087,8 @@ if ($accion === 'edit_contratos') {
 
     $db->begin_transaction();
 
-    $stmtU = $db->prepare("UPDATE contrato_empresa SET tipo_contrato = ?, inicio_contratacion = ?, fin_contratacion = ?, id_empresa = ? WHERE id_contrato_empresa = ?");
-    $stmtU->bind_param('sssii', $tipoContrato, $inicioContratacion, $finContratacion, $idEmpresa, $idContrato);
+    $stmtU = $db->prepare("UPDATE contrato_empresa SET tipo_contrato = ?, inicio_contratacion = ?, fin_contratacion = ?, id_empresa = ?, id_usuario = ? WHERE id_contrato_empresa = ?");
+    $stmtU->bind_param('sssiii', $tipoContrato, $inicioContratacion, $finContratacion, $idEmpresa, $idUsuarioServicio, $idContrato);
     $stmtU->execute();
     $stmtU->close();
 
@@ -1056,7 +1176,7 @@ if ($accion === 'edit_contratos') {
 if ($accion === 'delete_contratos') {
   $idContrato = (int)($_POST['id_contrato_empresa'] ?? 0);
   $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
-  
+
   if ($idContrato <= 0) {
     redirect_view_empresas('ver_contratos', 'Contrato inválido.');
   }
@@ -1216,7 +1336,7 @@ if ($accion === 'edit_plan') {
 if ($accion === 'delete_plan_empresa') {
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
   $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
-  
+
   if ($idEmpresa <= 0) {
     redirect_view_empresas('ver_planes', 'Empresa inválida.', $idEmpresa);
   }

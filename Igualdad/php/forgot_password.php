@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require __DIR__ . '/auth.php';
@@ -13,48 +14,50 @@ $success = '';
 $identifier = '';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-    if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
-        $error = 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.';
+  if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
+    $error = 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.';
+  } else {
+    $identifier = trim((string)($_POST['identifier'] ?? ''));
+
+    if ($identifier === '') {
+      $error = 'Introduce tu email o nombre de usuario.';
     } else {
-        $identifier = trim((string)($_POST['identifier'] ?? ''));
+      $success = 'Si los datos son correctos, te hemos enviado un enlace para restablecer tu contrasena.';
 
-        if ($identifier === '') {
-            $error = 'Introduce tu email o nombre de usuario.';
-        } else {
-            $success = 'Si los datos son correctos, te hemos enviado un enlace para restablecer tu contrasena.';
+      $stmt = db()->prepare('SELECT nombre_usuario, email FROM usuario WHERE email = ? OR nombre_usuario = ? LIMIT 1');
+      $stmt->bind_param('ss', $identifier, $identifier);
+      $stmt->execute();
+      $user = $stmt->get_result()->fetch_assoc() ?: null;
+      $stmt->close();
 
-            $stmt = db()->prepare('SELECT nombre_usuario, email FROM usuario WHERE email = ? OR nombre_usuario = ? LIMIT 1');
-            $stmt->bind_param('ss', $identifier, $identifier);
-            $stmt->execute();
-            $user = $stmt->get_result()->fetch_assoc() ?: null;
-            $stmt->close();
+      if ($user) {
+        try {
+          delete_expired_password_reset_tokens();
 
-            if ($user) {
-                try {
-                delete_expired_password_reset_tokens();
+          $email = (string)$user['email'];
+          $username = (string)$user['nombre_usuario'];
+          $token = bin2hex(random_bytes(32));
+          $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60));
 
-                    $email = (string)$user['email'];
-                    $username = (string)$user['nombre_usuario'];
-                    $token = bin2hex(random_bytes(32));
-                    $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60));
+          save_password_reset_token($email, $token, $expiresAt);
 
-                    save_password_reset_token($email, $token, $expiresAt);
-
-                    $baseUrl = correo_url_base();
-                    $resetLink = $baseUrl . '/php/reset_password.php?token=' . urlencode($token);
-                    correo_enviar_restablecimiento_contrasena($email, $username, $resetLink);
-                } catch (Throwable $e) {
-                    error_log('Error en recuperacion de contrasena: ' . $e->getMessage());
-                    $error = 'No se pudo completar el envio del enlace. Intentalo de nuevo en unos minutos.';
-                    $success = '';
-                }
-            }
+          $baseUrl = correo_url_base();
+          $resetLink = $baseUrl . '/php/reset_password.php?token=' . urlencode($token);
+          correo_enviar_restablecimiento_contrasena($email, $username, $resetLink);
+        } catch (Throwable $e) {
+          error_log('Error en recuperacion de contrasena: ' . $e->getMessage());
+          $error = 'No se pudo completar el envio del enlace. Intentalo de nuevo en unos minutos.';
+          $success = '';
         }
+      }
     }
+  }
 }
+
 ?>
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -62,10 +65,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
   <link rel="stylesheet" href="../css/global.css">
   <link rel="stylesheet" href="../css/login.css">
 </head>
+
 <body>
   <div class="login-container">
     <div class="login-card">
-      
+
       <!-- Encabezado con logo -->
       <div class="login-header">
         <div class="login-logo">CI</div>
@@ -88,7 +92,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
       <!-- FORMULARIO -->
       <form method="post" action="forgot_password.php">
         <?= csrf_input() ?>
-        
+
         <div class="form-group">
           <label for="identifier">Email o usuario</label>
           <input
@@ -98,8 +102,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             name="identifier"
             autocomplete="username"
             value="<?= htmlspecialchars($identifier, ENT_QUOTES, 'UTF-8') ?>"
-            required
-          >
+            required>
         </div>
 
         <button class="login-button" type="submit">Enviar enlace</button>
@@ -115,4 +118,5 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     </div>
   </div>
 </body>
+
 </html>

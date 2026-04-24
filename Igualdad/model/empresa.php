@@ -79,9 +79,89 @@ function company_scope_where(string $where, string $companyExpr, bool $isTecnico
     return $where;
   }
 
-  $scope = "EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = {$companyExpr} AND ue.id_usuario = ?)";
+  $scope = "(EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = {$companyExpr} AND ue.id_usuario = ?)"
+    . " OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = {$companyExpr} AND ce.id_usuario = ?)"
+    . " OR EXISTS (SELECT 1 FROM empresa es WHERE es.id_empresa = {$companyExpr} AND es.id_usuario = ?))";
 
   return ($where === '') ? "WHERE $scope" : $where . ' AND ' . $scope;
+}
+
+function tabla_cnae_disponible_model(): bool
+{
+  static $checked = false;
+  static $exists = false;
+
+  if ($checked) {
+    return $exists;
+  }
+
+  $checked = true;
+  $res = db()->query("SHOW TABLES LIKE 'cnae'");
+  $exists = ($res instanceof mysqli_result && $res->num_rows > 0);
+
+  return $exists;
+}
+
+function obtener_cnaes_empresa(int $idEmpresa): array
+{
+  if ($idEmpresa <= 0 || !tabla_cnae_disponible_model()) {
+    return [];
+  }
+
+  $stmt = db()->prepare('SELECT nombre FROM cnae WHERE id_empresa = ? ORDER BY id ASC');
+  if (!$stmt) {
+    return [];
+  }
+
+  $stmt->bind_param('i', $idEmpresa);
+  $stmt->execute();
+  $res = $stmt->get_result();
+
+  $result = [];
+  while ($row = $res->fetch_assoc()) {
+    $nombre = trim((string)($row['nombre'] ?? ''));
+    if ($nombre !== '') {
+      $result[] = $nombre;
+    }
+  }
+
+  $stmt->close();
+  return $result;
+}
+
+function empresa_tiene_columna_cnae(): bool
+{
+  static $checked = false;
+  static $exists = false;
+
+  if ($checked) {
+    return $exists;
+  }
+
+  $checked = true;
+  $res = db()->query("SHOW COLUMNS FROM empresa LIKE 'cnae'");
+  $exists = ($res instanceof mysqli_result && $res->num_rows > 0);
+
+  return $exists;
+}
+
+function obtener_cnae_legacy_empresa(int $idEmpresa): string
+{
+  if ($idEmpresa <= 0 || !empresa_tiene_columna_cnae()) {
+    return '';
+  }
+
+  $stmt = db()->prepare('SELECT cnae FROM empresa WHERE id_empresa = ? LIMIT 1');
+  if (!$stmt) {
+    return '';
+  }
+
+  $stmt->bind_param('i', $idEmpresa);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+
+  return trim((string)($row['cnae'] ?? ''));
 }
 
 $rol = normalize_role((string)($_SESSION['user']['rol'] ?? ''));
@@ -119,11 +199,11 @@ if ($idEmpresaContexto > 0) {
     SELECT id_empresa, razon_social
     FROM empresa
     WHERE id_empresa = ?
-    " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?)" : "") . "
+    " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . "
     LIMIT 1
   ");
   if ($esTecnico) {
-    $stmtEmpresaContexto->bind_param('ii', $idEmpresaContexto, $currentUserId);
+    $stmtEmpresaContexto->bind_param('iiii', $idEmpresaContexto, $currentUserId, $currentUserId, $currentUserId);
   } else {
     $stmtEmpresaContexto->bind_param('i', $idEmpresaContexto);
   }
@@ -186,7 +266,9 @@ if ($view === 'ver_empresas' || $view === 'delete_empresas') {
   $where = company_scope_where($where, 'e.id_empresa', $esTecnico);
   if ($esTecnico) {
     $params[] = $currentUserId;
-    $types .= 'i';
+    $params[] = $currentUserId;
+    $params[] = $currentUserId;
+    $types .= 'iii';
   }
 
   // Total
@@ -247,7 +329,7 @@ if ($view === 'ver_empresas' || $view === 'delete_empresas') {
  * ========================================================= */
 $detalleEmpresa = null;
 $detalleEmpresaAreas = [];
-$detalleUsuario = null;
+$detalleTecnicos = [];
 
 if ($view === 'ver_empresa') {
   $idEmpresaDetalle = (int)($_GET['id_empresa'] ?? 0);
@@ -264,11 +346,11 @@ if ($view === 'ver_empresa') {
         telefono
       FROM empresa
       WHERE id_empresa = ?
-      " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?)" : "") . "
+      " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . "
       LIMIT 1
     ");
     if ($esTecnico) {
-      $stmtEmpresaDetalle->bind_param('ii', $idEmpresaDetalle, $currentUserId);
+      $stmtEmpresaDetalle->bind_param('iiii', $idEmpresaDetalle, $currentUserId, $currentUserId, $currentUserId);
     } else {
       $stmtEmpresaDetalle->bind_param('i', $idEmpresaDetalle);
     }
@@ -277,29 +359,95 @@ if ($view === 'ver_empresa') {
     $stmtEmpresaDetalle->close();
 
     if ($detalleEmpresa !== null) {
-      $stmtDetalleUsuario = db()->prepare(" 
-        SELECT
+      $cnaesDetalle = obtener_cnaes_empresa((int)$detalleEmpresa['id_empresa']);
+      if (!empty($cnaesDetalle)) {
+        $detalleEmpresa['cnae_list'] = $cnaesDetalle;
+      } else {
+        $cnaeLegacy = obtener_cnae_legacy_empresa((int)$detalleEmpresa['id_empresa']);
+        if ($cnaeLegacy !== '') {
+          $detalleEmpresa['cnae_list'] = [$cnaeLegacy];
+        }
+      }
+
+      $servicioEmpresaDetalle = 'Sin contrato';
+      $stmtServicioEmpresa = db()->prepare("SELECT tipo_contrato FROM contrato_empresa WHERE id_empresa = ? ORDER BY id_contrato_empresa DESC LIMIT 1");
+      if ($stmtServicioEmpresa) {
+        $stmtServicioEmpresa->bind_param('i', $idEmpresaDetalle);
+        $stmtServicioEmpresa->execute();
+        $filaServicioEmpresa = $stmtServicioEmpresa->get_result()->fetch_assoc();
+        $stmtServicioEmpresa->close();
+
+        $servicioEmpresaDetalle = trim((string)($filaServicioEmpresa['tipo_contrato'] ?? ''));
+        if ($servicioEmpresaDetalle === '') {
+          $servicioEmpresaDetalle = 'Sin contrato';
+        }
+      }
+
+      $tecnicosById = [];
+
+      // Prioridad: técnicos asignados por servicio (contrato_empresa.id_usuario)
+      $stmtTecnicosContrato = db()->prepare(" 
+        SELECT DISTINCT
+          u.id_usuario,
+          u.nombre_usuario,
+          u.email
+        FROM contrato_empresa ce
+        INNER JOIN usuario u ON u.id_usuario = ce.id_usuario
+        WHERE ce.id_empresa = ?
+          AND ce.id_usuario IS NOT NULL
+        ORDER BY u.nombre_usuario ASC
+      ");
+      $stmtTecnicosContrato->bind_param('i', $idEmpresaDetalle);
+      $stmtTecnicosContrato->execute();
+      $resTecnicosContrato = $stmtTecnicosContrato->get_result();
+      while ($rowTecnico = $resTecnicosContrato->fetch_assoc()) {
+        $idTecnico = (int)($rowTecnico['id_usuario'] ?? 0);
+        if ($idTecnico <= 0) {
+          continue;
+        }
+        $tecnicosById[$idTecnico] = [
+          'id_usuario' => $idTecnico,
+          'nombre_usuario' => (string)($rowTecnico['nombre_usuario'] ?? ''),
+          'email' => (string)($rowTecnico['email'] ?? ''),
+          'empresa_asignada' => (string)($detalleEmpresa['razon_social'] ?? ''),
+          'servicio_asignado' => $servicioEmpresaDetalle,
+        ];
+      }
+      $stmtTecnicosContrato->close();
+
+      // Compatibilidad: técnicos asignados vía usuario_empresa
+      $stmtTecnicosUE = db()->prepare(" 
+        SELECT DISTINCT
           u.id_usuario,
           u.nombre_usuario,
           u.email
         FROM usuario_empresa ue
         INNER JOIN usuario u ON u.id_usuario = ue.id_usuario
+        INNER JOIN rol r ON r.id = u.rol_id
         WHERE ue.id_empresa = ?
-        " . ($esTecnico ? "AND ue.id_usuario = ?" : "") . "
+          AND UPPER(TRIM(COALESCE(r.nombre, ''))) IN ('TECNICO', 'TÉCNICO')
         ORDER BY u.nombre_usuario ASC
-        LIMIT 1
       ");
-        if ($esTecnico) {
-          $stmtDetalleUsuario->bind_param('ii', $idEmpresaDetalle, $currentUserId);
-        } else {
-          $stmtDetalleUsuario->bind_param('i', $idEmpresaDetalle);
+      $stmtTecnicosUE->bind_param('i', $idEmpresaDetalle);
+      $stmtTecnicosUE->execute();
+      $resTecnicosUE = $stmtTecnicosUE->get_result();
+      while ($rowTecnico = $resTecnicosUE->fetch_assoc()) {
+        $idTecnico = (int)($rowTecnico['id_usuario'] ?? 0);
+        if ($idTecnico <= 0 || isset($tecnicosById[$idTecnico])) {
+          continue;
         }
-      $stmtDetalleUsuario->execute();
-      $detalleUsuario = $stmtDetalleUsuario->get_result()->fetch_assoc();
-      $stmtDetalleUsuario->close();
+        $tecnicosById[$idTecnico] = [
+          'id_usuario' => $idTecnico,
+          'nombre_usuario' => (string)($rowTecnico['nombre_usuario'] ?? ''),
+          'email' => (string)($rowTecnico['email'] ?? ''),
+          'empresa_asignada' => (string)($detalleEmpresa['razon_social'] ?? ''),
+          'servicio_asignado' => $servicioEmpresaDetalle,
+        ];
+      }
+      $stmtTecnicosUE->close();
 
-      // Compatibilidad con empresas antiguas que guardan el técnico en empresa.id_usuario.
-      if ($detalleUsuario === null) {
+      // Último fallback legacy: empresa.id_usuario
+      if (empty($tecnicosById)) {
         $stmtDetalleUsuarioLegacy = db()->prepare(" 
           SELECT
             u.id_usuario,
@@ -308,18 +456,29 @@ if ($view === 'ver_empresa') {
           FROM empresa e
           LEFT JOIN usuario u ON u.id_usuario = e.id_usuario
           WHERE e.id_empresa = ?
-          " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?)" : "") . "
+          " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa AND ce.id_usuario = ?) OR e.id_usuario = ?)" : "") . "
           LIMIT 1
         ");
-          if ($esTecnico) {
-            $stmtDetalleUsuarioLegacy->bind_param('ii', $idEmpresaDetalle, $currentUserId);
-          } else {
-            $stmtDetalleUsuarioLegacy->bind_param('i', $idEmpresaDetalle);
-          }
+        if ($esTecnico) {
+          $stmtDetalleUsuarioLegacy->bind_param('iiii', $idEmpresaDetalle, $currentUserId, $currentUserId, $currentUserId);
+        } else {
+          $stmtDetalleUsuarioLegacy->bind_param('i', $idEmpresaDetalle);
+        }
         $stmtDetalleUsuarioLegacy->execute();
-        $detalleUsuario = $stmtDetalleUsuarioLegacy->get_result()->fetch_assoc();
+        $detalleUsuarioLegacy = $stmtDetalleUsuarioLegacy->get_result()->fetch_assoc();
         $stmtDetalleUsuarioLegacy->close();
+
+        $idTecnicoLegacy = (int)($detalleUsuarioLegacy['id_usuario'] ?? 0);
+        if ($idTecnicoLegacy > 0) {
+          $tecnicosById[$idTecnicoLegacy] = [
+            'id_usuario' => $idTecnicoLegacy,
+            'nombre_usuario' => (string)($detalleUsuarioLegacy['nombre_usuario'] ?? ''),
+            'email' => (string)($detalleUsuarioLegacy['email'] ?? ''),
+          ];
+        }
       }
+
+      $detalleTecnicos = array_values($tecnicosById);
 
       $stmtDetalleMedidas = db()->prepare(" 
         SELECT DISTINCT
@@ -332,11 +491,11 @@ if ($view === 'ver_empresa') {
         LEFT JOIN cliente_medida cm ON cm.id_areas_contratadas = ac.id_areas_contratadas
         LEFT JOIN medida m ON m.id_medida = cm.id_medida
         WHERE ac.id_empresa = ?
-        " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = ac.id_empresa AND ue.id_usuario = ?)" : "") . "
+        " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = ac.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = ac.id_empresa AND ce.id_usuario = ?) OR EXISTS (SELECT 1 FROM empresa eac WHERE eac.id_empresa = ac.id_empresa AND eac.id_usuario = ?))" : "") . "
         ORDER BY ap.nombre ASC, m.descripcion ASC
       ");
       if ($esTecnico) {
-        $stmtDetalleMedidas->bind_param('ii', $idEmpresaDetalle, $currentUserId);
+        $stmtDetalleMedidas->bind_param('iiii', $idEmpresaDetalle, $currentUserId, $currentUserId, $currentUserId);
       } else {
         $stmtDetalleMedidas->bind_param('i', $idEmpresaDetalle);
       }
@@ -387,7 +546,6 @@ if ($view === 'edit_empresas') {
         email,
         telefono,
         sector,
-        cnae,
         convenio,
         personas_mujeres,
         personas_hombres,
@@ -398,17 +556,31 @@ if ($view === 'edit_empresas') {
         id_usuario
       FROM empresa
       WHERE id_empresa = ?
-      " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?)" : "") . "
+      " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . "
       LIMIT 1
     ");
     if ($esTecnico) {
-      $stmt->bind_param('ii', $idEmpresa, $currentUserId);
+      $stmt->bind_param('iiii', $idEmpresa, $currentUserId, $currentUserId, $currentUserId);
     } else {
       $stmt->bind_param('i', $idEmpresa);
     }
     $stmt->execute();
     $selectedEmpresa = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+
+    if ($selectedEmpresa !== null) {
+      $cnaesEmpresa = obtener_cnaes_empresa((int)$selectedEmpresa['id_empresa']);
+      if (!empty($cnaesEmpresa)) {
+        $selectedEmpresa['cnae_list'] = $cnaesEmpresa;
+        $selectedEmpresa['cnae'] = implode("\n", $cnaesEmpresa);
+      } else {
+        $cnaeLegacy = obtener_cnae_legacy_empresa((int)$selectedEmpresa['id_empresa']);
+        if ($cnaeLegacy !== '') {
+          $selectedEmpresa['cnae_list'] = [$cnaeLegacy];
+          $selectedEmpresa['cnae'] = $cnaeLegacy;
+        }
+      }
+    }
 
     if ($selectedEmpresa !== null && !$esTecnico) {
       $stmtTecnicoAsignado = db()->prepare("\n        SELECT u.id_usuario, COALESCE(r.nombre, '') AS rol_nombre\n        FROM usuario_empresa ue\n        INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n        LEFT JOIN rol r ON r.id = u.rol_id\n        WHERE ue.id_empresa = ?\n        ORDER BY ue.id_usuario ASC\n      ");
@@ -438,7 +610,7 @@ if ($view === 'edit_empresas') {
 }
 
 $tecnicosDisponibles = [];
-if (!$esTecnico && in_array($view, ['add_empresas', 'edit_empresas'], true)) {
+if (!$esTecnico && in_array($view, ['add_empresas', 'edit_empresas', 'add_contratos', 'edit_contratos'], true)) {
   $stmtTecnicos = db()->prepare("\n    SELECT u.id_usuario, u.nombre_usuario, u.email, COALESCE(r.nombre, '') AS rol_nombre\n    FROM usuario u\n    LEFT JOIN rol r ON r.id = u.rol_id\n    ORDER BY u.nombre_usuario ASC\n  ");
   $stmtTecnicos->execute();
   $resTecnicos = $stmtTecnicos->get_result();
@@ -488,9 +660,12 @@ if ($view === 'edit_contratos' && $tablaContratoExiste) {
             c.inicio_contratacion,
             c.fin_contratacion,
             c.id_empresa,
+            c.id_usuario,
+            tu.nombre_usuario AS tecnico_nombre,
             e.razon_social AS empresa_nombre
           FROM contrato_empresa c
           LEFT JOIN empresa e ON e.id_empresa = c.id_empresa
+          LEFT JOIN usuario tu ON tu.id_usuario = c.id_usuario
           WHERE c.id_contrato_empresa = ?
           LIMIT 1"
         );
@@ -550,6 +725,7 @@ if ($view === 'edit_contratos' && $tablaContratoExiste) {
         if ($selectedContrato !== null && !empty($editContratoOld)) {
             $selectedContrato['id_contrato_empresa'] = $editContratoOld['id_contrato_empresa'] ?? $selectedContrato['id_contrato_empresa'];
             $selectedContrato['id_empresa'] = $editContratoOld['id_empresa'] ?? $selectedContrato['id_empresa'];
+          $selectedContrato['id_usuario'] = $editContratoOld['id_usuario'] ?? $selectedContrato['id_usuario'];
             $selectedContrato['tipo_contrato'] = $editContratoOld['tipo_contrato'] ?? $selectedContrato['tipo_contrato'];
             $selectedContrato['inicio_plan'] = $editContratoOld['inicio_plan'] ?? $selectedContrato['inicio_plan'];
             $selectedContrato['fin_plan'] = $editContratoOld['fin_plan'] ?? $selectedContrato['fin_plan'];
@@ -606,6 +782,7 @@ $areasPlanContrato = [];
 $medidasPorAreaContrato = [];
 $addContratoOld = $_SESSION['add_contrato_old'] ?? [
   'id_empresa' => 0,
+  'id_usuario' => 0,
   'tipo_contrato' => 'PLAN IGUALDAD',
   'inicio_plan' => '',
   'fin_plan' => '',
@@ -627,10 +804,10 @@ if ($view === 'add_contratos' && $tipoContratoFiltro !== '') {
 }
 
 if ($view === 'add_contratos') {
-  $sqlEmpresasContrato = "SELECT id_empresa, razon_social FROM empresa" . ($esTecnico ? " WHERE EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?)" : "") . " ORDER BY razon_social";
+  $sqlEmpresasContrato = "SELECT id_empresa, razon_social FROM empresa" . ($esTecnico ? " WHERE (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . " ORDER BY razon_social";
   $stmtEmp = $db->prepare($sqlEmpresasContrato);
   if ($esTecnico) {
-    $stmtEmp->bind_param('i', $currentUserId);
+    $stmtEmp->bind_param('iii', $currentUserId, $currentUserId, $currentUserId);
   }
   $stmtEmp->execute();
   $resEmp = $stmtEmp->get_result();
@@ -654,10 +831,10 @@ if ($view === 'add_contratos') {
 
 // --- SI ESTÁS EN EDITAR CONTRATO, CARGA TODAS LAS ÁREAS Y MEDIDAS IGUAL QUE EN ALTA ---
 if ($view === 'edit_contratos') {
-  $sqlEmpresasContrato = "SELECT id_empresa, razon_social FROM empresa" . ($esTecnico ? " WHERE EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?)" : "") . " ORDER BY razon_social";
+  $sqlEmpresasContrato = "SELECT id_empresa, razon_social FROM empresa" . ($esTecnico ? " WHERE (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . " ORDER BY razon_social";
   $stmtEmp = $db->prepare($sqlEmpresasContrato);
   if ($esTecnico) {
-    $stmtEmp->bind_param('i', $currentUserId);
+    $stmtEmp->bind_param('iii', $currentUserId, $currentUserId, $currentUserId);
   }
   $stmtEmp->execute();
   $resEmp = $stmtEmp->get_result();
@@ -710,7 +887,9 @@ if ($view === 'ver_contratos' && $tablaContratoExiste) {
   $whereContratos = company_scope_where($whereContratos, 'e.id_empresa', $esTecnico);
   if ($esTecnico) {
     $paramsCon[] = $currentUserId;
-    $typesCon .= 'i';
+    $paramsCon[] = $currentUserId;
+    $paramsCon[] = $currentUserId;
+    $typesCon .= 'iii';
   }
 
   $sqlTotalContratos = "
@@ -741,9 +920,12 @@ if ($view === 'ver_contratos' && $tablaContratoExiste) {
       c.inicio_contratacion,
       c.fin_contratacion,
       c.id_empresa,
+      c.id_usuario,
+      tu.nombre_usuario AS tecnico_nombre,
       e.razon_social
     FROM contrato_empresa c
     JOIN empresa e ON e.id_empresa = c.id_empresa
+    LEFT JOIN usuario tu ON tu.id_usuario = c.id_usuario
     $whereContratos
     ORDER BY c.id_contrato_empresa DESC
     LIMIT ? OFFSET ?
@@ -795,17 +977,19 @@ if ($view === 'ver_planes') {
   $wherePlanes = company_scope_where($wherePlanes, 'e.id_empresa', $esTecnico);
   if ($esTecnico) {
     $paramsPla[] = $currentUserId;
-    $typesPla .= 'i';
+    $paramsPla[] = $currentUserId;
+    $paramsPla[] = $currentUserId;
+    $typesPla .= 'iii';
   }
 
   $planIgualdadCondition = "EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa AND UPPER(TRIM(ce.tipo_contrato)) = 'PLAN IGUALDAD')";
   $wherePlanes = ($wherePlanes === '') ? ('WHERE ' . $planIgualdadCondition) : ($wherePlanes . ' AND ' . $planIgualdadCondition);
 
   // Total de planes
-  $sqlTotalPlanes = "
+ $sqlTotalPlanes = "
     SELECT COUNT(DISTINCT e.id_empresa) AS total
     FROM empresa e
-    JOIN areas_contratadas pc ON pc.id_empresa = e.id_empresa
+    LEFT JOIN contrato_empresa ce_plan ON ce_plan.id_empresa = e.id_empresa AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD'
     $wherePlanes
   ";
   $stmtTotal = db()->prepare($sqlTotalPlanes);
@@ -824,15 +1008,15 @@ if ($view === 'ver_planes') {
   }
 
   // Data de planes con paginación
-  $sqlDataPlanes = "
+ $sqlDataPlanes = "
     SELECT
       e.id_empresa,
       e.razon_social,
       COALESCE(MAX(TRIM(ce_plan.tipo_contrato)), 'PLAN IGUALDAD') AS tipo_contrato,
-      MIN(pc.inicio_plan) AS inicio_plan,
-      MAX(pc.fin_plan) AS fin_plan
+      MIN(ce_plan.inicio_contratacion) AS inicio_plan,
+      MAX(ce_plan.fin_contratacion) AS fin_plan,
+      MAX(ce_plan.id_contrato_empresa) AS id_contrato_empresa
     FROM empresa e
-    JOIN areas_contratadas pc ON pc.id_empresa = e.id_empresa
     LEFT JOIN contrato_empresa ce_plan
       ON ce_plan.id_empresa = e.id_empresa
       AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD'
@@ -872,12 +1056,12 @@ if ($view === 'ver_medidas') {
       FROM empresa e
       JOIN areas_contratadas pc ON pc.id_empresa = e.id_empresa
       WHERE e.id_empresa = ?
-      " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?)" : "") . "
+      " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa AND ce.id_usuario = ?) OR e.id_usuario = ?)" : "") . "
       GROUP BY e.id_empresa, e.razon_social
       LIMIT 1
     ");
     if ($esTecnico) {
-      $stmtPlan->bind_param('ii', $idEmpresaMedidas, $currentUserId);
+      $stmtPlan->bind_param('iiii', $idEmpresaMedidas, $currentUserId, $currentUserId, $currentUserId);
     } else {
       $stmtPlan->bind_param('i', $idEmpresaMedidas);
     }
@@ -897,11 +1081,11 @@ if ($view === 'ver_medidas') {
         LEFT JOIN cliente_medida cm ON cm.id_areas_contratadas = pc.id_areas_contratadas
         LEFT JOIN medida m ON m.id_medida = cm.id_medida
         WHERE pc.id_empresa = ?
-        " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = pc.id_empresa AND ue.id_usuario = ?)" : "") . "
+        " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = pc.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = pc.id_empresa AND ce.id_usuario = ?) OR EXISTS (SELECT 1 FROM empresa epc WHERE epc.id_empresa = pc.id_empresa AND epc.id_usuario = ?))" : "") . "
         ORDER BY ap.nombre ASC, m.descripcion ASC
       ");
       if ($esTecnico) {
-        $stmtMedidas->bind_param('ii', $idEmpresaMedidas, $currentUserId);
+        $stmtMedidas->bind_param('iiii', $idEmpresaMedidas, $currentUserId, $currentUserId, $currentUserId);
       } else {
         $stmtMedidas->bind_param('i', $idEmpresaMedidas);
       }
@@ -958,12 +1142,12 @@ if ($view === 'edit_plan') {
       FROM empresa e
       JOIN areas_contratadas pc ON pc.id_empresa = e.id_empresa
       WHERE e.id_empresa = ?
-      " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?)" : "") . "
+      " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa AND ce.id_usuario = ?) OR e.id_usuario = ?)" : "") . "
       GROUP BY e.id_empresa, e.razon_social
       LIMIT 1
     ");
     if ($esTecnico) {
-      $stmt->bind_param('ii', $idEmpresa, $currentUserId);
+      $stmt->bind_param('iiii', $idEmpresa, $currentUserId, $currentUserId, $currentUserId);
     } else {
       $stmt->bind_param('i', $idEmpresa);
     }
@@ -972,9 +1156,9 @@ if ($view === 'edit_plan') {
     $stmt->close();
 
     if ($editPlan !== null) {
-      $stmtAreas = db()->prepare("SELECT id_plan FROM areas_contratadas WHERE id_empresa = ?" . ($esTecnico ? " AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = areas_contratadas.id_empresa AND ue.id_usuario = ?)" : ""));
+      $stmtAreas = db()->prepare("SELECT id_plan FROM areas_contratadas WHERE id_empresa = ?" . ($esTecnico ? " AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = areas_contratadas.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = areas_contratadas.id_empresa AND ce.id_usuario = ?) OR EXISTS (SELECT 1 FROM empresa ea WHERE ea.id_empresa = areas_contratadas.id_empresa AND ea.id_usuario = ?))" : ""));
       if ($esTecnico) {
-        $stmtAreas->bind_param('ii', $idEmpresa, $currentUserId);
+        $stmtAreas->bind_param('iiii', $idEmpresa, $currentUserId, $currentUserId, $currentUserId);
       } else {
         $stmtAreas->bind_param('i', $idEmpresa);
       }
@@ -988,10 +1172,10 @@ if ($view === 'edit_plan') {
         FROM areas_contratadas pc
         JOIN cliente_medida cm ON cm.id_areas_contratadas = pc.id_areas_contratadas
         WHERE pc.id_empresa = ?
-        " . ($esTecnico ? "AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = pc.id_empresa AND ue.id_usuario = ?)" : "") . "
+        " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = pc.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = pc.id_empresa AND ce.id_usuario = ?) OR EXISTS (SELECT 1 FROM empresa epc2 WHERE epc2.id_empresa = pc.id_empresa AND epc2.id_usuario = ?))" : "") . "
       ");
       if ($esTecnico) {
-        $stmtCM->bind_param('ii', $idEmpresa, $currentUserId);
+        $stmtCM->bind_param('iiii', $idEmpresa, $currentUserId, $currentUserId, $currentUserId);
       } else {
         $stmtCM->bind_param('i', $idEmpresa);
       }
@@ -1023,10 +1207,10 @@ if ($view === 'edit_plan') {
     }
   }
 
-  $sqlEmpEdit = "SELECT id_empresa, razon_social FROM empresa" . ($esTecnico ? " WHERE EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?)" : "") . " ORDER BY razon_social";
+  $sqlEmpEdit = "SELECT id_empresa, razon_social FROM empresa" . ($esTecnico ? " WHERE (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . " ORDER BY razon_social";
   $stmtEmpEdit = db()->prepare($sqlEmpEdit);
   if ($esTecnico) {
-    $stmtEmpEdit->bind_param('i', $currentUserId);
+    $stmtEmpEdit->bind_param('iii', $currentUserId, $currentUserId, $currentUserId);
   }
   $stmtEmpEdit->execute();
   $resEmpEdit = $stmtEmpEdit->get_result();

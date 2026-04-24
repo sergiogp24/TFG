@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
 
 require __DIR__ . '/auth.php';
 require __DIR__ . '/../config/config.php';
 
-function fail(int $code, string $msg): void {
+function fail(int $code, string $msg): void
+{
   http_response_code($code);
   exit($msg);
 }
@@ -26,7 +28,9 @@ if ($id === $defaultId) {
   $mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   $filesize = filesize($fullPath);
 
-  if (ob_get_level()) { @ob_end_clean(); }
+  if (ob_get_level()) {
+    @ob_end_clean();
+  }
   header('Content-Description: File Transfer');
   header('Content-Type: ' . $mime);
   header('Content-Disposition: attachment; filename="' . basename($filename) . '"');
@@ -86,7 +90,9 @@ $filename = (string)$row['nombre_original'];
 $mime = (string)($row['mime'] ?? 'application/octet-stream');
 $filesize = filesize($fullPath);
 
-if (ob_get_level()) { @ob_end_clean(); }
+if (ob_get_level()) {
+  @ob_end_clean();
+}
 
 header('Content-Description: File Transfer');
 header('Content-Type: ' . $mime);

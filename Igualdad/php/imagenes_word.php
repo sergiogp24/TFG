@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use PhpOffice\PhpWord\TemplateProcessor;
@@ -1358,7 +1359,7 @@ function generarGraficoBarrasAgrupadasDesdeConfig(
                         'padding' => 20,
                     ],
                 ],
-                'title' => [ 'display' => true, 'text' => $cfg['titulo'] ?? '' ],
+                'title' => ['display' => true, 'text' => $cfg['titulo'] ?? ''],
             ],
             'scales' => [
                 'x' => [
@@ -1366,10 +1367,10 @@ function generarGraficoBarrasAgrupadasDesdeConfig(
                         'maxRotation' => 45,
                         'minRotation' => 30,
                         'autoSkip' => false,
-                        'font' => [ 'size' => 14 ],
+                        'font' => ['size' => 14],
                     ],
                 ],
-                'y' => [ 'beginAtZero' => true, 'title' => [ 'display' => true, 'text' => 'Personas' ] ],
+                'y' => ['beginAtZero' => true, 'title' => ['display' => true, 'text' => 'Personas']],
             ],
         ],
     ];
@@ -1377,7 +1378,7 @@ function generarGraficoBarrasAgrupadasDesdeConfig(
     // Añadir datasets
     foreach ($cfg['series'] as $serie) {
         $key = $serie['key'];
-        $color = $serie['color'] ?? ['R'=>0,'G'=>0,'B'=>0];
+        $color = $serie['color'] ?? ['R' => 0, 'G' => 0, 'B' => 0];
         $chartConfig['data']['datasets'][] = [
             'label' => $serie['label'],
             'data' => $seriesValues[$key],

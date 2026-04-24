@@ -24,7 +24,7 @@ if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
 $asunto = trim((string)($_POST['asunto'] ?? ''));
 $referenciaEmpresa = trim((string)($_POST['referencia_empresa'] ?? ''));
 $tipo = strtoupper(trim((string)($_POST['tipo'] ?? '')));
-$maxTamanoBytes = 50 * 1024 * 1024; // 50MB
+$maxTamanoBytes = 100 * 1024 * 1024; // 100MB
 $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
 $tiposPermitidos = ['IGUALDAD', 'SELECCION', 'SALUD', 'COMUNICACION', 'LGTBI', 'TOMA DE DATOS'];
@@ -67,7 +67,7 @@ if ($tamanoBytes <= 0) {
 }
 
 if ($tamanoBytes > $maxTamanoBytes) {
-    redirect_documentos('Tamano de archivo no valido (max 50MB).');
+    redirect_documentos('Tamano de archivo no valido (max 100MB).');
 }
 
 $uploadDir = __DIR__ . '/../uploads/documentos_tipo';
@@ -159,7 +159,7 @@ if ($ext !== '') {
 
 try {
     $stmt = $db->prepare(
-           'INSERT INTO archivos (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
+        'INSERT INTO archivos (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
 

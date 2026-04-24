@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 function is_https_request(): bool
@@ -34,11 +35,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
   ]);
   session_start();
 }
-const SESSION_TIMEOUT = 86400;
+// 9 horas f horas/min/secs
+const SESSION_TIMEOUT = 9 * 60 * 60;
 
 // Comprueba si existe user; si no, redirige al login.
 
-function require_login(): void {
+function require_login(): void
+{
   if (!isset($_SESSION['user'])) {
     header('Location: ../php/login.php');
     exit;
@@ -64,7 +67,8 @@ $_SESSION['last_activity'] = time();
 
 // Lee el rol actual de la sesión y si no coincide devuelve 403.
 
-function require_role(string $role): void {
+function require_role(string $role): void
+{
   require_login();
   // Leer rol del usuario desde la sesión
   $current = (string)($_SESSION['user']['rol'] ?? '');

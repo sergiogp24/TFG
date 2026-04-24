@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 function registrarLogProcesarRegistroRetributivo(string $mensaje): void
@@ -553,14 +554,14 @@ foreach ($names as $i => $originalName) {
         continue;
     }
     $id_empresa = (int)$empresa['id_empresa'];
-    
+
     // Renombrar archivo con nombre formateado: EMPRESA_NOMBRE_AAAA
     if ($tipo === 'REGISTRO_RETRIBUTIVO') {
         $empresaNombreToken = preg_replace('~\s+~', '_', $empresaNombreArchivo);
         $empresaNombreToken = mb_strtoupper((string)$empresaNombreToken, 'UTF-8');
         $nombreGuardadoNuevo = $empresaNombreToken . '_' . $anioRegistro . '.' . $ext;
         $rutaCompleta = $uploadDir . $nombreGuardadoNuevo;
-        
+
         if (!rename($uploadDir . $nombreGuardado, $rutaCompleta)) {
             $totalErroresGlobal++;
             $erroresMensajes[] = "Error renombrando archivo para empresa '{$razon_social}'.";
@@ -587,6 +588,40 @@ foreach ($names as $i => $originalName) {
             $idClienteMedidaArchivo = (int)$rowClienteMedidaArchivo['id_cliente_medida'];
         }
     }
+
+
+    // ================== Contrato ==================
+    // SOLO comprobar que exista contrato para la empresa; NO insertar.
+    $stmtContrato = $db->prepare("
+        SELECT id_contrato_empresa
+        FROM contrato_empresa
+        WHERE id_empresa = ?
+        ORDER BY id_contrato_empresa DESC
+        LIMIT 1
+    ");
+
+    if (!$stmtContrato) {
+        $totalErroresGlobal++;
+        $erroresMensajes[] = "Error prepare contrato: " . $db->error;
+        continue;
+    }
+
+    $stmtContrato->bind_param("i", $id_empresa);
+    $stmtContrato->execute();
+    $contrato = $stmtContrato->get_result()->fetch_assoc();
+    $stmtContrato->close();
+
+    if (!$contrato) {
+        $totalErroresGlobal++;
+        $erroresMensajes[] = "La empresa '{$razon_social}' no tiene contrato dado de alta.";
+        // Eliminar el archivo subido si no hay contrato
+        if (is_file($rutaCompleta)) {
+            @unlink($rutaCompleta);
+        }
+        continue;
+    }
+
+    $id_contrato_empresa = (int)$contrato['id_contrato_empresa'];
 
     // ================== Guardar archivo en BD ==================
     $sha256 = hash_file('sha256', $rutaCompleta);
@@ -680,43 +715,6 @@ foreach ($names as $i => $originalName) {
         $stmtArchivo->close();
         $totalArchivosGuardados++;
     }
-
-    $extLower = strtolower((string)$ext);
-    $extRequiereZip = in_array($extLower, ['xlsx', 'xlsm', 'xltx', 'xltm', 'ods'], true);
-    if ($extRequiereZip && !class_exists('ZipArchive')) {
-        $totalErroresGlobal++;
-        $erroresMensajes[] = 'El archivo se subio, pero no se pudo procesar: falta la extension ZIP de PHP (ZipArchive). Reinicia Apache despues de activarla en php.ini.';
-        continue;
-    }
-
-    // ================== Contrato ==================
-    // SOLO comprobar que exista contrato para la empresa; NO insertar.
-    $stmtContrato = $db->prepare("
-        SELECT id_contrato_empresa
-        FROM contrato_empresa
-        WHERE id_empresa = ?
-        ORDER BY id_contrato_empresa DESC
-        LIMIT 1
-    ");
-
-    if (!$stmtContrato) {
-        $totalErroresGlobal++;
-        $erroresMensajes[] = "Error prepare contrato: " . $db->error;
-        continue;
-    }
-
-    $stmtContrato->bind_param("i", $id_empresa);
-    $stmtContrato->execute();
-    $contrato = $stmtContrato->get_result()->fetch_assoc();
-    $stmtContrato->close();
-
-    if (!$contrato) {
-        $totalErroresGlobal++;
-        $erroresMensajes[] = "La empresa '{$razon_social}' no tiene contrato dado de alta.";
-        continue;
-    }
-
-    $id_contrato_empresa = (int)$contrato['id_contrato_empresa'];
 
     // ================== Año Datos ==================
     $stmtAno = $db->prepare("
@@ -899,7 +897,7 @@ foreach ($names as $i => $originalName) {
         // Replicar fÃ³rmulas Excel para f_fin_cal y salario_base_eq
         $salario   = $v($r, 'AD') !== null ? (float)$v($r, 'AD') : 0;
         $f_fin_cal = $minFechaIso($fechaCorteFFinCal, $fin_sit);
-        
+
         $normaliz = $v($r, 'BP') !== null ? (float)$v($r, 'BP') : 0;
         $anualiz  = $v($r, 'BQ') !== null ? (float)$v($r, 'BQ') : 0;
 
@@ -1071,7 +1069,7 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
                 $stmtEmpresa->close();
 
                 // Quitar la empresa subida del array
-                $empresas = array_filter($empresas, function($e) use ($nombreEmpresaSubida) {
+                $empresas = array_filter($empresas, function ($e) use ($nombreEmpresaSubida) {
                     return mb_strtoupper($e) !== mb_strtoupper($nombreEmpresaSubida);
                 });
 
@@ -1112,7 +1110,7 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
     } catch (\Throwable $e) {
         registrarLogProcesarRegistroRetributivo("Error al actualizar/eliminar reunión 'Subir R.R': " . $e->getMessage());
     }
-    
+
     redirigirMenuSubida($urlMenuSubida, 'Subido con Exito', 1, $idEmpresaContexto);
 }
 

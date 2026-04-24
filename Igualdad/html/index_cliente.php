@@ -30,8 +30,18 @@ function formatear_fecha_resumen(string $fecha): string
     }
 
     $meses = [
-        'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-        'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+        'ene',
+        'feb',
+        'mar',
+        'abr',
+        'may',
+        'jun',
+        'jul',
+        'ago',
+        'sep',
+        'oct',
+        'nov',
+        'dic',
     ];
 
     $dia = date('j', $timestamp);
@@ -428,7 +438,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
 
                             <!-- Área Privada Collapse -->
                             <?php $isPrivateView = in_array($view, ['privada', 'perfil', 'reuniones'], true); ?>
-                            <button class="nav-button nav-collapse <?= $isPrivateView ? 'active' : '' ?>" 
+                            <button class="nav-button nav-collapse <?= $isPrivateView ? 'active' : '' ?>"
                                 type="button" data-bs-toggle="collapse" data-bs-target="#menuAreaPrivada"
                                 aria-expanded="<?= $isPrivateView ? 'true' : 'false' ?>">
                                 <span class="nav-icon">🔐</span>
@@ -478,7 +488,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                             <div class="alert alert-light border mb-0">
                                 Selecciona una opcion de Area Privada: <strong>Mi cuenta</strong> o <strong>Mis reuniones</strong>.
                             </div>
-                        //Mi perfil cliente
+                            //Mi perfil cliente
                         <?php elseif ($view === 'perfil'): ?>
                             <div class="d-flex justify-content-center">
                                 <div class="card shadow-sm border-0" style="max-width: 520px; width: 100%;">
@@ -487,7 +497,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
 
                                         <?php if (!empty($clientePerfil)): ?>
                                             <form method="post" action="<?= h(app_path('/controller/cliente_controller.php')) ?>" class="vstack gap-3">
-                                              <?= csrf_input() ?>
+                                                <?= csrf_input() ?>
                                                 <input type="hidden" name="accion" value="editar_perfil">
                                                 <input type="hidden" name="id" value="<?= (int)($clientePerfil['id_usuario'] ?? 0) ?>">
 
@@ -553,7 +563,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 <div class="card-body">
                                     <h6 class="mb-3">Crear Nueva Reunión</h6>
                                     <form method="post" action="<?= h(app_path('/controller/cliente_controller.php')) ?>" class="row g-2 align-items-end">
-                                      <?= csrf_input() ?>
+                                        <?= csrf_input() ?>
                                         <input type="hidden" name="accion" value="crear_reunion">
                                         <div class="col-12 col-md-3">
                                             <label class="form-label">🏢 Empresa</label>
@@ -620,7 +630,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                         <details>
                                                             <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
                                                             <form method="post" action="<?= h(app_path('/controller/cliente_controller.php')) ?>" class="mt-2 row g-2 align-items-end" style="min-width: 320px;">
-                                                              <?= csrf_input() ?>
+                                                                <?= csrf_input() ?>
                                                                 <input type="hidden" name="accion" value="editar_reunion">
                                                                 <input type="hidden" name="id_reunion" value="<?= $idReunionLista ?>">
                                                                 <div class="col-12 col-md-4">
@@ -641,7 +651,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                             </form>
                                                         </details>
                                                         <form method="post" action="<?= h(app_path('/controller/cliente_controller.php')) ?>" onsubmit="return confirm('¿Eliminar esta reunión?');">
-                                                          <?= csrf_input() ?>
+                                                            <?= csrf_input() ?>
                                                             <input type="hidden" name="accion" value="eliminar_reunion">
                                                             <input type="hidden" name="id_reunion" value="<?= $idReunionLista ?>">
                                                             <button class="btn btn-outline-danger btn-sm" type="submit">Eliminar</button>
@@ -704,9 +714,9 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                             <div class="space-stat-value"><?= (int)$pendientesEspacio ?></div>
                                             <div class="space-stat-icon" <?= $pendientesEspacio > 0 ? 'style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes" title="Ver empresas pendientes"' : '' ?>>▣</div>
                                             <?php if ($pendientesEspacio > 0): ?>
-                                            <div class="mt-2 text-end">
-                                                <button class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes">Ver detalles</button>
-                                            </div>
+                                                <div class="mt-2 text-end">
+                                                    <button class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes">Ver detalles</button>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -827,7 +837,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 </div>
 
                                 <form action="../php/procesar_registro_retributivo.php" method="POST" enctype="multipart/form-data">
-                                  <?= csrf_input() ?>
+                                    <?= csrf_input() ?>
                                     <div class="row g-4">
                                         <div class="col-12 col-xl-7">
                                             <div class="upload-action-card h-100">
@@ -1065,9 +1075,9 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                         const apellidos = String(t.apellidos || '').trim();
                         const empresa = String(t.razon_social || '').trim();
                         const nombreCompleto = (nombre + ' ' + apellidos).trim();
-                        option.textContent = empresa !== ''
-                            ? ((nombreCompleto !== '' ? nombreCompleto : 'Técnico') + ' - ' + empresa)
-                            : (nombreCompleto !== '' ? nombreCompleto : 'Técnico');
+                        option.textContent = empresa !== '' ?
+                            ((nombreCompleto !== '' ? nombreCompleto : 'Técnico') + ' - ' + empresa) :
+                            (nombreCompleto !== '' ? nombreCompleto : 'Técnico');
                         selectTecnico.appendChild(option);
                     });
 
@@ -1163,9 +1173,9 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                         btnDescargarWordFinal.removeAttribute('tabindex');
                         estadoWordFinal.classList.remove('text-info');
                         estadoWordFinal.classList.add('text-muted');
-                        estadoWordFinal.textContent = (subidoEn !== '')
-                            ? ('Ultima subida: ' + subidoEn)
-                            : 'Word final disponible para descarga.';
+                        estadoWordFinal.textContent = (subidoEn !== '') ?
+                            ('Ultima subida: ' + subidoEn) :
+                            'Word final disponible para descarga.';
                         return;
                     }
 

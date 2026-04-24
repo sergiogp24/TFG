@@ -2360,7 +2360,6 @@ function obtenerConteosEstudiosDinamico(mysqli $db, int $idEmpresa, int $idAnoDa
         return strcasecmp($a['estudio'], $b['estudio']);
     });
     return $filas;
-
 }
 
 /**
@@ -2389,11 +2388,11 @@ function area_Permisos_retribuidos(mysqli $db, int $idEmpresa, $sheet): bool
         GROUP BY tipo
         "
     );
-    
+
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta a area_Permisos_retribuidos.');
     }
-    
+
     $stmt->bind_param('i', $idEmpresa);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -2417,7 +2416,7 @@ function area_Permisos_retribuidos(mysqli $db, int $idEmpresa, $sheet): bool
         $totalesPorTipo[$tipoClave]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
         $totalesPorTipo[$tipoClave]['hombres'] += (int)($row['n_hombres'] ?? 0);
     }
-    
+
     $ultimaFilaTipos = max(3, $sheet->getHighestDataRow('B'));
     for ($fila = 3; $fila <= $ultimaFilaTipos; $fila++) {
         $tipoHoja = normalizarTextoPuesto((string)$sheet->getCell('B' . $fila)->getValue());
@@ -2433,7 +2432,7 @@ function area_Permisos_retribuidos(mysqli $db, int $idEmpresa, $sheet): bool
     }
 
     $stmt->close();
-    
+
     return true;
 }
 
@@ -2593,11 +2592,11 @@ function area_excedencias(mysqli $db, int $idEmpresa, $sheet): bool
         GROUP BY tipo
         "
     );
-    
+
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta a area_excedencias.');
     }
-    
+
     $stmt->bind_param('i', $idEmpresa);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -2614,7 +2613,7 @@ function area_excedencias(mysqli $db, int $idEmpresa, $sheet): bool
         $totalesPorTipo[$tipo]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
         $totalesPorTipo[$tipo]['hombres'] += (int)($row['n_hombres'] ?? 0);
     }
-    
+
     $ultimaFilaTipos = max(3, $sheet->getHighestDataRow('B'));
     for ($fila = 3; $fila <= $ultimaFilaTipos; $fila++) {
         $tipoHoja = normalizarTextoPuesto((string)$sheet->getCell('B' . $fila)->getValue());
@@ -2630,7 +2629,7 @@ function area_excedencias(mysqli $db, int $idEmpresa, $sheet): bool
     }
 
     $stmt->close();
-    
+
     return true;
 }
 

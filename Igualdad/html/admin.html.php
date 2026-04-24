@@ -313,8 +313,8 @@
                                                 <article class="seguimiento-empresa-item">
                                                     <div class="seguimiento-empresa-top">
                                                         <div>
-                                                            <div class="seguimiento-empresa-title"><?= h((string)($empresaSeg['razon_social'] ?? '')) ?></div>
-                                                            <div class="seguimiento-empresa-meta"><?= h((string)($empresaSeg['plan'] ?? '')) ?></div>
+                                                            <div class="seguimiento-empresa-title">Empresa: <?= h((string)($empresaSeg['empresa_asignada'] ?? $empresaSeg['razon_social'] ?? '')) ?></div>
+                                                            <div class="seguimiento-empresa-meta">Servicio: <?= h((string)($empresaSeg['servicio'] ?? $empresaSeg['plan'] ?? '')) ?></div>
                                                         </div>
                                                         <div class="seguimiento-badges">
                                                             <span class="seguimiento-pill"><?= h((string)($empresaSeg['estado'] ?? 'Pendiente')) ?></span>
@@ -868,7 +868,7 @@
                                 cb.required = !isAnyChecked;
                             });
                         };
-                        
+
                         companyCheckboxes.forEach(cb => {
                             cb.addEventListener('change', updateRequiredState);
                         });
