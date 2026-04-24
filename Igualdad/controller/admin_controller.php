@@ -235,7 +235,7 @@ if ($accion === 'crear') {
 
   try {
     save_password_reset_token($email, $token, $expiresAt);
-    
+
     // Validar que el token se guardó correctamente
     $stmtVerify = db()->prepare("SELECT token FROM password_reset_token WHERE token = ? LIMIT 1");
     if (!$stmtVerify) {
@@ -555,7 +555,7 @@ if ($accion === 'editar_reunion') {
   try {
     $objetivoDb = ($objetivo === '') ? null : $objetivo;
     $stmt = $db->prepare("UPDATE reuniones SET objetivo = ?, hora_reunion = ?, fecha_reunion = ? WHERE id_reunion = ?");
-    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idEmpresa ,$idReunion);
+    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idEmpresa, $idReunion);
     $stmt->execute();
     $stmt->close();
 
