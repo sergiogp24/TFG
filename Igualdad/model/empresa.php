@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require __DIR__ . '/../php/auth.php';
@@ -21,8 +22,16 @@ function normalize_role(string $role): string
   }
 
   return strtr($role, [
-    'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U',
-    'á' => 'A', 'é' => 'E', 'í' => 'I', 'ó' => 'O', 'ú' => 'U',
+    'Á' => 'A',
+    'É' => 'E',
+    'Í' => 'I',
+    'Ó' => 'O',
+    'Ú' => 'U',
+    'á' => 'A',
+    'é' => 'E',
+    'í' => 'I',
+    'ó' => 'O',
+    'ú' => 'U',
   ]);
 }
 
@@ -33,7 +42,7 @@ function load_assignment_alerts_from_cookie(int $userId): array
     return $alertas;
   }
 
-  $stmt = db()->prepare("\n    SELECT ue.id_empresa, COALESCE(e.razon_social, '') AS razon_social\n    FROM usuario_empresa ue\n    LEFT JOIN empresa e ON e.id_empresa = ue.id_empresa\n    WHERE ue.id_usuario = ?\n    ORDER BY ue.id_empresa ASC\n  ");
+  $stmt = db()->prepare("\n SELECT ue.id_empresa, COALESCE(e.razon_social, '') AS razon_social\n    FROM usuario_empresa ue\n    LEFT JOIN empresa e ON e.id_empresa = ue.id_empresa\n    WHERE ue.id_usuario = ?\n    ORDER BY ue.id_empresa ASC\n  ");
   $stmt->bind_param('i', $userId);
   $stmt->execute();
   $res = $stmt->get_result();
@@ -272,11 +281,7 @@ if ($view === 'ver_empresas' || $view === 'delete_empresas') {
   }
 
   // Total
-  $sqlTotal = "
-    SELECT COUNT(*) AS total
-    FROM empresa e
-    $where
-  ";
+  $sqlTotal = "SELECT COUNT(*) AS total FROM empresa e $where ";
   $stmt = db()->prepare($sqlTotal);
   if (!empty($params)) $stmt->bind_param($types, ...$params);
   $stmt->execute();
@@ -293,20 +298,7 @@ if ($view === 'ver_empresas' || $view === 'delete_empresas') {
   }
 
   // Data
-  $sqlData = "
-    SELECT
-      e.id_empresa,
-      e.razon_social,
-      e.nif,
-      e.responsable,
-      e.sector,
-      e.telefono,
-      e.email
-    FROM empresa e
-    $where
-    ORDER BY e.razon_social ASC
-    LIMIT ? OFFSET ?
-  ";
+  $sqlData = " SELECT e.id_empresa, e.razon_social, e.nif, e.responsable, e.sector, e.telefono, e.email FROM empresa e $where ORDER BY e.razon_social ASC LIMIT ? OFFSET ?";
 
   $stmt = db()->prepare($sqlData);
 
@@ -386,33 +378,41 @@ if ($view === 'ver_empresa') {
       $tecnicosById = [];
 
       // Prioridad: técnicos asignados por servicio (contrato_empresa.id_usuario)
-      $stmtTecnicosContrato = db()->prepare(" 
-        SELECT DISTINCT
-          u.id_usuario,
-          u.nombre_usuario,
-          u.email
-        FROM contrato_empresa ce
-        INNER JOIN usuario u ON u.id_usuario = ce.id_usuario
-        WHERE ce.id_empresa = ?
-          AND ce.id_usuario IS NOT NULL
-        ORDER BY u.nombre_usuario ASC
-      ");
+      $stmtTecnicosContrato = db()->prepare("
+    SELECT 
+        u.id_usuario,
+        u.nombre_usuario,
+        u.email,
+        ce.tipo_contrato
+    FROM contrato_empresa ce
+    INNER JOIN usuario u ON u.id_usuario = ce.id_usuario
+    WHERE ce.id_empresa = ?
+      AND ce.id_usuario IS NOT NULL
+    ORDER BY u.nombre_usuario ASC
+");
       $stmtTecnicosContrato->bind_param('i', $idEmpresaDetalle);
       $stmtTecnicosContrato->execute();
       $resTecnicosContrato = $stmtTecnicosContrato->get_result();
       while ($rowTecnico = $resTecnicosContrato->fetch_assoc()) {
+
         $idTecnico = (int)($rowTecnico['id_usuario'] ?? 0);
-        if ($idTecnico <= 0) {
-          continue;
+        if ($idTecnico <= 0) continue;
+
+        if (!isset($tecnicosById[$idTecnico])) {
+          $tecnicosById[$idTecnico] = [
+            'id_usuario' => $idTecnico,
+            'nombre_usuario' => (string)($rowTecnico['nombre_usuario'] ?? ''),
+            'email' => (string)($rowTecnico['email'] ?? ''),
+            'empresa_asignada' => (string)($detalleEmpresa['razon_social'] ?? ''),
+            'servicios' => []
+          ];
         }
-        $tecnicosById[$idTecnico] = [
-          'id_usuario' => $idTecnico,
-          'nombre_usuario' => (string)($rowTecnico['nombre_usuario'] ?? ''),
-          'email' => (string)($rowTecnico['email'] ?? ''),
-          'empresa_asignada' => (string)($detalleEmpresa['razon_social'] ?? ''),
-          'servicio_asignado' => $servicioEmpresaDetalle,
-        ];
+
+        // 🔥 SOLO GUARDAS EL SERVICIO (NO ARRAY ENTERO)
+        $tecnicosById[$idTecnico]['servicios'][] =
+          $rowTecnico['tipo_contrato'] ?? 'SIN CONTRATO';
       }
+
       $stmtTecnicosContrato->close();
 
       // Compatibilidad: técnicos asignados vía usuario_empresa
@@ -420,7 +420,8 @@ if ($view === 'ver_empresa') {
         SELECT DISTINCT
           u.id_usuario,
           u.nombre_usuario,
-          u.email
+          u.email,
+          'SIN CONTRATO' AS tipo_contrato
         FROM usuario_empresa ue
         INNER JOIN usuario u ON u.id_usuario = ue.id_usuario
         INNER JOIN rol r ON r.id = u.rol_id
@@ -432,17 +433,21 @@ if ($view === 'ver_empresa') {
       $stmtTecnicosUE->execute();
       $resTecnicosUE = $stmtTecnicosUE->get_result();
       while ($rowTecnico = $resTecnicosUE->fetch_assoc()) {
+
         $idTecnico = (int)($rowTecnico['id_usuario'] ?? 0);
-        if ($idTecnico <= 0 || isset($tecnicosById[$idTecnico])) {
-          continue;
+        if ($idTecnico <= 0) continue;
+
+        if (!isset($tecnicosById[$idTecnico])) {
+          $tecnicosById[$idTecnico] = [
+            'id_usuario' => $idTecnico,
+            'nombre_usuario' => (string)($rowTecnico['nombre_usuario'] ?? ''),
+            'email' => (string)($rowTecnico['email'] ?? ''),
+            'empresa_asignada' => (string)($detalleEmpresa['razon_social'] ?? ''),
+            'servicios' => []
+          ];
         }
-        $tecnicosById[$idTecnico] = [
-          'id_usuario' => $idTecnico,
-          'nombre_usuario' => (string)($rowTecnico['nombre_usuario'] ?? ''),
-          'email' => (string)($rowTecnico['email'] ?? ''),
-          'empresa_asignada' => (string)($detalleEmpresa['razon_social'] ?? ''),
-          'servicio_asignado' => $servicioEmpresaDetalle,
-        ];
+
+        $tecnicosById[$idTecnico]['servicios'][] = 'SIN CONTRATO';
       }
       $stmtTecnicosUE->close();
 
@@ -650,11 +655,11 @@ unset($_SESSION['edit_contrato_old'], $_SESSION['edit_contrato_error']);
  * ========================================================= */
 $selectedContrato = null;
 if ($view === 'edit_contratos' && $tablaContratoExiste) {
-    $idContrato = (int)($_GET['id_contrato'] ?? 0);
-    if ($idContrato > 0) {
+  $idContrato = (int)($_GET['id_contrato'] ?? 0);
+  if ($idContrato > 0) {
 
-        $stmt = $db->prepare(
-          "SELECT
+    $stmt = $db->prepare(
+      "SELECT
             c.id_contrato_empresa,
             c.tipo_contrato,
             c.inicio_contratacion,
@@ -668,94 +673,94 @@ if ($view === 'edit_contratos' && $tablaContratoExiste) {
           LEFT JOIN usuario tu ON tu.id_usuario = c.id_usuario
           WHERE c.id_contrato_empresa = ?
           LIMIT 1"
-        );
-        $stmt->bind_param('i', $idContrato);
-        $stmt->execute();
-        $selectedContrato = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+    );
+    $stmt->bind_param('i', $idContrato);
+    $stmt->execute();
+    $selectedContrato = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-        // Calcular fechas de vigencia desde las áreas contratadas
-        $selectedContrato['inicio_plan'] = '';
-        $selectedContrato['fin_plan'] = '';
-        $fechas_inicio = [];
-        $fechas_fin = [];
-        $stmtAreasFechas = $db->prepare("SELECT inicio_plan, fin_plan FROM areas_contratadas WHERE id_empresa = ?");
-        $stmtAreasFechas->bind_param('i', $selectedContrato['id_empresa']);
-        $stmtAreasFechas->execute();
-        $resAreasFechas = $stmtAreasFechas->get_result();
-        while ($row = $resAreasFechas->fetch_assoc()) {
-          if (!empty($row['inicio_plan'])) $fechas_inicio[] = $row['inicio_plan'];
-          if (!empty($row['fin_plan'])) $fechas_fin[] = $row['fin_plan'];
-        }
-        $stmtAreasFechas->close();
-        if (!empty($fechas_inicio)) $selectedContrato['inicio_plan'] = min($fechas_inicio);
-        if (!empty($fechas_fin)) $selectedContrato['fin_plan'] = max($fechas_fin);
-
-        // Cargar áreas y medidas seleccionadas para este contrato usando el modelo real
-        $selectedContrato['areas'] = [];
-        $selectedContrato['medidas'] = [];
-        $selectedContrato['medidas_personalizadas'] = [];
-        // Áreas seleccionadas (areas_contratadas)
-        $stmtAreas = $db->prepare("SELECT id_areas_contratadas, id_plan FROM areas_contratadas WHERE id_empresa = ?");
-        $stmtAreas->bind_param('i', $selectedContrato['id_empresa']);
-        $stmtAreas->execute();
-        $resAreas = $stmtAreas->get_result();
-        $areas_contratadas_ids = [];
-        while ($row = $resAreas->fetch_assoc()) {
-            $aid = (int)$row['id_plan'];
-            $selectedContrato['areas'][] = $aid;
-            $areas_contratadas_ids[$aid] = (int)$row['id_areas_contratadas'];
-        }
-        $stmtAreas->close();
-        // Medidas seleccionadas por área (cliente_medida)
-        foreach ($areas_contratadas_ids as $aid => $id_areas_contratadas) {
-            $stmtMedidas = $db->prepare("SELECT id_medida FROM cliente_medida WHERE id_areas_contratadas = ?");
-            $stmtMedidas->bind_param('i', $id_areas_contratadas);
-            $stmtMedidas->execute();
-            $resMedidas = $stmtMedidas->get_result();
-            while ($row = $resMedidas->fetch_assoc()) {
-                $mid = (int)$row['id_medida'];
-                if (!isset($selectedContrato['medidas'][$aid])) $selectedContrato['medidas'][$aid] = [];
-                $selectedContrato['medidas'][$aid][] = $mid;
-            }
-            $stmtMedidas->close();
-        }
-        // Medidas personalizadas: no implementado en modelo, dejar vacío
-
-        if ($selectedContrato !== null && !empty($editContratoOld)) {
-            $selectedContrato['id_contrato_empresa'] = $editContratoOld['id_contrato_empresa'] ?? $selectedContrato['id_contrato_empresa'];
-            $selectedContrato['id_empresa'] = $editContratoOld['id_empresa'] ?? $selectedContrato['id_empresa'];
-          $selectedContrato['id_usuario'] = $editContratoOld['id_usuario'] ?? $selectedContrato['id_usuario'];
-            $selectedContrato['tipo_contrato'] = $editContratoOld['tipo_contrato'] ?? $selectedContrato['tipo_contrato'];
-            $selectedContrato['inicio_plan'] = $editContratoOld['inicio_plan'] ?? $selectedContrato['inicio_plan'];
-            $selectedContrato['fin_plan'] = $editContratoOld['fin_plan'] ?? $selectedContrato['fin_plan'];
-            $selectedContrato['inicio_contratacion'] = $editContratoOld['inicio_contratacion'] ?? $selectedContrato['inicio_contratacion'];
-            $selectedContrato['fin_contratacion'] = $editContratoOld['fin_contratacion'] ?? $selectedContrato['fin_contratacion'];
-
-            if (isset($editContratoOld['areas']) && is_array($editContratoOld['areas'])) {
-              $selectedContrato['areas'] = array_values(array_unique(array_map('intval', $editContratoOld['areas'])));
-            }
-
-            if (isset($editContratoOld['medidas']) && is_array($editContratoOld['medidas'])) {
-              $selectedContrato['medidas'] = [];
-              foreach ($editContratoOld['medidas'] as $areaId => $medidasArea) {
-                $aid = (int)$areaId;
-                if (!is_array($medidasArea)) {
-                  $medidasArea = [];
-                }
-                $selectedContrato['medidas'][$aid] = array_values(array_unique(array_map('intval', $medidasArea)));
-              }
-            }
-
-            if (isset($editContratoOld['medidas_personalizadas']) && is_array($editContratoOld['medidas_personalizadas'])) {
-              $selectedContrato['medidas_personalizadas'] = [];
-              foreach ($editContratoOld['medidas_personalizadas'] as $areaId => $textoMedida) {
-                $aid = (int)$areaId;
-                $selectedContrato['medidas_personalizadas'][$aid] = trim((string)$textoMedida);
-              }
-            }
-        }
+    // Calcular fechas de vigencia desde las áreas contratadas
+    $selectedContrato['inicio_plan'] = '';
+    $selectedContrato['fin_plan'] = '';
+    $fechas_inicio = [];
+    $fechas_fin = [];
+    $stmtAreasFechas = $db->prepare("SELECT inicio_plan, fin_plan FROM areas_contratadas WHERE id_empresa = ?");
+    $stmtAreasFechas->bind_param('i', $selectedContrato['id_empresa']);
+    $stmtAreasFechas->execute();
+    $resAreasFechas = $stmtAreasFechas->get_result();
+    while ($row = $resAreasFechas->fetch_assoc()) {
+      if (!empty($row['inicio_plan'])) $fechas_inicio[] = $row['inicio_plan'];
+      if (!empty($row['fin_plan'])) $fechas_fin[] = $row['fin_plan'];
     }
+    $stmtAreasFechas->close();
+    if (!empty($fechas_inicio)) $selectedContrato['inicio_plan'] = min($fechas_inicio);
+    if (!empty($fechas_fin)) $selectedContrato['fin_plan'] = max($fechas_fin);
+
+    // Cargar áreas y medidas seleccionadas para este contrato usando el modelo real
+    $selectedContrato['areas'] = [];
+    $selectedContrato['medidas'] = [];
+    $selectedContrato['medidas_personalizadas'] = [];
+    // Áreas seleccionadas (areas_contratadas)
+    $stmtAreas = $db->prepare("SELECT id_areas_contratadas, id_plan FROM areas_contratadas WHERE id_empresa = ?");
+    $stmtAreas->bind_param('i', $selectedContrato['id_empresa']);
+    $stmtAreas->execute();
+    $resAreas = $stmtAreas->get_result();
+    $areas_contratadas_ids = [];
+    while ($row = $resAreas->fetch_assoc()) {
+      $aid = (int)$row['id_plan'];
+      $selectedContrato['areas'][] = $aid;
+      $areas_contratadas_ids[$aid] = (int)$row['id_areas_contratadas'];
+    }
+    $stmtAreas->close();
+    // Medidas seleccionadas por área (cliente_medida)
+    foreach ($areas_contratadas_ids as $aid => $id_areas_contratadas) {
+      $stmtMedidas = $db->prepare("SELECT id_medida FROM cliente_medida WHERE id_areas_contratadas = ?");
+      $stmtMedidas->bind_param('i', $id_areas_contratadas);
+      $stmtMedidas->execute();
+      $resMedidas = $stmtMedidas->get_result();
+      while ($row = $resMedidas->fetch_assoc()) {
+        $mid = (int)$row['id_medida'];
+        if (!isset($selectedContrato['medidas'][$aid])) $selectedContrato['medidas'][$aid] = [];
+        $selectedContrato['medidas'][$aid][] = $mid;
+      }
+      $stmtMedidas->close();
+    }
+    // Medidas personalizadas: no implementado en modelo, dejar vacío
+
+    if ($selectedContrato !== null && !empty($editContratoOld)) {
+      $selectedContrato['id_contrato_empresa'] = $editContratoOld['id_contrato_empresa'] ?? $selectedContrato['id_contrato_empresa'];
+      $selectedContrato['id_empresa'] = $editContratoOld['id_empresa'] ?? $selectedContrato['id_empresa'];
+      $selectedContrato['id_usuario'] = $editContratoOld['id_usuario'] ?? $selectedContrato['id_usuario'];
+      $selectedContrato['tipo_contrato'] = $editContratoOld['tipo_contrato'] ?? $selectedContrato['tipo_contrato'];
+      $selectedContrato['inicio_plan'] = $editContratoOld['inicio_plan'] ?? $selectedContrato['inicio_plan'];
+      $selectedContrato['fin_plan'] = $editContratoOld['fin_plan'] ?? $selectedContrato['fin_plan'];
+      $selectedContrato['inicio_contratacion'] = $editContratoOld['inicio_contratacion'] ?? $selectedContrato['inicio_contratacion'];
+      $selectedContrato['fin_contratacion'] = $editContratoOld['fin_contratacion'] ?? $selectedContrato['fin_contratacion'];
+
+      if (isset($editContratoOld['areas']) && is_array($editContratoOld['areas'])) {
+        $selectedContrato['areas'] = array_values(array_unique(array_map('intval', $editContratoOld['areas'])));
+      }
+
+      if (isset($editContratoOld['medidas']) && is_array($editContratoOld['medidas'])) {
+        $selectedContrato['medidas'] = [];
+        foreach ($editContratoOld['medidas'] as $areaId => $medidasArea) {
+          $aid = (int)$areaId;
+          if (!is_array($medidasArea)) {
+            $medidasArea = [];
+          }
+          $selectedContrato['medidas'][$aid] = array_values(array_unique(array_map('intval', $medidasArea)));
+        }
+      }
+
+      if (isset($editContratoOld['medidas_personalizadas']) && is_array($editContratoOld['medidas_personalizadas'])) {
+        $selectedContrato['medidas_personalizadas'] = [];
+        foreach ($editContratoOld['medidas_personalizadas'] as $areaId => $textoMedida) {
+          $aid = (int)$areaId;
+          $selectedContrato['medidas_personalizadas'][$aid] = trim((string)$textoMedida);
+        }
+      }
+    }
+  }
 }
 
 /* =========================================================
@@ -986,7 +991,7 @@ if ($view === 'ver_planes') {
   $wherePlanes = ($wherePlanes === '') ? ('WHERE ' . $planIgualdadCondition) : ($wherePlanes . ' AND ' . $planIgualdadCondition);
 
   // Total de planes
- $sqlTotalPlanes = "
+  $sqlTotalPlanes = "
     SELECT COUNT(DISTINCT e.id_empresa) AS total
     FROM empresa e
     LEFT JOIN contrato_empresa ce_plan ON ce_plan.id_empresa = e.id_empresa AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD'
@@ -1008,7 +1013,7 @@ if ($view === 'ver_planes') {
   }
 
   // Data de planes con paginación
- $sqlDataPlanes = "
+  $sqlDataPlanes = "
     SELECT
       e.id_empresa,
       e.razon_social,

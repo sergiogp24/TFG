@@ -634,6 +634,37 @@ function correo_obtener_empresa_y_servicio(mysqli $db, int $idEmpresa): ?array
         'servicio' => $servicio,
     ];
 }
+function correo_enviar_notificacion_tecnico_nueva_empresa(
+    string $emailTecnico,
+    string $nombreTecnico,
+    string $nombreUsuario,
+    array $empresasNuevas
+): void {
+    if (empty($empresasNuevas)) return;
+
+    $empresasList = '';
+    foreach ($empresasNuevas as $empresa) {
+        $empresaNombre = htmlspecialchars($empresa['razon_social'] ?? '', ENT_QUOTES, 'UTF-8');
+        $tipoContrato  = htmlspecialchars($empresa['tipo_contrato'] ?? '', ENT_QUOTES, 'UTF-8');
+        $empresasList .= "<li><strong>{$empresaNombre}</strong> ({$tipoContrato})</li>";
+    }
+    $subject = "Nuevas empresas asignadas  $nombreUsuario";
+    $body = '
+        <html>
+        <body>
+        <p>Se han asignado las siguientes nuevas empresas  <strong>' . htmlspecialchars($nombreUsuario, ENT_QUOTES, 'UTF-8') . '</strong>:</p>
+        <ul>' . $empresasList . '</ul>
+        </body>
+        </html>';
+
+    correo_enviar_html(
+        $emailTecnico,
+        $nombreTecnico,
+        $subject,
+        $body,
+        strip_tags($body)
+    );
+}
 
 function correo_enviar_nueva_empresa_asignada(
     string $emailDestino,
