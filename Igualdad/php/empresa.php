@@ -42,7 +42,7 @@ function load_assignment_alerts_from_cookie(int $userId): array
     return $alertas;
   }
 
-  $stmt = db()->prepare("\n    SELECT ue.id_empresa, COALESCE(e.razon_social, '') AS razon_social\n    FROM usuario_empresa ue\n    LEFT JOIN empresa e ON e.id_empresa = ue.id_empresa\n    WHERE ue.id_usuario = ?\n    ORDER BY ue.id_empresa ASC\n  ");
+  $stmt = db()->prepare(" SELECT ue.id_empresa, COALESCE(e.razon_social, '') AS razon_social\n  FROM usuario_empresa ue\n    LEFT JOIN empresa e ON e.id_empresa = ue.id_empresa\n    WHERE ue.id_usuario = ?\n    ORDER BY ue.id_empresa ASC\n  ");
   $stmt->bind_param('i', $userId);
   $stmt->execute();
   $res = $stmt->get_result();
@@ -260,14 +260,8 @@ if ($view === 'ver_empresas' || $view === 'delete_empresas') {
   $types = '';
 
   if ($searchQ !== '') {
-    $where = "WHERE (
-      e.razon_social LIKE CONCAT('%', ?, '%')
-      OR e.nif LIKE CONCAT('%', ?, '%')
-      OR e.responsable LIKE CONCAT('%', ?, '%')
-      OR e.sector LIKE CONCAT('%', ?, '%')
-      OR e.email LIKE CONCAT('%', ?, '%')
-      OR e.telefono LIKE CONCAT('%', ?, '%')
-    )";
+    $where = "WHERE ( e.razon_social LIKE CONCAT('%', ?, '%') OR e.nif LIKE CONCAT('%', ?, '%') OR e.responsable LIKE CONCAT('%', ?, '%') OR e.sector LIKE CONCAT('%', ?, '%') OR e.email LIKE CONCAT('%', ?, '%')
+     OR e.telefono LIKE CONCAT('%', ?, '%') )";
     $params = [$searchQ, $searchQ, $searchQ, $searchQ, $searchQ, $searchQ];
     $types = 'ssssss';
   }
@@ -281,11 +275,7 @@ if ($view === 'ver_empresas' || $view === 'delete_empresas') {
   }
 
   // Total
-  $sqlTotal = "
-    SELECT COUNT(*) AS total
-    FROM empresa e
-    $where
-  ";
+  $sqlTotal = " SELECT COUNT(*) AS total FROM empresa e $where";
   $stmt = db()->prepare($sqlTotal);
   if (!empty($params)) $stmt->bind_param($types, ...$params);
   $stmt->execute();
@@ -302,20 +292,7 @@ if ($view === 'ver_empresas' || $view === 'delete_empresas') {
   }
 
   // Data
-  $sqlData = "
-    SELECT
-      e.id_empresa,
-      e.razon_social,
-      e.nif,
-      e.responsable,
-      e.sector,
-      e.telefono,
-      e.email
-    FROM empresa e
-    $where
-    ORDER BY e.razon_social ASC
-    LIMIT ? OFFSET ?
-  ";
+  $sqlData = " SELECT e.id_empresa, e.razon_social, e.nif, e.responsable, e.sector, e.telefono, e.email FROM empresa e $where ORDER BY e.razon_social ASC LIMIT ? OFFSET ?";
 
   $stmt = db()->prepare($sqlData);
 
@@ -344,17 +321,7 @@ if ($view === 'ver_empresa') {
   $idEmpresaDetalle = (int)($_GET['id_empresa'] ?? 0);
 
   if ($idEmpresaDetalle > 0) {
-    $stmtEmpresaDetalle = db()->prepare(" 
-      SELECT
-        id_empresa,
-        razon_social,
-        nif,
-        responsable,
-        sector,
-        email,
-        telefono
-      FROM empresa
-      WHERE id_empresa = ?
+    $stmtEmpresaDetalle = db()->prepare("SELECT id_empresa, razon_social, nif, responsable, sector, email, telefono FROM empresa WHERE id_empresa = ?
       " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . "
       LIMIT 1
     ");
@@ -381,17 +348,8 @@ if ($view === 'ver_empresa') {
       $tecnicosById = [];
 
       // Prioridad: técnicos asignados por servicio (contrato_empresa.id_usuario)
-      $stmtTecnicosContrato = db()->prepare(" 
-        SELECT DISTINCT
-          u.id_usuario,
-          u.nombre_usuario,
-          u.email
-        FROM contrato_empresa ce
-        INNER JOIN usuario u ON u.id_usuario = ce.id_usuario
-        WHERE ce.id_empresa = ?
-          AND ce.id_usuario IS NOT NULL
-        ORDER BY u.nombre_usuario ASC
-      ");
+      $stmtTecnicosContrato = db()->prepare("SELECT DISTINCT u.id_usuario, u.nombre_usuario, u.email FROM contrato_empresa ce INNER JOIN usuario u ON u.id_usuario = ce.id_usuario
+        WHERE ce.id_empresa = ? AND ce.id_usuario IS NOT NULL ORDER BY u.nombre_usuario ASC");
       $stmtTecnicosContrato->bind_param('i', $idEmpresaDetalle);
       $stmtTecnicosContrato->execute();
       $resTecnicosContrato = $stmtTecnicosContrato->get_result();
@@ -409,15 +367,8 @@ if ($view === 'ver_empresa') {
       $stmtTecnicosContrato->close();
 
       // Compatibilidad: técnicos asignados vía usuario_empresa
-      $stmtTecnicosUE = db()->prepare(" 
-        SELECT DISTINCT
-          u.id_usuario,
-          u.nombre_usuario,
-          u.email
-        FROM usuario_empresa ue
-        INNER JOIN usuario u ON u.id_usuario = ue.id_usuario
-        INNER JOIN rol r ON r.id = u.rol_id
-        WHERE ue.id_empresa = ?
+      $stmtTecnicosUE = db()->prepare("SELECT DISTINCT u.id_usuario, u.nombre_usuario, u.email FROM usuario_empresa ue INNER JOIN usuario u ON u.id_usuario = ue.id_usuario
+        INNER JOIN rol r ON r.id = u.rol_id WHERE ue.id_empresa = ?
           AND UPPER(TRIM(COALESCE(r.nombre, ''))) IN ('TECNICO', 'TÉCNICO')
         ORDER BY u.nombre_usuario ASC
       ");
@@ -439,14 +390,7 @@ if ($view === 'ver_empresa') {
 
       // Último fallback legacy: empresa.id_usuario
       if (empty($tecnicosById)) {
-        $stmtDetalleUsuarioLegacy = db()->prepare(" 
-          SELECT
-            u.id_usuario,
-            u.nombre_usuario,
-            u.email
-          FROM empresa e
-          LEFT JOIN usuario u ON u.id_usuario = e.id_usuario
-          WHERE e.id_empresa = ?
+        $stmtDetalleUsuarioLegacy = db()->prepare("SELECT u.id_usuario, u.nombre_usuario, u.email FROM empresa e LEFT JOIN usuario u ON u.id_usuario = e.id_usuario WHERE e.id_empresa = ?
           " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa AND ce.id_usuario = ?) OR e.id_usuario = ?)" : "") . "
           LIMIT 1
         ");
@@ -471,13 +415,7 @@ if ($view === 'ver_empresa') {
 
       $detalleTecnicos = array_values($tecnicosById);
 
-      $stmtDetalleMedidas = db()->prepare(" 
-        SELECT DISTINCT
-          ap.id_plan,
-          ap.nombre AS area_nombre,
-          m.id_medida,
-          m.descripcion
-        FROM areas_contratadas ac
+      $stmtDetalleMedidas = db()->prepare("SELECT DISTINCT ap.id_plan, ap.nombre AS area_nombre, m.id_medida, m.descripcion FROM areas_contratadas ac
         JOIN area_plan ap ON ap.id_plan = ac.id_plan
         LEFT JOIN cliente_medida cm ON cm.id_areas_contratadas = ac.id_areas_contratadas
         LEFT JOIN medida m ON m.id_medida = cm.id_medida
@@ -523,29 +461,8 @@ $tecnicosAsignadosEmpresa = [];
 if ($view === 'edit_empresas') {
   $idEmpresa = (int)($_GET['id_empresa'] ?? 0);
   if ($idEmpresa > 0) {
-    $stmt = db()->prepare("
-      SELECT
-        id_empresa,
-        razon_social,
-        nif,
-        domicilio_social,
-        forma_juridica,
-        ano_constitucional,
-        responsable,
-        cargo,
-        contacto,
-        email,
-        telefono,
-        sector,
-        convenio,
-        personas_mujeres,
-        personas_hombres,
-        personas_total,
-        centros_trabajo,
-        recogida_informacion,
-        vigencia_plan,
-        id_usuario
-      FROM empresa
+    $stmt = db()->prepare(" SELECT id_empresa, razon_social, nif, domicilio_social, forma_juridica, ano_constitucional, responsable, cargo, contacto, email, telefono, sector,
+        convenio, personas_mujeres, personas_hombres, personas_total, centros_trabajo, recogida_informacion, vigencia_plan, id_usuario FROM empresa
       WHERE id_empresa = ?
       " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)" : "") . "
       LIMIT 1
@@ -574,7 +491,7 @@ if ($view === 'edit_empresas') {
     }
 
     if ($selectedEmpresa !== null && !$esTecnico) {
-      $stmtTecnicoAsignado = db()->prepare("\n        SELECT u.id_usuario, COALESCE(r.nombre, '') AS rol_nombre\n        FROM usuario_empresa ue\n        INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n        LEFT JOIN rol r ON r.id = u.rol_id\n        WHERE ue.id_empresa = ?\n        ORDER BY ue.id_usuario ASC\n      ");
+      $stmtTecnicoAsignado = db()->prepare("SELECT u.id_usuario, COALESCE(r.nombre, '') AS rol_nombre\n FROM usuario_empresa ue\n INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n  LEFT JOIN rol r ON r.id = u.rol_id\n  WHERE ue.id_empresa = ?\n ORDER BY ue.id_usuario ASC\n      ");
       $stmtTecnicoAsignado->bind_param('i', $idEmpresa);
       $stmtTecnicoAsignado->execute();
       $resTecnicoAsignado = $stmtTecnicoAsignado->get_result();
@@ -602,7 +519,7 @@ if ($view === 'edit_empresas') {
 
 $tecnicosDisponibles = [];
 if (!$esTecnico && in_array($view, ['add_empresas', 'edit_empresas', 'add_contratos', 'edit_contratos'], true)) {
-  $stmtTecnicos = db()->prepare("\n    SELECT u.id_usuario, u.nombre_usuario, u.email, COALESCE(r.nombre, '') AS rol_nombre\n    FROM usuario u\n    LEFT JOIN rol r ON r.id = u.rol_id\n    ORDER BY u.nombre_usuario ASC\n  ");
+  $stmtTecnicos = db()->prepare("SELECT u.id_usuario, u.nombre_usuario, u.email, COALESCE(r.nombre, '') AS rol_nombre\n FROM usuario u\n  LEFT JOIN rol r ON r.id = u.rol_id\n  ORDER BY u.nombre_usuario ASC\n  ");
   $stmtTecnicos->execute();
   $resTecnicos = $stmtTecnicos->get_result();
 
@@ -645,21 +562,10 @@ if ($view === 'edit_contratos' && $tablaContratoExiste) {
   if ($idContrato > 0) {
 
     $stmt = $db->prepare(
-      "SELECT
-            c.id_contrato_empresa,
-            c.tipo_contrato,
-            c.inicio_contratacion,
-            c.fin_contratacion,
-            c.id_empresa,
-            c.id_usuario,
-            tu.nombre_usuario AS tecnico_nombre,
-            e.razon_social AS empresa_nombre
-          FROM contrato_empresa c
-          LEFT JOIN empresa e ON e.id_empresa = c.id_empresa
-          LEFT JOIN usuario tu ON tu.id_usuario = c.id_usuario
+      "SELECT c.id_contrato_empresa, c.tipo_contrato, c.inicio_contratacion, c.fin_contratacion, c.id_empresa, c.id_usuario, tu.nombre_usuario AS tecnico_nombre, e.razon_social AS empresa_nombre
+          FROM contrato_empresa c LEFT JOIN empresa e ON e.id_empresa = c.id_empresa LEFT JOIN usuario tu ON tu.id_usuario = c.id_usuario
           WHERE c.id_contrato_empresa = ?
-          LIMIT 1"
-    );
+          LIMIT 1" );
     $stmt->bind_param('i', $idContrato);
     $stmt->execute();
     $selectedContrato = $stmt->get_result()->fetch_assoc();
@@ -883,12 +789,7 @@ if ($view === 'ver_contratos' && $tablaContratoExiste) {
     $typesCon .= 'iii';
   }
 
-  $sqlTotalContratos = "
-    SELECT COUNT(*) AS total
-    FROM contrato_empresa c
-    JOIN empresa e ON e.id_empresa = c.id_empresa
-    $whereContratos
-  ";
+  $sqlTotalContratos = "SELECT COUNT(*) AS total FROM contrato_empresa c JOIN empresa e ON e.id_empresa = c.id_empresa $whereContratos";
   $stmtTotalCon = $db->prepare($sqlTotalContratos);
   if (!empty($paramsCon)) $stmtTotalCon->bind_param($typesCon, ...$paramsCon);
   $stmtTotalCon->execute();
@@ -904,23 +805,9 @@ if ($view === 'ver_contratos' && $tablaContratoExiste) {
     $offsetContratos = ($currentPageContratos - 1) * $perPageContratos;
   }
 
-  $sqlContratos = "
-    SELECT
-      c.id_contrato_empresa,
-      c.tipo_contrato,
-      c.inicio_contratacion,
-      c.fin_contratacion,
-      c.id_empresa,
-      c.id_usuario,
-      tu.nombre_usuario AS tecnico_nombre,
-      e.razon_social
-    FROM contrato_empresa c
-    JOIN empresa e ON e.id_empresa = c.id_empresa
-    LEFT JOIN usuario tu ON tu.id_usuario = c.id_usuario
-    $whereContratos
-    ORDER BY c.id_contrato_empresa DESC
-    LIMIT ? OFFSET ?
-  ";
+  $sqlContratos = "SELECT c.id_contrato_empresa, c.tipo_contrato, c.inicio_contratacion, c.fin_contratacion, c.id_empresa, c.id_usuario, tu.nombre_usuario AS tecnico_nombre,
+      e.razon_social FROM contrato_empresa c JOIN empresa e ON e.id_empresa = c.id_empresa LEFT JOIN usuario tu ON tu.id_usuario = c.id_usuario $whereContratos
+    ORDER BY c.id_contrato_empresa DESC LIMIT ? OFFSET ?";
 
   $stmtCon = $db->prepare($sqlContratos);
   $typesConData = $typesCon . 'ii';
@@ -977,12 +864,7 @@ if ($view === 'ver_planes') {
   $wherePlanes = ($wherePlanes === '') ? ('WHERE ' . $planIgualdadCondition) : ($wherePlanes . ' AND ' . $planIgualdadCondition);
 
   // Total de planes
-  $sqlTotalPlanes = "
-    SELECT COUNT(DISTINCT e.id_empresa) AS total
-    FROM empresa e
-    LEFT JOIN contrato_empresa ce_plan ON ce_plan.id_empresa = e.id_empresa AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD'
-    $wherePlanes
-  ";
+  $sqlTotalPlanes = " SELECT COUNT(DISTINCT e.id_empresa) AS total FROM empresa e LEFT JOIN contrato_empresa ce_plan ON ce_plan.id_empresa = e.id_empresa AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD' $wherePlanes";
   $stmtTotal = db()->prepare($sqlTotalPlanes);
   if (!empty($paramsPla)) $stmtTotal->bind_param($typesPla, ...$paramsPla);
   $stmtTotal->execute();
@@ -999,23 +881,10 @@ if ($view === 'ver_planes') {
   }
 
   // Data de planes con paginación
-  $sqlDataPlanes = "
-    SELECT
-      e.id_empresa,
-      e.razon_social,
-      COALESCE(MAX(TRIM(ce_plan.tipo_contrato)), 'PLAN IGUALDAD') AS tipo_contrato,
-      MIN(ce_plan.inicio_contratacion) AS inicio_plan,
-      MAX(ce_plan.fin_contratacion) AS fin_plan,
-      MAX(ce_plan.id_contrato_empresa) AS id_contrato_empresa
-    FROM empresa e
-    LEFT JOIN contrato_empresa ce_plan
-      ON ce_plan.id_empresa = e.id_empresa
-      AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD'
-    $wherePlanes
-    GROUP BY e.id_empresa, e.razon_social
-    ORDER BY e.razon_social ASC
-    LIMIT ? OFFSET ?
-  ";
+  $sqlDataPlanes = " SELECT e.id_empresa, e.razon_social, COALESCE(MAX(TRIM(ce_plan.tipo_contrato)), 'PLAN IGUALDAD') AS tipo_contrato, MIN(ce_plan.inicio_contratacion) AS inicio_plan,
+      MAX(ce_plan.fin_contratacion) AS fin_plan, MAX(ce_plan.id_contrato_empresa) AS id_contrato_empresa
+    FROM empresa e LEFT JOIN contrato_empresa ce_plan ON ce_plan.id_empresa = e.id_empresa AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD'
+    $wherePlanes GROUP BY e.id_empresa, e.razon_social ORDER BY e.razon_social ASC LIMIT ? OFFSET ?";
 
   $stmtData = db()->prepare($sqlDataPlanes);
   $typesFinal = $typesPla . 'ii';
@@ -1038,13 +907,7 @@ if ($view === 'ver_medidas') {
   $idEmpresaMedidas = (int)($_GET['id_empresa'] ?? 0);
 
   if ($idEmpresaMedidas > 0) {
-    $stmtPlan = db()->prepare(" 
-      SELECT
-        e.id_empresa,
-        e.razon_social,
-        MIN(pc.inicio_plan) AS inicio_plan,
-        MAX(pc.fin_plan) AS fin_plan
-      FROM empresa e
+    $stmtPlan = db()->prepare("SELECT e.id_empresa, e.razon_social, MIN(pc.inicio_plan) AS inicio_plan, MAX(pc.fin_plan) AS fin_plan FROM empresa e
       JOIN areas_contratadas pc ON pc.id_empresa = e.id_empresa
       WHERE e.id_empresa = ?
       " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa AND ce.id_usuario = ?) OR e.id_usuario = ?)" : "") . "
@@ -1061,13 +924,7 @@ if ($view === 'ver_medidas') {
     $stmtPlan->close();
 
     if ($verMedidasPlan !== null) {
-      $stmtMedidas = db()->prepare(" 
-        SELECT DISTINCT
-          ap.id_plan,
-          ap.nombre AS area_nombre,
-          m.id_medida,
-          m.descripcion
-        FROM areas_contratadas pc
+      $stmtMedidas = db()->prepare(" SELECT DISTINCT ap.id_plan, ap.nombre AS area_nombre, m.id_medida, m.descripcion FROM areas_contratadas pc
         JOIN area_plan ap ON ap.id_plan = pc.id_plan
         LEFT JOIN cliente_medida cm ON cm.id_areas_contratadas = pc.id_areas_contratadas
         LEFT JOIN medida m ON m.id_medida = cm.id_medida
@@ -1124,13 +981,7 @@ if ($view === 'edit_plan') {
   unset($_SESSION['edit_plan_error'], $_SESSION['edit_plan_old']);
 
   if ($idEmpresa > 0) {
-    $stmt = db()->prepare("
-      SELECT
-        e.id_empresa,
-        e.razon_social,
-        MIN(pc.inicio_plan) AS inicio_plan,
-        MAX(pc.fin_plan) AS fin_plan
-      FROM empresa e
+    $stmt = db()->prepare(" SELECT e.id_empresa, e.razon_social, MIN(pc.inicio_plan) AS inicio_plan, MAX(pc.fin_plan) AS fin_plan FROM empresa e
       JOIN areas_contratadas pc ON pc.id_empresa = e.id_empresa
       WHERE e.id_empresa = ?
       " . ($esTecnico ? "AND (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa AND ce.id_usuario = ?) OR e.id_usuario = ?)" : "") . "

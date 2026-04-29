@@ -49,7 +49,7 @@ $db = db();
 $isDefault = $id === 1;
 
 // Buscar archivo en BD (tabla archivos)
-$stmt = $db->prepare("\n  SELECT a.id_archivo, a.nombre_original, a.ruta_relativa, a.mime, a.id_cliente_medida\n  FROM archivos a\n  WHERE a.id_archivo = ?\n  LIMIT 1\n");
+$stmt = $db->prepare("SELECT a.id_archivo, a.nombre_original, a.ruta_relativa, a.mime, a.id_cliente_medida\n  FROM archivos a\n  WHERE a.id_archivo = ?\n  LIMIT 1\n");
 $stmt->bind_param('i', $id);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
@@ -64,7 +64,7 @@ if (!$isDefault) {
 
   // ADMINISTRADOR/TECNICO pueden descargar cualquiera; CLIENTE solo el suyo.
   if ($rol === 'CLIENTE') {
-    $stmt = $db->prepare("\n      SELECT 1\n      FROM archivos a\n      JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n      JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = ac.id_empresa\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
+    $stmt = $db->prepare("SELECT 1\n FROM archivos a\n JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n  JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = ac.id_empresa\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
     $stmt->bind_param('ii', $id, $currentUserId);
     $stmt->execute();
     $hasAccess = (bool)$stmt->get_result()->fetch_assoc();

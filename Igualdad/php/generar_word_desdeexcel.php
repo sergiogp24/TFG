@@ -239,7 +239,7 @@ function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial, ?int $
     }
 
     if ($empresa === []) {
-        $stmt = $db->prepare("\n        SELECT * FROM empresa\n        WHERE UPPER(TRIM(razon_social)) = ?\n        LIMIT 1\n    ");
+        $stmt = $db->prepare(" SELECT * FROM empresa\n   WHERE UPPER(TRIM(razon_social)) = ?\n  LIMIT 1\n    ");
 
         if ($stmt) {
             $razonSocial = mb_strtoupper(trim($razonSocial));
@@ -342,17 +342,8 @@ function obtenerValoresCuestionariosDesdeBD(mysqli $db, string $razonSocial, ?st
         $fila = [];
 
         if ($anio !== null) {
-            $sqlAnio = "
-                SELECT {$select}
-                FROM `{$tabla}` q
-                INNER JOIN ano_datos ad ON ad.id_ano_datos = q.id_ano_datos
-                INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-                WHERE q.id_empresa = ?
-                  AND ce.id_empresa = ?
-                  AND (YEAR(ad.fecha_inicio) = ? OR YEAR(ad.fecha_fin) = ?)
-                ORDER BY q.id_ano_datos DESC
-                LIMIT 1
-            ";
+            $sqlAnio = " SELECT {$select} FROM `{$tabla}` q  INNER JOIN ano_datos ad ON ad.id_ano_datos = q.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+                WHERE q.id_empresa = ? AND ce.id_empresa = ? AND (YEAR(ad.fecha_inicio) = ? OR YEAR(ad.fecha_fin) = ?) ORDER BY q.id_ano_datos DESC LIMIT 1";
             $stmtAnio = $db->prepare($sqlAnio);
             if ($stmtAnio) {
                 $stmtAnio->bind_param('iiii', $idEmpresa, $idEmpresa, $anio, $anio);

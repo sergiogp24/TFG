@@ -84,7 +84,7 @@ if ($kind === 'archivos') {
   }
 
   if (!$esAdmin) {
-    $stmt = $db->prepare("\n      SELECT 1\n      FROM archivos a\n      LEFT JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n      LEFT JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = COALESCE(ac.id_empresa, a.id_empresa)\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
+    $stmt = $db->prepare(" SELECT 1\n  FROM archivos a\n  LEFT JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n   LEFT JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = COALESCE(ac.id_empresa, a.id_empresa)\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
     $stmt->bind_param('ii', $id, $userId);
     $stmt->execute();
     $hasAccess = (bool)$stmt->get_result()->fetch_assoc();
@@ -119,12 +119,7 @@ if ($kind === 'archivos') {
 
   if (!$esAdmin) {
     $empresas = [];
-    $stmt = db()->prepare(
-      "SELECT e.razon_social
-       FROM usuario_empresa ue
-       INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
-       WHERE ue.id_usuario = ?"
-    );
+    $stmt = db()->prepare( "SELECT e.razon_social FROM usuario_empresa ue INNER JOIN empresa e ON e.id_empresa = ue.id_empresa WHERE ue.id_usuario = ?");
     $stmt->bind_param('i', $userId);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -199,12 +194,7 @@ if ($kind === 'archivos') {
 
   if (!$esAdmin) {
     $empresas = [];
-    $stmt = db()->prepare(
-      "SELECT e.razon_social
-       FROM usuario_empresa ue
-       INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
-       WHERE ue.id_usuario = ?"
-    );
+    $stmt = db()->prepare("SELECT e.razon_social FROM usuario_empresa ue INNER JOIN empresa e ON e.id_empresa = ue.id_empresa WHERE ue.id_usuario = ?");
     $stmt->bind_param('i', $userId);
     $stmt->execute();
     $res = $stmt->get_result();
@@ -236,7 +226,7 @@ if ($kind === 'archivos') {
 if ($kind === 'empresa_word' && $rol === 'TECNICO' && $userId > 0 && $downloadEmpresaId > 0) {
   try {
     $db = db();
-    $db->query("\n CREATE TABLE IF NOT EXISTS archivo_descarga_log (\n id_descarga INT AUTO_INCREMENT PRIMARY KEY,\n id_empresa INT NOT NULL,\n id_usuario INT NOT NULL,\n tipo_descarga VARCHAR(60) NOT NULL,\n  archivo VARCHAR(255) NULL,\n  descargado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n        INDEX idx_descarga_empresa (id_empresa),\n        INDEX idx_descarga_usuario (id_usuario),\n INDEX idx_descarga_tipo (tipo_descarga)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n ");
+    $db->query(" CREATE TABLE IF NOT EXISTS archivo_descarga_log (\n id_descarga INT AUTO_INCREMENT PRIMARY KEY,\n id_empresa INT NOT NULL,\n id_usuario INT NOT NULL,\n tipo_descarga VARCHAR(60) NOT NULL,\n  archivo VARCHAR(255) NULL,\n  descargado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n        INDEX idx_descarga_empresa (id_empresa),\n        INDEX idx_descarga_usuario (id_usuario),\n INDEX idx_descarga_tipo (tipo_descarga)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n ");
 
     $tipoDescarga = 'WORD_GENERADO';
     $archivoDescargado = (string)$filename;

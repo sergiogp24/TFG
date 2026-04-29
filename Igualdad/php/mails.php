@@ -69,6 +69,13 @@ function correo_enviar_html(
     string $textoPlano = '',
     ?callable $configurar = null
 ): void {
+    // Validación y saneamiento de parámetros críticos
+    if (!filter_var($emailDestino, FILTER_VALIDATE_EMAIL)) {
+        throw new InvalidArgumentException('Email de destino inválido');
+    }
+    $nombreDestino = trim(strip_tags($nombreDestino));
+    $asunto = trim(strip_tags($asunto));
+
     $mail = correo_crear_mailer();
 
     if ($configurar !== null) {
@@ -76,14 +83,21 @@ function correo_enviar_html(
     }
 
     $mail->addAddress($emailDestino, $nombreDestino);
-    $mail->Subject = $asunto;
+    // Escapar asunto para evitar inyección de cabeceras y XSS
+    $mail->Subject = htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8');
     $mail->Body = $html;
 
     if ($textoPlano !== '') {
         $mail->AltBody = $textoPlano;
     }
 
-    $mail->send();
+    try {
+        $mail->send();
+    } catch (\Throwable $e) {
+        // Log interno para monitoreo de errores de correo
+        error_log('[correo_enviar_html] Error enviando correo a ' . $emailDestino . ': ' . $e->getMessage());
+        throw $e;
+    }
 }
 
 function correo_formatear_lista(array $items): string
@@ -131,19 +145,8 @@ function correo_obtener_empresas_asignadas(mysqli $db, int $userId): array
     $empresas = [];
 
     $stmt = $db->prepare(
-        "SELECT
-                e.razon_social,
-                COALESCE((
-                        SELECT ce.tipo_contrato
-                        FROM contrato_empresa ce
-                        WHERE ce.id_empresa = e.id_empresa
-                        ORDER BY ce.id_contrato_empresa DESC
-                        LIMIT 1
-                ), 'SIN CONTRATO') AS tipo_contrato
-         FROM usuario_empresa ue
-         INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
-         WHERE ue.id_usuario = ?
-         ORDER BY e.razon_social ASC"
+        "SELECT e.razon_social, COALESCE(( SELECT ce.tipo_contrato FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa ORDER BY ce.id_contrato_empresa DESC LIMIT 1), 'SIN CONTRATO') AS tipo_contrato
+         FROM usuario_empresa ue INNER JOIN empresa e ON e.id_empresa = ue.id_empresa WHERE ue.id_usuario = ? ORDER BY e.razon_social ASC"
     );
 
     if (!$stmt) {
@@ -169,12 +172,7 @@ function correo_obtener_empresas_asignadas(mysqli $db, int $userId): array
 function correo_tiene_reunion_subir_rr(mysqli $db, int $userId): bool
 {
     $stmt = $db->prepare(
-        "SELECT 1
-         FROM reuniones r
-         INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
-         WHERE ur.id_usuario = ?
-             AND r.objetivo = 'Subir R.R'
-         LIMIT 1"
+        "SELECT 1 FROM reuniones r INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion  WHERE ur.id_usuario = ?  AND r.objetivo = 'Subir R.R' LIMIT 1"
     );
 
     if (!$stmt) {
@@ -192,12 +190,7 @@ function correo_tiene_reunion_subir_rr(mysqli $db, int $userId): bool
 function correo_tiene_registro_retributivo(mysqli $db, int $userId): bool
 {
     $stmt = $db->prepare(
-        "SELECT 1
-         FROM archivos a
-         INNER JOIN usuario_empresa ue ON ue.id_empresa = a.id_empresa
-         WHERE ue.id_usuario = ?
-             AND a.tipo = 'REGISTRO_RETRIBUTIVO'
-         LIMIT 1"
+        "SELECT 1 FROM archivos a INNER JOIN usuario_empresa ue ON ue.id_empresa = a.id_empresa WHERE ue.id_usuario = ? AND a.tipo = 'REGISTRO_RETRIBUTIVO' LIMIT 1"
     );
 
     if (!$stmt) {
@@ -456,24 +449,9 @@ function correo_enviar_recordatorio_registro_retributivo(string $email, string $
 function correo_enviar_recordatorio_rr_reuniones_vencidas(mysqli $db): void
 {
     $stmt = $db->prepare(
-        "SELECT DISTINCT
-          u.id_usuario,
-          u.email,
-          u.nombre_usuario
-        FROM reuniones r
-        INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
-        INNER JOIN usuario u ON u.id_usuario = ur.id_usuario
-        INNER JOIN rol ro ON ro.id = u.rol_id
-        WHERE UPPER(TRIM(ro.nombre)) = 'CLIENTE'
-          AND r.objetivo = 'Subir R.R'
-          AND STR_TO_DATE(CONCAT(r.fecha_reunion, ' ', r.hora_reunion), '%Y-%m-%d %H:%i') <= NOW()
-          AND NOT EXISTS (
-            SELECT 1
-            FROM usuario_empresa ue
-            INNER JOIN archivos a ON a.id_empresa = ue.id_empresa
-            WHERE ue.id_usuario = u.id_usuario
-              AND UPPER(TRIM(a.tipo)) = 'REGISTRO_RETRIBUTIVO'
-          )"
+        "SELECT DISTINCT u.id_usuario, u.email, u.nombre_usuario FROM reuniones r INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion INNER JOIN usuario u ON u.id_usuario = ur.id_usuario
+ INNER JOIN rol ro ON ro.id = u.rol_id  WHERE UPPER(TRIM(ro.nombre)) = 'CLIENTE' AND r.objetivo = 'Subir R.R' AND STR_TO_DATE(CONCAT(r.fecha_reunion, ' ', r.hora_reunion), '%Y-%m-%d %H:%i') <= NOW() AND NOT EXISTS (
+            SELECT 1  FROM usuario_empresa ue INNER JOIN archivos a ON a.id_empresa = ue.id_empresa WHERE ue.id_usuario = u.id_usuario AND UPPER(TRIM(a.tipo)) = 'REGISTRO_RETRIBUTIVO' )"
     );
 
     if (!$stmt) {

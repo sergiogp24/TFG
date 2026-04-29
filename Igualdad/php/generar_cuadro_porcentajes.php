@@ -17,23 +17,10 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  */
 function obtenerConteosPorRangoEdad(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
-    $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.fecha_nacimiento,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
-          AND de.fecha_nacimiento IS NOT NULL
+    $stmt = $db->prepare("SELECT de.sexo, de.fecha_nacimiento, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.fecha_nacimiento IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-        "
-    );
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0");
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de edades.');
@@ -126,23 +113,9 @@ function obtenerIndiceRangoEdad(int $edad): int
  */
 function obtenerConteosPorRangoAntiguedad(mysqli $db, int $idEmpresa, int $idAnoDatos, string $fechaReferencia): array
 {
-    $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.inicio_contratacion,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
-          AND de.inicio_contratacion IS NOT NULL
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-        "
-    );
+    $stmt = $db->prepare("SELECT de.sexo, de.inicio_contratacion, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ? AND de.id_ano_datos = ?
+          AND de.inicio_contratacion IS NOT NULL AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 ");
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de antigüedad.');
@@ -223,16 +196,8 @@ function obtenerIndiceRangoAntiguedad(int $antiguedad): int
 function obtenerConteosPorModalidadContrato(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.clave_contrato,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
+        "SELECT de.sexo, de.clave_contrato, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ?
           AND de.id_ano_datos = ?
           AND de.clave_contrato IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
@@ -287,25 +252,10 @@ function obtenerConteosPorModalidadContrato(mysqli $db, int $idEmpresa, int $idA
 function obtenerConteosPorModalidadContratoEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.clave_contrato,
-            de.inicio_contratacion,
-            ad.fecha_inicio,
-            ad.fecha_fin,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
-          AND de.clave_contrato IS NOT NULL
-          AND de.inicio_contratacion IS NOT NULL
-          AND ad.fecha_inicio IS NOT NULL
-          AND ad.fecha_fin IS NOT NULL
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        "SELECT de.sexo, de.clave_contrato, de.inicio_contratacion, ad.fecha_inicio, ad.fecha_fin, de.salario_base_eq, de.salario_base_ef  FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.clave_contrato IS NOT NULL AND de.inicio_contratacion IS NOT NULL
+          AND ad.fecha_inicio IS NOT NULL AND ad.fecha_fin IS NOT NULL  AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
     );
@@ -427,17 +377,9 @@ function obtenerIndiceModalidadContrato(int $claveContrato): ?int
 function obtenerConteosPorPorcentajeJornada(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.porc_jornada,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
+        " SELECT de.sexo, de.porc_jornada, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ? AND de.id_ano_datos = ?
           AND de.porc_jornada IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
@@ -511,29 +453,11 @@ function obtenerConteosPorPorcentajeJornada(mysqli $db, int $idEmpresa, int $idA
 function obtenerConteosPorPorcentajeJornadaEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.porc_jornada,
-            de.inicio_contratacion,
-            ad.fecha_inicio,
-            ad.fecha_fin,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
-          AND de.porc_jornada IS NOT NULL
-          AND de.inicio_contratacion IS NOT NULL
-          AND ad.fecha_inicio IS NOT NULL
-          AND ad.fecha_fin IS NOT NULL
-          AND de.inicio_contratacion BETWEEN ad.fecha_inicio AND ad.fecha_fin
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-        "
-    );
+        "SELECT de.sexo, de.porc_jornada, de.inicio_contratacion, ad.fecha_inicio, ad.fecha_fin, de.salario_base_eq, de.salario_base_ef
+        FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.porc_jornada IS NOT NULL AND de.inicio_contratacion IS NOT NULL AND ad.fecha_inicio IS NOT NULL
+          AND ad.fecha_fin IS NOT NULL AND de.inicio_contratacion BETWEEN ad.fecha_inicio AND ad.fecha_fin
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 ");
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de porcentaje de jornada en periodo.');
@@ -593,21 +517,10 @@ function obtenerConteosPorPorcentajeJornadaEnPeriodo(mysqli $db, int $idEmpresa,
 function obtenerConteosPorPuestoProfesional(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.puesto_empresa,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
-          AND de.puesto_empresa IS NOT NULL
-          AND TRIM(de.puesto_empresa) <> ''
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        "SELECT de.sexo, de.puesto_empresa, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ? AND de.id_ano_datos = ?  AND de.puesto_empresa IS NOT NULL
+          AND TRIM(de.puesto_empresa) <> '' AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
     );
 
@@ -680,14 +593,8 @@ function obtenerConteosPorPuestoProfesional(mysqli $db, int $idEmpresa, int $idA
 function obtenerConteosPorPuestoProfesionalEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.puesto_empresa,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        " SELECT de.sexo, de.puesto_empresa, de.salario_base_eq, de.salario_base_ef
+        FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
         WHERE ce.id_empresa = ?
           AND de.id_ano_datos = ?
@@ -802,14 +709,7 @@ function normalizarTipoBaja(string $texto): string
 function obtenerConteosPuestosDirectivosGrupo01(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.puesto_empresa,
-            de.agrup_class_prof,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
+        " SELECT de.sexo, de.puesto_empresa, de.agrup_class_prof, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
         WHERE ce.id_empresa = ?
@@ -909,24 +809,10 @@ function esGrupo01(string $valor): bool
 function obtenerConteosPorAreaFuncional(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.dpto_empresa,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        " SELECT de.sexo, de.dpto_empresa, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
-          AND de.dpto_empresa IS NOT NULL
-          AND TRIM(de.dpto_empresa) <> ''
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-           
-        "
-    );
+        WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.dpto_empresa IS NOT NULL AND TRIM(de.dpto_empresa) <> ''
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0  AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 " );
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de areas funcionales.');
@@ -996,13 +882,7 @@ function obtenerConteosPorAreaFuncional(mysqli $db, int $idEmpresa, int $idAnoDa
 function obtenerConteosPorAreaFuncionalEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.dpto_empresa,
-            de.salario_base_eq,
-            de.salario_base_ef
-        FROM datos_empleados de
+        "SELECT de.sexo, de.dpto_empresa, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
         WHERE ce.id_empresa = ?
@@ -1087,23 +967,11 @@ function obtenerConteosPorAreaFuncionalEnPeriodo(mysqli $db, int $idEmpresa, int
 function obtenerConteosPorHijos(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-     
-SELECT
-    de.sexo,
-    de.hijos,
-    de.salario_base_eq,
-    de.salario_base_ef
-FROM datos_empleados de
+        "SELECT de.sexo, de.hijos, de.salario_base_eq, de.salario_base_efb FROM datos_empleados de
 INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
 INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
 WHERE ce.id_empresa = ?
-  AND de.id_ano_datos = ?
-    AND de.hijos IS NOT NULL
-    AND COALESCE(de.salario_base_eq, 0) <> 0
-    AND COALESCE(de.salario_base_ef, 0) <> 0;
-        "
-    );
+  AND de.id_ano_datos = ? AND de.hijos IS NOT NULL AND COALESCE(de.salario_base_eq, 0) <> 0 AND COALESCE(de.salario_base_ef, 0) <> 0; " );
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de hijos.');
     }
@@ -1160,12 +1028,7 @@ WHERE ce.id_empresa = ?
 function obtenerConteosPorGrupoProfesional(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.grupo_profesional,
-            de.salario_base_eq,
-            de.salario_base_ef
+        " SELECT de.sexo, de.grupo_profesional, de.salario_base_eq, de.salario_base_ef
         FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
@@ -1268,15 +1131,8 @@ function obtenerIndiceGrupoProfesional(string $valor): ?int
 function obtenerConteosEdadContratacionPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.fecha_nacimiento,
-            de.inicio_contratacion,
-            ad.fecha_inicio,
-            ad.fecha_fin,
-            de.salario_base_eq,
-            de.salario_base_ef
+        " SELECT de.sexo, de.fecha_nacimiento, de.inicio_contratacion, ad.fecha_inicio,
+            ad.fecha_fin, de.salario_base_eq, de.salario_base_ef
         FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
@@ -1439,8 +1295,7 @@ function obtenerIndiceEdadHoja17(int $edad): ?int
 function generarCuadroPorcentajesEmpresa(mysqli $db, int $idEmpresa, int $idAnoDatos, string $razonSocial): string
 {
     $stmt = $db->prepare(
-        "
-SELECT
+        "SELECT
     SUM(CASE WHEN t.sexo_normalizado = 'MUJER' THEN 1 ELSE 0 END) AS total_mujeres,
     SUM(CASE WHEN t.sexo_normalizado = 'HOMBRE' THEN 1 ELSE 0 END) AS total_hombres
 FROM (

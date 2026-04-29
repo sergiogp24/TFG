@@ -10,6 +10,7 @@ require_once __DIR__ . '/mails.php';
 header('Content-Type: text/html; charset=UTF-8');
 
 // Obtener parámetros del GET/POST
+
 $token = trim((string)($_GET['token'] ?? $_POST['token'] ?? ''));
 $method = $_SERVER['REQUEST_METHOD'] ?? '';
 
@@ -18,6 +19,26 @@ $successMsg = '';
 $tokenValid = false;
 $userEmail = '';
 $userName = '';
+// Control de intentos de restablecimiento por IP/sesión
+$maxResetAttempts = 5;
+$resetBlockTime = 60 * 60; // 1 hora
+$ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+$now = time();
+if (!isset($_SESSION['reset_attempts'])) {
+    $_SESSION['reset_attempts'] = [];
+}
+// Limpiar intentos antiguos
+foreach ($_SESSION['reset_attempts'] as $key => $data) {
+    if ($data['time'] < $now - $resetBlockTime) {
+        unset($_SESSION['reset_attempts'][$key]);
+    }
+}
+if (!isset($_SESSION['reset_attempts'][$ip])) {
+    $_SESSION['reset_attempts'][$ip] = ['count' => 0, 'time' => $now];
+}
+if ($_SESSION['reset_attempts'][$ip]['count'] >= $maxResetAttempts && $now - $_SESSION['reset_attempts'][$ip]['time'] < $resetBlockTime) {
+    $errorMsg = 'Demasiados intentos de restablecimiento. Intenta de nuevo en una hora.';
+}
 
 // Validar token (GET o POST)
 if ($token === '') {
@@ -77,9 +98,11 @@ if ($token === '') {
 }
 
 // Si es POST y el token es válido, procesamos el establecimiento de contraseña
-if ($method === 'POST' && $tokenValid) {
+if ($method === 'POST' && $tokenValid && $errorMsg === '') {
     if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
         $errorMsg = 'La sesión ha expirado. Recarga la página e inténtalo de nuevo.';
+        $_SESSION['reset_attempts'][$ip]['count']++;
+        $_SESSION['reset_attempts'][$ip]['time'] = $now;
     } else {
         $password = (string)($_POST['password'] ?? '');
         $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
@@ -87,10 +110,16 @@ if ($method === 'POST' && $tokenValid) {
         // Validar contraseña
         if ($password === '') {
             $errorMsg = 'La contraseña no puede estar vacía';
+            $_SESSION['reset_attempts'][$ip]['count']++;
+            $_SESSION['reset_attempts'][$ip]['time'] = $now;
         } elseif (strlen($password) < 6) {
             $errorMsg = 'La contraseña debe tener al menos 6 caracteres';
+            $_SESSION['reset_attempts'][$ip]['count']++;
+            $_SESSION['reset_attempts'][$ip]['time'] = $now;
         } elseif ($password !== $passwordConfirm) {
             $errorMsg = 'Las contraseñas no coinciden';
+            $_SESSION['reset_attempts'][$ip]['count']++;
+            $_SESSION['reset_attempts'][$ip]['time'] = $now;
         } else {
             // Verificar que el usuario existe (por si acaso)
             $stmtUser = db()->prepare("SELECT id_usuario FROM usuario WHERE email = ? LIMIT 1");
@@ -100,6 +129,8 @@ if ($method === 'POST' && $tokenValid) {
 
             if ($resultUser->num_rows === 0) {
                 $errorMsg = 'El email no está registrado en el sistema';
+                $_SESSION['reset_attempts'][$ip]['count']++;
+                $_SESSION['reset_attempts'][$ip]['time'] = $now;
             } else {
                 $user = $resultUser->fetch_assoc();
                 $userId = (int)($user['id_usuario'] ?? 0);
@@ -117,6 +148,8 @@ if ($method === 'POST' && $tokenValid) {
 
                 $successMsg = 'Contraseña establecida correctamente. Puedes acceder a la plataforma con tu usuario y contraseña.';
                 $tokenValid = false; // Ocultar el formulario después del éxito
+                // Resetear contador tras éxito
+                $_SESSION['reset_attempts'][$ip] = ['count' => 0, 'time' => $now];
             }
             $stmtUser->close();
         }
