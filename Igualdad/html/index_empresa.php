@@ -374,7 +374,7 @@ if ($fromPanel === 'tecnico') {
                                                     <a class="btn btn-primary btn-sm ge-company-action-btn" href="../model/empresa.php?view=ver_planes&id_empresa=<?= $detalleEmpresaId ?><?= $fromParam ?>">🗂 Ver planes</a>
                                                 <?php endif; ?>
                                             <?php endif; ?>
-                                            <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/php/archivos_subidos.php?id_empresa=' . $detalleEmpresaId)) ?>">📁 Archivos subidos</a>
+                                            <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/php/ver_archivos.php?id_empresa=' . $detalleEmpresaId)) ?>">📁 Archivos subidos</a>
                                             <?php if (!$isAdmin): ?>
                                                 <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/html/index_staff.php?id_empresa=' . $detalleEmpresaId)) ?>">📊 Subir registro retributivo</a>
                                             <?php endif; ?>
@@ -417,6 +417,49 @@ if ($fromPanel === 'tecnico') {
                                                 <div class="ge-info-value"><?= h($detalleEmpresa['telefono'] ?? '') ?></div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div class="card border-0 shadow-sm mb-3 ge-company-card">
+                                    <div class="card-body">
+                                        <div class="ge-section-label">Enviar correo a la empresa</div>
+                                        <?php $emailEmpresaDetalle = trim((string)($detalleEmpresa['email'] ?? '')); ?>
+
+                                        <?php if ($emailEmpresaDetalle === ''): ?>
+                                            <div class="alert alert-warning mb-0">Esta empresa no tiene email configurado.</div>
+                                        <?php else: ?>
+                                            <form method="post" action="../controller/empresa_controller.php" class="vstack gap-2">
+                                                <?= csrf_input() ?>
+                                                <input type="hidden" name="accion" value="enviar_correo_empresa">
+                                                <input type="hidden" name="id_empresa" value="<?= $detalleEmpresaId ?>">
+                                                <?php if ($fromPanel !== ''): ?>
+                                                    <input type="hidden" name="from" value="<?= h($fromPanel) ?>">
+                                                <?php endif; ?>
+
+                                                <div class="small text-muted">Destino: <?= h($emailEmpresaDetalle) ?></div>
+
+                                                <label for="asunto_correo_<?= $detalleEmpresaId ?>" class="form-label mb-0">Asunto</label>
+                                                <input
+                                                    type="text"
+                                                    id="asunto_correo_<?= $detalleEmpresaId ?>"
+                                                    name="asunto_correo"
+                                                    class="form-control"
+                                                    maxlength="180"
+                                                    required>
+
+                                                <label for="cuerpo_correo_<?= $detalleEmpresaId ?>" class="form-label mb-0">Cuerpo</label>
+                                                <textarea
+                                                    id="cuerpo_correo_<?= $detalleEmpresaId ?>"
+                                                    name="cuerpo_correo"
+                                                    class="form-control"
+                                                    rows="5"
+                                                    required></textarea>
+
+                                                <div>
+                                                    <button type="submit" class="btn btn-primary btn-sm">Enviar correo</button>
+                                                </div>
+                                            </form>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
 
@@ -1615,8 +1658,8 @@ if ($fromPanel === 'tecnico') {
                         </div>
 
                         <?php $tipoContratoActualAdd = strtoupper(trim((string)((($tipoContratoForzadoAdd ?? '') !== '') ? $tipoContratoForzadoAdd : ($addContratoOld['tipo_contrato'] ?? 'PLAN IGUALDAD')))); ?>
-                        <div class="maintenance-fields border rounded p-3 bg-light" style="display: <?= ($tipoContratoActualAdd === 'MANTENIMIENTO') ? 'block' : 'none' ?>;">
-                            <div class="small text-muted mb-2">Estos datos solo son obligatorios cuando el servicio es de Mantenimiento.</div>
+                        <div class="maintenance-fields border rounded p-3 bg-light" style="display: <?= in_array($tipoContratoActualAdd, ['MANTENIMIENTO', 'PLAN IGUALDAD']) ? 'block' : 'none' ?>;">
+                            <div class="small text-muted mb-2 js-maintenance-info"><?= ($tipoContratoActualAdd === 'PLAN IGUALDAD') ? 'Estos datos son <strong>opcionales</strong> para el Plan de Igualdad. Puedes seleccionar áreas y medidas si lo deseas.' : 'Estos datos solo son obligatorios cuando el servicio es de Mantenimiento.' ?></div>
                             <div>
                                 <label class="form-label">Fecha inicio vigencia</label>
                                 <input class="form-control js-contrato-plan-date" type="date" name="inicio_plan" value="<?= h($addContratoOld['inicio_plan'] ?? '') ?>">
@@ -1636,6 +1679,7 @@ if ($fromPanel === 'tecnico') {
                                     $areaId      = (int)$area['id_plan'];
                                     $checkedArea = in_array($areaId, array_map('intval', $addContratoOld['areas'] ?? []), true);
                                     $medidasArea = $medidasPorAreaContrato[$areaId] ?? [];
+                                    $medidasPreseleccionadasArea = array_map('intval', (array)($addContratoOld['medidas'][$areaId] ?? []));
                                     ?>
                                     <div class="border rounded p-2 mb-2 bg-white">
                                         <div class="form-check">
@@ -1665,6 +1709,7 @@ if ($fromPanel === 'tecnico') {
                                                             id="contrato_medida_<?= $idMedida ?>"
                                                             name="medidas[<?= $areaId ?>][]"
                                                             value="<?= $idMedida ?>"
+                                                            <?= in_array($idMedida, $medidasPreseleccionadasArea, true) ? 'checked' : '' ?>
                                                             <?= $checkedArea ? '' : 'disabled' ?>>
                                                         <label class="form-check-label" for="contrato_medida_<?= $idMedida ?>">
                                                             <?= h($m['descripcion']) ?>
@@ -1810,11 +1855,22 @@ if ($fromPanel === 'tecnico') {
             } else if (tipoInput) {
                 tipo = String(tipoInput.value || '').toUpperCase();
             }
-            var showPlanMedidas = (tipo === 'MANTENIMIENTO');
+            var esMantenimiento = (tipo === 'MANTENIMIENTO');
+            var esPlanIgualdad = (tipo === 'PLAN IGUALDAD');
+            var showPlanMedidas = (esMantenimiento || esPlanIgualdad);
             fields.style.display = showPlanMedidas ? 'block' : 'none';
 
+            // Update hint text dynamically
+            var infoText = fields.querySelector('.js-maintenance-info');
+            if (infoText) {
+                infoText.innerHTML = esMantenimiento
+                    ? 'Estos datos solo son obligatorios cuando el servicio es de Mantenimiento.'
+                    : 'Estos datos son <strong>opcionales</strong> para el Plan de Igualdad. Puedes seleccionar áreas y medidas si lo deseas.';
+            }
+
             fields.querySelectorAll('.js-contrato-plan-date').forEach(function(input) {
-                input.required = showPlanMedidas;
+                // Dates are only REQUIRED for Mantenimiento; optional for Plan Igualdad
+                input.required = esMantenimiento;
                 input.disabled = !showPlanMedidas;
                 if (!showPlanMedidas) input.value = '';
             });

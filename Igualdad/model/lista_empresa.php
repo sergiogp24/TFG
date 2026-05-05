@@ -93,16 +93,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $usuarioData = $stmt->get_result()->fetch_assoc();
           $stmt->close();
 
-          if ($usuarioData) {
-              // <--- Avisa al usuario destinatario (ya deberías tener esto)
-              foreach ($empresasNuevas as $empresa) {
-                  correo_enviar_nueva_empresa_asignada(
-                      $usuarioData['email'],
-                      $usuarioData['nombre_usuario'],
-                      $empresa['razon_social'],
-                      $empresa['tipo_contrato'],
-                      '#' // Puedes poner aquí el enlace a la empresa
-                  );
+            if ($usuarioData) {
+              $empresaReferencia = $empresasNuevas[0] ?? null;
+              if (is_array($empresaReferencia)) {
+                // Un solo correo por operacion de edicion/asignacion.
+                correo_enviar_nueva_empresa_asignada(
+                  (string)$usuarioData['email'],
+                  (string)$usuarioData['nombre_usuario'],
+                  (string)($empresaReferencia['razon_social'] ?? ''),
+                  (string)($empresaReferencia['tipo_contrato'] ?? 'SIN CONTRATO'),
+                  '#' // Puedes poner aquí el enlace a la empresa
+                );
               }
 
 $stmt = $db->prepare("

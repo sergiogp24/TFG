@@ -106,7 +106,7 @@ function obtener_word_final_empresa(int $idEmpresa): ?array
     $sql = '
         SELECT id_archivo, nombre_original, subido_en
         FROM archivos
-        WHERE UPPER(TRIM(tipo)) = "WORD_FINAL" AND id_empresa = ?
+        WHERE UPPER(TRIM(tipo)) IN ("WORD_GENERADO", "WORD_FINAL") AND id_empresa = ?
         ORDER BY subido_en DESC, id_archivo DESC
         LIMIT 1';
 
@@ -909,7 +909,8 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                 </a>
 
                                                 <div class="mt-4">
-                                                    <label class="form-label d-block">Datos Cuantitativos / Cuestionarios Cualitativos</label>
+                                                    <label class="form-label d-block mb-2">Datos Cuantitativos / Cuestionarios Cualitativos</label>
+                                                    
                                                     <?php if (!$registroSubido): ?>
                                                         <div class="alert alert-warning py-2 mb-0">
                                                             Debes subir primero el Registro Retributivo para desbloquear los Datos Cuantitativos / Cuestionarios Cualitativos.
@@ -920,6 +921,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                         </div>
                                                     <?php endif; ?>
                                                 </div>
+                                            </div>
 
                                             </div>
                                         </div>
@@ -1193,6 +1195,9 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
             })();
         </script>
     <?php endif; ?>
+    
+
+<?php include_once __DIR__ . '/chatbot_widget.php'; ?>
 </body>
 
 </html>

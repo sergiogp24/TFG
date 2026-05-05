@@ -57,7 +57,7 @@ function tecnico_tiene_empresa(int $idEmpresa, int $idUsuario): bool
   return $ok;
 }
 
-if ($esTecnico && $accion !== 'editar_empresas' && $accion !== 'add_contratos' && $accion !== 'edit_contratos' && $accion !== 'delete_contratos' && $accion !== 'edit_plan' && $accion !== 'delete_plan_empresa') {
+if ($esTecnico && $accion !== 'editar_empresas' && $accion !== 'add_contratos' && $accion !== 'edit_contratos' && $accion !== 'delete_contratos' && $accion !== 'edit_plan' && $accion !== 'delete_plan_empresa' && $accion !== 'enviar_correo_empresa') {
   http_response_code(403);
   exit('Acceso denegado');
 }
@@ -340,13 +340,6 @@ function guardar_archivos_empresa(int $idEmpresa, $filesInput): array
     return $result;
   }
 
-  $companyDirName = 'empresa_' . $idEmpresa;
-  $companyDir = $baseUploads . '/' . $companyDirName;
-  if (!is_dir($companyDir) && !mkdir($companyDir, 0775, true)) {
-    $result['errores'][] = 'No se pudo crear la carpeta de la empresa.';
-    return $result;
-  }
-
   $allowedExtensions = ['xlsx', 'xls', 'docx', 'doc', 'pdf'];
   $db = db();
   $totalFiles = count($filesInput['name']);
@@ -383,7 +376,7 @@ function guardar_archivos_empresa(int $idEmpresa, $filesInput): array
     }
 
     $newName = bin2hex(random_bytes(16)) . '.' . $ext;
-    $newPath = $companyDir . '/' . $newName;
+    $newPath = $baseUploads . '/' . $newName;
 
     if (!move_uploaded_file($tmpFile, $newPath)) {
       $result['errores'][] = $filename . ': no se pudo guardar en disco.';
@@ -400,7 +393,7 @@ function guardar_archivos_empresa(int $idEmpresa, $filesInput): array
     };
 
     $sha = hash_file('sha256', $newPath) ?: '';
-    $rutaRelativa = 'uploads/' . $companyDirName . '/' . $newName;
+    $rutaRelativa = 'uploads/' . $newName;
 
     $stmt = $db->prepare("\n      INSERT INTO archivos\n      (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_cliente_medida, id_empresa)\n      VALUES ('DOCUMENTO EMPRESA', NULL, ?, ?, ?, ?, ?, ?, NULL, ?)\n    ");
 
@@ -426,6 +419,80 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
   redirect_menu_empresas('La sesion ha expirado. Recarga la pagina e intentalo de nuevo.');
+}
+
+if ($accion === 'enviar_correo_empresa') {
+  $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
+  $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
+  $asunto = trim((string)($_POST['asunto_correo'] ?? ''));
+  $cuerpo = trim((string)($_POST['cuerpo_correo'] ?? ''));
+
+  if ($idEmpresa <= 0) {
+    redirect_view_empresas('ver_empresa', 'Empresa invalida.');
+  }
+
+  if ($esTecnico && !tecnico_tiene_empresa($idEmpresa, $currentUserId)) {
+    redirect_view_empresas('ver_empresas', 'No tienes permiso para esta empresa.');
+  }
+
+  if ($asunto === '' || $cuerpo === '') {
+    redirect_view_empresas('ver_empresa', 'Debes indicar asunto y cuerpo del correo.', $idEmpresa);
+  }
+
+  $asuntoLength = function_exists('mb_strlen') ? mb_strlen($asunto, 'UTF-8') : strlen($asunto);
+  if ($asuntoLength > 180) {
+    redirect_view_empresas('ver_empresa', 'El asunto es demasiado largo (maximo 180 caracteres).', $idEmpresa);
+  }
+
+  $stmtEmpresaCorreo = db()->prepare('SELECT razon_social, email FROM empresa WHERE id_empresa = ? LIMIT 1');
+  if (!$stmtEmpresaCorreo) {
+    redirect_view_empresas('ver_empresa', 'No se pudo preparar la consulta de empresa.', $idEmpresa);
+  }
+
+  $stmtEmpresaCorreo->bind_param('i', $idEmpresa);
+  $stmtEmpresaCorreo->execute();
+  $empresaCorreo = $stmtEmpresaCorreo->get_result()->fetch_assoc();
+  $stmtEmpresaCorreo->close();
+
+  if (!$empresaCorreo) {
+    redirect_view_empresas('ver_empresa', 'No se encontro la empresa seleccionada.', $idEmpresa);
+  }
+
+  $emailDestino = trim((string)($empresaCorreo['email'] ?? ''));
+  $nombreEmpresa = trim((string)($empresaCorreo['razon_social'] ?? 'Empresa'));
+
+  if ($emailDestino === '' || filter_var($emailDestino, FILTER_VALIDATE_EMAIL) === false) {
+    redirect_view_empresas('ver_empresa', 'La empresa no tiene un email valido para envio.', $idEmpresa);
+  }
+
+  try {
+    $asuntoHtml = htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8');
+    $cuerpoHtml = nl2br(htmlspecialchars($cuerpo, ENT_QUOTES, 'UTF-8'));
+
+    $html = '
+      <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
+          <div style="max-width: 680px; margin: 0 auto; padding: 16px;">
+            <p><strong>' . $asuntoHtml . '</strong></p>
+            <div>' . $cuerpoHtml . '</div>
+          </div>
+        </body>
+      </html>
+    ';
+
+    correo_enviar_html(
+      $emailDestino,
+      $nombreEmpresa,
+      $asunto,
+      $html,
+      $cuerpo
+    );
+
+    redirect_view_empresas('ver_empresa', 'Correo enviado correctamente.', $idEmpresa);
+  } catch (Throwable $e) {
+    log_internal_error_empresa('empresa.enviar_correo', $e);
+    redirect_view_empresas('ver_empresa', 'No se pudo enviar el correo. Intentalo de nuevo.', $idEmpresa);
+  }
 }
 
 //  CREAR EMPRESA
@@ -804,7 +871,8 @@ if ($accion === 'add_contratos') {
     $errorContrato('Tipo de contrato inválido.');
   }
 
-  $usaPlanYMedidas = ($tipoContrato === 'MANTENIMIENTO');
+  $usaMantenimiento = ($tipoContrato === 'MANTENIMIENTO');
+  $usaPlanYMedidas = $usaMantenimiento || ($tipoContrato === 'PLAN IGUALDAD');
 
   if (strtotime($inicioContratacion) === false || strtotime($finContratacion) === false) {
     $errorContrato('Formato de fecha inválido.');
@@ -813,11 +881,10 @@ if ($accion === 'add_contratos') {
     $errorContrato('La fecha de inicio no puede ser mayor que la fecha de fin.');
   }
 
-  if ($usaPlanYMedidas) {
+  if ($usaMantenimiento) {
     if ($inicioPlan === '' || $finPlan === '') {
       $errorContrato('Completa la fecha de inicio y fin de vigencia para mantenimiento.');
     }
-
     if (strtotime($inicioPlan) === false || strtotime($finPlan) === false) {
       $errorContrato('Formato de fecha de vigencia inválido.');
     }
@@ -826,6 +893,17 @@ if ($accion === 'add_contratos') {
     }
     if (empty($areas)) {
       $errorContrato('Selecciona al menos un área para mantenimiento.');
+    }
+  } elseif ($usaPlanYMedidas && ($inicioPlan !== '' || $finPlan !== '')) {
+    // Plan Igualdad: fechas opcionales, pero si se rellenan hay que validarlas
+    if ($inicioPlan === '' || $finPlan === '') {
+      $errorContrato('Si indicas una fecha de vigencia, debes completar tanto el inicio como el fin.');
+    }
+    if (strtotime($inicioPlan) === false || strtotime($finPlan) === false) {
+      $errorContrato('Formato de fecha de vigencia inválido.');
+    }
+    if (strtotime($inicioPlan) > strtotime($finPlan)) {
+      $errorContrato('La fecha de inicio de vigencia no puede ser mayor que la de fin.');
     }
   }
 
@@ -856,7 +934,7 @@ if ($accion === 'add_contratos') {
       }
     }
 
-    if ($usaPlanYMedidas) {
+    if ($usaPlanYMedidas && !empty($areas)) {
       $stmtArea = $db->prepare("SELECT id_plan FROM area_plan WHERE id_plan = ? LIMIT 1");
       foreach ($areas as $idPlanArea) {
         $stmtArea->bind_param('i', $idPlanArea);
@@ -876,7 +954,7 @@ if ($accion === 'add_contratos') {
     $stmt->execute();
     $stmt->close();
 
-    if ($usaPlanYMedidas) {
+    if ($usaPlanYMedidas && !empty($areas)) {
       $stmtAreaInsert = $db->prepare("INSERT INTO areas_contratadas (inicio_plan, fin_plan, id_empresa, id_plan) VALUES (?, ?, ?, ?)");
 
       foreach ($areas as $idPlanArea) {
@@ -924,6 +1002,19 @@ if ($accion === 'add_contratos') {
       }
 
       $stmtAreaInsert->close();
+    }
+
+    // --- Asignar técnico a la empresa en usuario_empresa si no existe ---
+    $stmtCheck = $db->prepare("SELECT 1 FROM usuario_empresa WHERE id_usuario = ? AND id_empresa = ?");
+    $stmtCheck->bind_param('ii', $idUsuarioServicio, $idEmpresa);
+    $stmtCheck->execute();
+    $existe = $stmtCheck->get_result()->fetch_assoc();
+    $stmtCheck->close();
+    if (!$existe) {
+      $stmtInsert = $db->prepare("INSERT INTO usuario_empresa (id_usuario, id_empresa) VALUES (?, ?)");
+      $stmtInsert->bind_param('ii', $idUsuarioServicio, $idEmpresa);
+      $stmtInsert->execute();
+      $stmtInsert->close();
     }
 
     $db->commit();
@@ -1005,7 +1096,8 @@ if ($accion === 'edit_contratos') {
     $errorEditContrato('Tipo de contrato inválido.');
   }
 
-  $usaPlanYMedidas = ($tipoContrato === 'MANTENIMIENTO');
+  $usaMantenimiento = ($tipoContrato === 'MANTENIMIENTO');
+  $usaPlanYMedidas = $usaMantenimiento || ($tipoContrato === 'PLAN IGUALDAD');
 
   if (strtotime($inicioContratacion) === false || strtotime($finContratacion) === false) {
     $errorEditContrato('Formato de fecha inválido.');
@@ -1014,11 +1106,10 @@ if ($accion === 'edit_contratos') {
     $errorEditContrato('La fecha de inicio no puede ser mayor que la fecha de fin.');
   }
 
-  if ($usaPlanYMedidas) {
+  if ($usaMantenimiento) {
     if ($inicioPlan === '' || $finPlan === '') {
       $errorEditContrato('Completa la fecha de inicio y fin de vigencia para mantenimiento.');
     }
-
     if (strtotime($inicioPlan) === false || strtotime($finPlan) === false) {
       $errorEditContrato('Formato de fecha de vigencia inválido.');
     }
@@ -1027,6 +1118,17 @@ if ($accion === 'edit_contratos') {
     }
     if (empty($areas)) {
       $errorEditContrato('Selecciona al menos un área para mantenimiento.');
+    }
+  } elseif ($usaPlanYMedidas && ($inicioPlan !== '' || $finPlan !== '')) {
+    // Plan Igualdad: fechas opcionales, pero si se rellenan hay que validarlas
+    if ($inicioPlan === '' || $finPlan === '') {
+      $errorEditContrato('Si indicas una fecha de vigencia, debes completar tanto el inicio como el fin.');
+    }
+    if (strtotime($inicioPlan) === false || strtotime($finPlan) === false) {
+      $errorEditContrato('Formato de fecha de vigencia inválido.');
+    }
+    if (strtotime($inicioPlan) > strtotime($finPlan)) {
+      $errorEditContrato('La fecha de inicio de vigencia no puede ser mayor que la de fin.');
     }
   }
 
@@ -1072,7 +1174,7 @@ if ($accion === 'edit_contratos') {
       }
     }
 
-    if ($usaPlanYMedidas) {
+    if ($usaPlanYMedidas && !empty($areas)) {
       $stmtArea = $db->prepare("SELECT id_plan FROM area_plan WHERE id_plan = ? LIMIT 1");
       foreach ($areas as $idPlanArea) {
         $stmtArea->bind_param('i', $idPlanArea);
@@ -1092,7 +1194,7 @@ if ($accion === 'edit_contratos') {
     $stmtU->execute();
     $stmtU->close();
 
-    if ($usaPlanYMedidas) {
+    if ($usaPlanYMedidas && !empty($areas)) {
       $stmtDelAf = $db->prepare("DELETE af FROM area_formacion af INNER JOIN cliente_medida cm ON cm.id_cliente_medida = af.id_cliente_medida INNER JOIN areas_contratadas pc ON pc.id_areas_contratadas = cm.id_areas_contratadas WHERE pc.id_empresa = ?");
       $stmtDelAf->bind_param('i', $idEmpresa);
       $stmtDelAf->execute();
@@ -1161,6 +1263,19 @@ if ($accion === 'edit_contratos') {
       $stmtAreaInsert->close();
     }
 
+    // --- Asignar técnico a la empresa en usuario_empresa si no existe ---
+    $stmtCheck = $db->prepare("SELECT 1 FROM usuario_empresa WHERE id_usuario = ? AND id_empresa = ?");
+    $stmtCheck->bind_param('ii', $idUsuarioServicio, $idEmpresa);
+    $stmtCheck->execute();
+    $existe = $stmtCheck->get_result()->fetch_assoc();
+    $stmtCheck->close();
+    if (!$existe) {
+      $stmtInsert = $db->prepare("INSERT INTO usuario_empresa (id_usuario, id_empresa) VALUES (?, ?)");
+      $stmtInsert->bind_param('ii', $idUsuarioServicio, $idEmpresa);
+      $stmtInsert->execute();
+      $stmtInsert->close();
+    }
+
     $db->commit();
 
     unset($_SESSION['edit_contrato_old'], $_SESSION['edit_contrato_error']);
@@ -1182,7 +1297,8 @@ if ($accion === 'delete_contratos') {
   }
 
   try {
-    $stmtCheck = db()->prepare("SELECT id_empresa FROM contrato_empresa WHERE id_contrato_empresa = ? LIMIT 1");
+    $db = db();
+    $stmtCheck = $db->prepare("SELECT id_empresa, tipo_contrato FROM contrato_empresa WHERE id_contrato_empresa = ? LIMIT 1");
     $stmtCheck->bind_param('i', $idContrato);
     $stmtCheck->execute();
     $contratoRow = $stmtCheck->get_result()->fetch_assoc();
@@ -1193,6 +1309,7 @@ if ($accion === 'delete_contratos') {
     }
 
     $idEmpresaContrato = (int)($contratoRow['id_empresa'] ?? 0);
+    $tipoContratoElim   = strtoupper(trim((string)($contratoRow['tipo_contrato'] ?? '')));
 
     // Verificación de seguridad para técnico
     if ($esTecnico) {
@@ -1201,13 +1318,41 @@ if ($accion === 'delete_contratos') {
       }
     }
 
-    $stmt = db()->prepare("DELETE FROM contrato_empresa WHERE id_contrato_empresa = ?");
+    $db->begin_transaction();
+
+    // Limpiar áreas y medidas asociadas (aplica a PLAN IGUALDAD y MANTENIMIENTO)
+    if (in_array($tipoContratoElim, ['PLAN IGUALDAD', 'MANTENIMIENTO'], true)) {
+      $stmtDelAf = $db->prepare("DELETE af FROM area_formacion af INNER JOIN cliente_medida cm ON cm.id_cliente_medida = af.id_cliente_medida INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas WHERE ac.id_empresa = ?");
+      $stmtDelAf->bind_param('i', $idEmpresaContrato);
+      $stmtDelAf->execute();
+      $stmtDelAf->close();
+
+      $stmtDelAe = $db->prepare("DELETE ae FROM area_ejercicio ae INNER JOIN cliente_medida cm ON cm.id_cliente_medida = ae.id_cliente_medida INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas WHERE ac.id_empresa = ?");
+      $stmtDelAe->bind_param('i', $idEmpresaContrato);
+      $stmtDelAe->execute();
+      $stmtDelAe->close();
+
+      $stmtDelCm = $db->prepare("DELETE cm FROM cliente_medida cm INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas WHERE ac.id_empresa = ?");
+      $stmtDelCm->bind_param('i', $idEmpresaContrato);
+      $stmtDelCm->execute();
+      $stmtDelCm->close();
+
+      $stmtDelAc = $db->prepare("DELETE FROM areas_contratadas WHERE id_empresa = ?");
+      $stmtDelAc->bind_param('i', $idEmpresaContrato);
+      $stmtDelAc->execute();
+      $stmtDelAc->close();
+    }
+
+    $stmt = $db->prepare("DELETE FROM contrato_empresa WHERE id_contrato_empresa = ?");
     $stmt->bind_param('i', $idContrato);
     $stmt->execute();
     $stmt->close();
 
+    $db->commit();
+
     redirect_view_empresas('ver_contratos', 'Contrato eliminado correctamente.', $idEmpresaContrato);
   } catch (Throwable $e) {
+    @$db->rollback();
     log_internal_error_empresa('empresa.delete_contrato', $e);
     redirect_view_empresas('ver_contratos', 'No se pudo eliminar el contrato. Intentalo de nuevo.');
   }

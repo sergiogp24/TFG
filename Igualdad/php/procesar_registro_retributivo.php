@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+// Extender timeout para todo el script (Excel processing toma tiempo)
+set_time_limit(300);
+
 function registrarLogProcesarRegistroRetributivo(string $mensaje): void
 {
     $archivos = [
@@ -181,11 +184,267 @@ function registrarArchivoGeneradoEnTabla(
 
 // ================== VALIDACIONES INICIALES ==================
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
-$debeGenerarDerivados = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true);
+$debeGenerarDerivados = false;
 $urlMenuSubida = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true)
     ? app_path('/html/index_staff.php')
     : app_path('/html/index_cliente.php');
 $idEmpresaPost = isset($_POST['id_empresa']) ? (int)$_POST['id_empresa'] : 0;
+
+// Soporte para regenerar Word sin subir archivo: acción POST 'accion=regenerar_word'
+if (isset($_POST['accion']) && $_POST['accion'] === 'regenerar_word') {
+    ini_set('display_errors', '0');
+    set_time_limit(60);  // 1 minuto es suficiente
+
+    // Permitir CLIENTE y TECNICO
+    if ($rol !== 'CLIENTE' && $rol !== 'TECNICO') {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['exito' => false, 'mensaje' => 'Acceso denegado']);
+        exit;
+    }
+
+    $idEmpresa = $idEmpresaPost;
+    $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
+    if ($idEmpresa <= 0 || $usuarioId <= 0) {
+        http_response_code(400);
+        header('Content-Type: application/json');
+        echo json_encode(['exito' => false, 'mensaje' => 'Datos incompletos']);
+        exit;
+    }
+
+    // Verificar que el usuario tiene acceso a esta empresa
+    $stmtAcceso = db()->prepare(
+        'SELECT 1 FROM usuario_empresa WHERE id_usuario = ? AND id_empresa = ?
+         UNION
+         SELECT 1 FROM empresa WHERE id_usuario = ? AND id_empresa = ?
+         LIMIT 1'
+    );
+    if ($stmtAcceso) {
+        $stmtAcceso->bind_param('iiii', $usuarioId, $idEmpresa, $usuarioId, $idEmpresa);
+        $stmtAcceso->execute();
+        $tieneAcceso = ($stmtAcceso->get_result()->num_rows > 0);
+        $stmtAcceso->close();
+    } else {
+        $tieneAcceso = false;
+    }
+
+    if (!$tieneAcceso) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['exito' => false, 'mensaje' => 'No tienes acceso a esta empresa']);
+        exit;
+    }
+
+    // Obtener la empresa
+    $stmtEmp = db()->prepare('SELECT razon_social FROM empresa WHERE id_empresa = ? LIMIT 1');
+    if (!$stmtEmp) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode(['exito' => false, 'mensaje' => 'Error preparando consulta de empresa']);
+        exit;
+    }
+    $stmtEmp->bind_param('i', $idEmpresa);
+    $stmtEmp->execute();
+    $rowEmp = $stmtEmp->get_result()->fetch_assoc();
+    $stmtEmp->close();
+
+    if (!$rowEmp) {
+        http_response_code(404);
+        header('Content-Type: application/json');
+        echo json_encode(['exito' => false, 'mensaje' => 'Empresa no encontrada']);
+        exit;
+    }
+
+    $razonSocial = (string)($rowEmp['razon_social'] ?? '');
+
+    $anioRegistro = null;
+    $stmtAno = db()->prepare(
+        'SELECT YEAR(ad.fecha_inicio) AS ano_referencia
+         FROM ano_datos ad
+         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+         WHERE ce.id_empresa = ?
+         ORDER BY ad.id_ano_datos DESC
+         LIMIT 1'
+    );
+    if ($stmtAno) {
+        $stmtAno->bind_param('i', $idEmpresa);
+        $stmtAno->execute();
+        $rowAno = $stmtAno->get_result()->fetch_assoc();
+        $stmtAno->close();
+
+        if ($rowAno) {
+            $anioRegistro = (string)($rowAno['ano_referencia'] ?? null);
+        }
+    }
+
+    // Buscar el cuadro de porcentajes primero en /uploads y luego en BD.
+    $uploadDir = realpath(__DIR__ . '/../uploads');
+    $rutaCuadroAbsoluta = '';
+
+    if ($uploadDir !== false && is_dir($uploadDir)) {
+        $baseNombreEmpresa = normalizarNombreArchivoEmpresa($razonSocial);
+        $candidatos = [];
+
+        if ($anioRegistro !== null && $anioRegistro !== '') {
+            $candidatos[] = $uploadDir . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '_' . $anioRegistro . '.xlsx';
+        }
+
+        $candidatos[] = $uploadDir . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '.xlsx';
+
+        foreach ($candidatos as $candidato) {
+            if (is_file($candidato)) {
+                $rutaCuadroAbsoluta = $candidato;
+                break;
+            }
+        }
+
+        if ($rutaCuadroAbsoluta === '') {
+            $patron = $uploadDir . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.xlsx';
+            $archivos = glob($patron) ?: [];
+            sort($archivos, SORT_NATURAL | SORT_FLAG_CASE);
+
+            foreach (array_reverse($archivos) as $archivo) {
+                $nombre = basename($archivo);
+                if (str_starts_with($nombre, '~$')) {
+                    continue;
+                }
+                if (str_ends_with($nombre, '_PLAN_IGUALDAD.xlsx')) {
+                    continue;
+                }
+
+                $rutaCuadroAbsoluta = $archivo;
+                break;
+            }
+        }
+    }
+
+    if ($rutaCuadroAbsoluta === '') {
+        $stmtCuadro = db()->prepare(
+            'SELECT ruta_relativa
+             FROM archivos
+             WHERE id_empresa = ? AND UPPER(TRIM(tipo)) = "CUADRO_PORCENTAJES" AND ruta_relativa IS NOT NULL
+               AND LOWER(ruta_relativa) LIKE "uploads/%"
+               AND LOWER(ruta_relativa) REGEXP "\\.(xlsx|xls|xlsm|csv)$"
+             ORDER BY subido_en DESC, id_archivo DESC
+             LIMIT 1'
+        );
+        if (!$stmtCuadro) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['exito' => false, 'mensaje' => 'Error al buscar cuadro de porcentajes']);
+            exit;
+        }
+
+        $stmtCuadro->bind_param('i', $idEmpresa);
+        $stmtCuadro->execute();
+        $rowCuadro = $stmtCuadro->get_result()->fetch_assoc();
+        $stmtCuadro->close();
+
+        if ($rowCuadro) {
+            $rutaCuadroRelativa = (string)($rowCuadro['ruta_relativa'] ?? '');
+            $rutaCuadroAbsoluta = __DIR__ . '/../' . $rutaCuadroRelativa;
+        }
+    }
+
+    if ($rutaCuadroAbsoluta === '' || !is_file($rutaCuadroAbsoluta)) {
+        http_response_code(404);
+        header('Content-Type: application/json');
+        echo json_encode(['exito' => false, 'mensaje' => 'No hay cuadro de porcentajes generado para esta empresa']);
+        exit;
+    }
+
+    try {
+        // Obtener año de los datos si existe
+        $stmtAno = db()->prepare(
+            'SELECT YEAR(ad.fecha_inicio) AS ano_referencia
+             FROM ano_datos ad
+             INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+             WHERE ce.id_empresa = ?
+             ORDER BY ad.id_ano_datos DESC
+             LIMIT 1'
+        );
+        if (!$stmtAno) {
+            throw new RuntimeException('Error preparando consulta de año de datos');
+        }
+        $stmtAno->bind_param('i', $idEmpresa);
+        $stmtAno->execute();
+        $rowAno = $stmtAno->get_result()->fetch_assoc();
+        $stmtAno->close();
+
+        $anioRegistro = null;
+        if ($rowAno) {
+            $anioRegistro = (string)($rowAno['ano_referencia'] ?? null);
+        }
+
+        // Buscar el último Word generado para sobrescribirlo
+        $stmtWordDestino = db()->prepare(
+            'SELECT tipo, ruta_relativa
+             FROM archivos
+             WHERE id_empresa = ?
+               AND UPPER(TRIM(COALESCE(asunto, ""))) = "GENERADO WORD"
+               AND UPPER(TRIM(tipo)) IN ("GENERADO WORD", "WORD_FINAL")
+             ORDER BY subido_en DESC, id_archivo DESC
+             LIMIT 1'
+        );
+        if (!$stmtWordDestino) {
+            throw new RuntimeException('Error preparando consulta del Word destino');
+        }
+        $stmtWordDestino->bind_param('i', $idEmpresa);
+        $stmtWordDestino->execute();
+        $rowWordDestino = $stmtWordDestino->get_result()->fetch_assoc() ?: null;
+        $stmtWordDestino->close();
+
+        $rutaWordDestinoAbsoluta = null;
+        $tipoWordDestino = 'GENERADO WORD';
+        $rutaWordDestinoRelativa = null;
+        if ($rowWordDestino) {
+            $tipoWordDestino = strtoupper(trim((string)($rowWordDestino['tipo'] ?? 'GENERADO WORD')));
+            $rutaWordDestinoRelativa = (string)($rowWordDestino['ruta_relativa'] ?? '');
+            if ($rutaWordDestinoRelativa !== '') {
+                $rutaWordDestinoAbsoluta = __DIR__ . '/../' . $rutaWordDestinoRelativa;
+            }
+        }
+
+        // Actualizar datos cuantitativos en el Excel ANTES de generar el Word
+        // para asegurar que formaciones, bajas, excedencias y permisos estén actualizados desde los forms
+        actualizarDatosCuantitativosExcel(db(), $rutaCuadroAbsoluta, $idEmpresa);
+
+        // Generar Word usando el cuadro de porcentajes actualizado y datos actuales de BD
+        $rutaWordPlan = rellenarWordPlanIgualdad($rutaCuadroAbsoluta, $razonSocial, $anioRegistro, $idEmpresa, $rutaWordDestinoAbsoluta);
+
+        if ($rutaWordDestinoRelativa === null || $rutaWordDestinoRelativa === '') {
+            $rutaWordDestinoRelativa = 'uploads/' . basename($rutaWordPlan);
+        }
+
+        // Registrar en base de datos
+        registrarArchivoGeneradoEnTabla(
+            db(),
+            $tipoWordDestino,
+            $rutaWordPlan,
+            $rutaWordDestinoRelativa,
+            'GENERADO WORD',
+            $idEmpresa,
+            null
+        );
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'exito' => true,
+            'mensaje' => 'Word regenerado exitosamente',
+            'archivo' => basename($rutaWordPlan)
+        ]);
+        exit;
+    } catch (\Throwable $e) {
+        error_log('Error regenerando Word (procesar): ' . $e->getMessage());
+        http_response_code(500);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'exito' => false,
+            'mensaje' => 'Error al regenerar el Word: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
 
 if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
     redirigirMenuSubida($urlMenuSubida, 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.', null, $idEmpresaPost);
@@ -207,6 +466,8 @@ if (!in_array($tipo, $tiposPermitidos, true)) {
 if ($tipo === 'WORD_FINAL' && $rol !== 'TECNICO') {
     redirigirMenuSubida($urlMenuSubida, 'Solo el tecnico puede subir WORD_FINAL.', null, $idEmpresaPost);
 }
+
+$debeGenerarDerivados = ($tipo === 'REGISTRO_RETRIBUTIVO');
 
 $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
@@ -338,11 +599,15 @@ $files = $_FILES['excel'];
 $names = is_array($files['name']) ? $files['name'] : [$files['name']];
 $tmp_names = is_array($files['tmp_name']) ? $files['tmp_name'] : [$files['tmp_name']];
 $errors = is_array($files['error']) ? $files['error'] : [$files['error']];
+$empresaNombreToken = '';
 
 $uploadDir = __DIR__ . '/../uploads/';
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
+
+// Dar tiempo suficiente para procesar Excel grande
+set_time_limit(300);
 
 // ================== PROCESAR ARCHIVOS ==================
 foreach ($names as $i => $originalName) {
@@ -500,7 +765,11 @@ foreach ($names as $i => $originalName) {
 
     // ================== Leer Excel ==================
     try {
-        $spreadsheet = IOFactory::load($rutaCompleta);
+        // Optimizar: usar readDataOnly para evitar recalcular fórmulas (timeout)
+        $reader = IOFactory::createReaderForFile($rutaCompleta);
+        $reader->setReadDataOnly(true);
+        $reader->setReadEmptyCells(false);  // No leer celdas vacías (más rápido)
+        $spreadsheet = $reader->load($rutaCompleta);
     } catch (\Throwable $e) {
         $totalErroresGlobal++;
         error_log(sprintf('[registro_retributivo.leer_excel] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
@@ -854,8 +1123,27 @@ foreach ($names as $i => $originalName) {
 
         $rawJornada = $v($r, 'M');
         $rawReducida = $v($r, 'N');
-        $porc_jornada = $rawJornada !== null ? (float)str_replace([',', '%'], ['.', ''], $rawJornada) : null;
-        $porc_reducida = $rawReducida !== null ? (float)str_replace([',', '%'], ['.', ''], $rawReducida) : null;
+        // Si es número (formato porcentaje en Excel): multiplicar por 100
+        // Si es texto (ej: "53,75%"): limpiar y usar directo
+        if ($rawJornada !== null) {
+            if (is_numeric($rawJornada) && (float)$rawJornada <= 1) {
+                $porc_jornada = (string)((float)$rawJornada * 100);
+            } else {
+                $porc_jornada = str_replace([',', '%'], ['.', ''], $rawJornada);
+            }
+        } else {
+            $porc_jornada = null;
+        }
+        
+        if ($rawReducida !== null) {
+            if (is_numeric($rawReducida) && (float)$rawReducida <= 1) {
+                $porc_reducida = (string)((float)$rawReducida * 100);
+            } else {
+                $porc_reducida = str_replace([',', '%'], ['.', ''], $rawReducida);
+            }
+        } else {
+            $porc_reducida = null;
+        }
 
         $motivo_reduccion = $v($r, 'O');
         $clave_contrato = $v($r, 'P') !== null ? (int)$v($r, 'P') : null;
@@ -933,7 +1221,7 @@ foreach ($names as $i => $originalName) {
         }
 
         $okBind = $stmtEmp->bind_param(
-            "ssssiisssssddsisssssssssssidsddsddisi",
+            "ssssiissssssssisssssssssssidsddsddisi",
             $id,
             $sexo,
             $fecha_nacimiento,
@@ -991,37 +1279,46 @@ foreach ($names as $i => $originalName) {
     $stmtEmp->close();
 
     if ($debeGenerarDerivados) {
+        set_time_limit(300);  // Dar tiempo adicional para generar derivados
         try {
-            $rutaExcelPorcentajes = generarCuadroPorcentajesEmpresa($db, $id_empresa, $id_ano_datos, $razon_social);
-            registrarArchivoGeneradoEnTabla(
-                $db,
-                'CUADRO PORCENTAJES',
-                $rutaExcelPorcentajes,
-                'uploads/' . basename($rutaExcelPorcentajes),
-                'GENERADO PORCENTAJES',
-                $id_empresa,
-                $idClienteMedidaArchivo
-            );
-        } catch (\Throwable $e) {
-            $totalErroresGlobal++;
-            error_log(sprintf('[registro_retributivo.generar_porcentajes] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
-            $erroresMensajes[] = "No se pudo generar el cuadro de porcentajes para '{$razon_social}'.";
-            continue;
-        }
+            if (!empty($id_ano_datos)) {
+                set_time_limit(300);
+                $rutaCuadroPorcentajes = generarCuadroPorcentajesEmpresa($db, $id_empresa, (int)$id_ano_datos, $razon_social);
+                registrarArchivoGeneradoEnTabla(
+                    $db,
+                    'CUADRO PORCENTAJES',
+                    $rutaCuadroPorcentajes,
+                    'uploads/' . basename($rutaCuadroPorcentajes),
+                    'GENERADO PORCENTAJES',
+                    $id_empresa,
+                    $idClienteMedidaArchivo
+                );
 
-        try {
-            $rutaWordPlan = rellenarWordPlanIgualdad($rutaExcelPorcentajes, $razon_social, $anioRegistro, $id_empresa);
-            registrarArchivoGeneradoEnTabla(
-                $db,
-                'REGISTRO_RETRIBUTIVO',
-                $rutaWordPlan,
-                'uploads/' . basename($rutaWordPlan),
-                'GENERADO WORD',
-                $id_empresa,
-                $idClienteMedidaArchivo
-            );
+                // El Word se genera a partir del cuadro de porcentajes recién creado.
+                $rutaWordPlan = rellenarWordPlanIgualdad($rutaCuadroPorcentajes, $razon_social, $anioRegistro, $id_empresa);
+                registrarArchivoGeneradoEnTabla(
+                    $db,
+                    'GENERADO WORD',
+                    $rutaWordPlan,
+                    'uploads/' . basename($rutaWordPlan),
+                    'GENERADO WORD',
+                    $id_empresa,
+                    $idClienteMedidaArchivo
+                );
+            } else {
+                // Fallback defensivo si no hay id_ano_datos: generar Word desde el Excel original.
+                $rutaWordPlan = rellenarWordPlanIgualdad($rutaCompleta, $razon_social, $anioRegistro, $id_empresa);
+                registrarArchivoGeneradoEnTabla(
+                    $db,
+                    'GENERADO WORD',
+                    $rutaWordPlan,
+                    'uploads/' . basename($rutaWordPlan),
+                    'GENERADO WORD',
+                    $id_empresa,
+                    $idClienteMedidaArchivo
+                );
+            }
         } catch (\Throwable $e) {
-            $totalErroresGlobal++;
             error_log(sprintf('[registro_retributivo.generar_word] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
             $erroresMensajes[] = "No se pudo generar el Word para '{$razon_social}'.";
             continue;

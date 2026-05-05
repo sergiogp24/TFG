@@ -24,6 +24,9 @@ function is_local_request(): bool
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+  // Extender timeout para evitar bloqueos en session_start
+  set_time_limit(500);
+  
   $secureCookie = is_https_request() && !is_local_request();
   session_set_cookie_params([
     'lifetime' => 0,

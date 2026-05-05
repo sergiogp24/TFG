@@ -6,6 +6,7 @@ require __DIR__ . '/../php/auth.php';
 require_login();
 require_once __DIR__ . '/../php/helpers.php';
 require __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../php/generar_word_desdeexcel.php';
 
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? 'CLIENTE'));
 $esStaff = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true);
@@ -374,6 +375,15 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                             <?php endif; ?>
                         </div>
                     </form>
+
+                    <?php if ($registroSubido): ?>
+                        <form action="../php/regenerar_word.php" method="POST">
+                            <?= csrf_input() ?>
+                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaFormulario ?>">
+                            <input type="hidden" name="accion" value="regenerar_word">
+                            <button class="btn btn-dark px-4" type="submit">🔄 Regenerar Word</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </main>
         </div>
@@ -424,6 +434,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
             });
         })();
     </script>
+    
 </body>
 
 </html>

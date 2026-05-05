@@ -140,12 +140,13 @@ function correo_normalizar_servicio(string $tipoContrato): string
     return $servicio;
 }
 
-function correo_obtener_empresas_asignadas(mysqli $db, int $userId): array
+function correo_obtener_empresas_asignadas(mysqli $db, int $userId, array $soloIds = []): array
 {
     $empresas = [];
+    $soloIds = array_values(array_unique(array_filter(array_map('intval', $soloIds), static fn(int $id): bool => $id > 0)));
 
     $stmt = $db->prepare(
-        "SELECT e.razon_social, COALESCE(( SELECT ce.tipo_contrato FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa ORDER BY ce.id_contrato_empresa DESC LIMIT 1), 'SIN CONTRATO') AS tipo_contrato
+        "SELECT e.id_empresa, e.razon_social, COALESCE(( SELECT ce.tipo_contrato FROM contrato_empresa ce WHERE ce.id_empresa = e.id_empresa ORDER BY ce.id_contrato_empresa DESC LIMIT 1), 'SIN CONTRATO') AS tipo_contrato
          FROM usuario_empresa ue INNER JOIN empresa e ON e.id_empresa = ue.id_empresa WHERE ue.id_usuario = ? ORDER BY e.razon_social ASC"
     );
 
@@ -158,7 +159,13 @@ function correo_obtener_empresas_asignadas(mysqli $db, int $userId): array
     $result = $stmt->get_result();
 
     while ($row = $result->fetch_assoc()) {
+        $idEmpresa = (int)($row['id_empresa'] ?? 0);
+        if (!empty($soloIds) && !in_array($idEmpresa, $soloIds, true)) {
+            continue;
+        }
+
         $empresas[] = [
+            'id_empresa' => $idEmpresa,
             'razon_social' => trim((string)($row['razon_social'] ?? '')),
             'tipo_contrato' => trim((string)($row['tipo_contrato'] ?? 'SIN CONTRATO')),
         ];
@@ -167,6 +174,39 @@ function correo_obtener_empresas_asignadas(mysqli $db, int $userId): array
     $stmt->close();
 
     return $empresas;
+}
+
+function correo_formatear_lista_empresas_html(array $empresasAsignadas): string
+{
+    $items = [];
+
+    foreach ($empresasAsignadas as $empresa) {
+        $nombreEmpresa = trim((string)($empresa['razon_social'] ?? ''));
+        if ($nombreEmpresa === '') {
+            continue;
+        }
+
+        $servicioEmpresa = correo_normalizar_servicio((string)($empresa['tipo_contrato'] ?? 'SIN CONTRATO'));
+        $texto = $nombreEmpresa;
+        if ($servicioEmpresa !== '') {
+            $texto .= ' - ' . $servicioEmpresa;
+        }
+
+        $items[] = $texto;
+    }
+
+    $items = array_values(array_unique($items));
+
+    if (empty($items)) {
+        return '<li>No hay empresas asignadas.</li>';
+    }
+
+    $html = '';
+    foreach ($items as $item) {
+        $html .= '<li>' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '</li>';
+    }
+
+    return $html;
 }
 
 function correo_tiene_reunion_subir_rr(mysqli $db, int $userId): bool
@@ -363,7 +403,6 @@ function correo_enviar_contacto_tecnico_empresa(
     $mensajeSeguroHtml = nl2br(htmlspecialchars($mensaje, ENT_QUOTES, 'UTF-8'));
     $tecnicoHtml = htmlspecialchars($tecnicoNombre, ENT_QUOTES, 'UTF-8');
     $empresaHtml = htmlspecialchars($empresaNombre, ENT_QUOTES, 'UTF-8');
-    $asuntoHtml = htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8');
     $tecnicoEmailHtml = $tecnicoEmail !== '' ? ' (' . htmlspecialchars($tecnicoEmail, ENT_QUOTES, 'UTF-8') . ')' : '';
 
     $body = '
@@ -373,7 +412,6 @@ function correo_enviar_contacto_tecnico_empresa(
             <h2 style="color: #1f4aa2;">Nuevo mensaje de tu tecnico asignado</h2>
             <p><strong>Empresa:</strong> ' . $empresaHtml . '</p>
             <p><strong>Tecnico:</strong> ' . $tecnicoHtml . $tecnicoEmailHtml . '</p>
-            <p><strong>Asunto:</strong> ' . $asuntoHtml . '</p>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             <div>' . $mensajeSeguroHtml . '</div>
           </div>
@@ -381,7 +419,7 @@ function correo_enviar_contacto_tecnico_empresa(
       </html>
     ';
 
-    $altBody = "Tecnico: {$tecnicoNombre}" . ($tecnicoEmail !== '' ? " ({$tecnicoEmail})" : '') . "\nEmpresa: {$empresaNombre}\nAsunto: {$asunto}\n\n{$mensaje}";
+        $altBody = "Tecnico: {$tecnicoNombre}" . ($tecnicoEmail !== '' ? " ({$tecnicoEmail})" : '') . "\nEmpresa: {$empresaNombre}\n\n{$mensaje}";
 
     correo_enviar_html(
         $emailDestino,
@@ -656,6 +694,47 @@ function correo_enviar_nueva_empresa_asignada(
     $servicioHtml = htmlspecialchars($servicioNombre, ENT_QUOTES, 'UTF-8');
     $urlLogin = correo_url_login();
     $urlHtml = htmlspecialchars($urlLogin, ENT_QUOTES, 'UTF-8');
+        $urlEmpresaHtml = $urlVerEmpresa !== '' ? htmlspecialchars($urlVerEmpresa, ENT_QUOTES, 'UTF-8') : '';
+
+        $empresasAsignadas = [];
+        $stmtUsuario = null;
+        $db = db();
+        $stmtUsuario = $db->prepare('SELECT id_usuario FROM usuario WHERE email = ? LIMIT 1');
+        if ($stmtUsuario) {
+                $stmtUsuario->bind_param('s', $emailDestino);
+                $stmtUsuario->execute();
+                $rowUsuario = $stmtUsuario->get_result()->fetch_assoc() ?: null;
+                $stmtUsuario->close();
+
+                if ($rowUsuario !== null) {
+                        $userId = (int)($rowUsuario['id_usuario'] ?? 0);
+                        if ($userId > 0) {
+                                $empresasAsignadas = correo_obtener_empresas_asignadas($db, $userId);
+                        }
+                }
+        }
+
+        if (empty($empresasAsignadas)) {
+                $empresasAsignadas = [
+                        [
+                                'razon_social' => $empresaNombre,
+                                'tipo_contrato' => $servicioNombre,
+                        ],
+                ];
+        }
+
+        $listaEmpresasHtml = correo_formatear_lista_empresas_html($empresasAsignadas);
+        $nombresEmpresas = [];
+        foreach ($empresasAsignadas as $empresaAsignada) {
+            $nombreEmpresa = trim((string)($empresaAsignada['razon_social'] ?? ''));
+            if ($nombreEmpresa !== '') {
+                $nombresEmpresas[] = $nombreEmpresa;
+            }
+        }
+        $resumenEmpresas = correo_formatear_lista($nombresEmpresas);
+        if ($resumenEmpresas === '') {
+            $resumenEmpresas = $empresaHtml;
+        }
 
     $body = '
       <html>
@@ -663,21 +742,36 @@ function correo_enviar_nueva_empresa_asignada(
           <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #1f4aa2; margin-top: 0;">Nueva empresa asignada</h2>
             <p>Hola ' . $nombreHtml . ',</p>
-            <p>Se te ha asignado una nueva empresa:</p>
-            <p><strong>Empresa:</strong> ' . $empresaHtml . '<br><strong>Servicio:</strong> ' . $servicioHtml . '</p>
+            <p>Se te ha asignado <strong>' . htmlspecialchars($resumenEmpresas, ENT_QUOTES, 'UTF-8') . '</strong> para que gestiones sus servicios:</p>
+            <p><strong>Servicios que debes gestionar::</strong></p>
+            <ul>' . $listaEmpresasHtml . '</ul>
             <p>Ya puedes acceder para revisar la información y comenzar la gestión.</p>
             <p style="text-align: center; margin: 28px 0;">
-              <a href="' . $urlHtml . '"
+                            <a href="' . $urlHtml . '"
                  style="display: inline-block; padding: 12px 28px; background-color: #1f4aa2; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold;">
                                  Ir al login
               </a>
+                            ' . ($urlEmpresaHtml !== '' ? '<div style="margin-top: 12px;"><a href="' . $urlEmpresaHtml . '" style="color: #1f4aa2; text-decoration: none;">Ver esta empresa</a></div>' : '') . '
             </p>
           </div>
         </body>
       </html>
     ';
 
-    $altBody = "Nueva empresa asignada\n\nEmpresa: {$empresaNombre}\nServicio: {$servicioNombre}\n\nAccede desde login: {$urlLogin}";
+    $altBody = "Nueva empresa asignada\n\nSe te ha asignado {$resumenEmpresas} para que gestiones sus servicios.\n\nServicios que debes gestionar::\n";
+    foreach ($empresasAsignadas as $empresaAsignada) {
+        $nombreEmpresa = trim((string)($empresaAsignada['razon_social'] ?? ''));
+        $servicioEmpresa = trim((string)($empresaAsignada['tipo_contrato'] ?? 'SIN CONTRATO'));
+        if ($nombreEmpresa === '') {
+            continue;
+        }
+        $altBody .= '- ' . $nombreEmpresa;
+        if ($servicioEmpresa !== '') {
+            $altBody .= ' - ' . $servicioEmpresa;
+        }
+        $altBody .= "\n";
+    }
+    $altBody .= "\nAccede desde login: {$urlLogin}";
 
     correo_enviar_html(
         $emailDestino,

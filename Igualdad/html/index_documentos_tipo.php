@@ -214,7 +214,7 @@ if (!$esStaff && $usuarioId > 0) {
                                     <span>Subir documentos por tipo</span>
                                 </a>
 
-                                <a class="nav-button" href="../php/archivos_subidos.php">
+                                <a class="nav-button" href="../php/ver_archivos.php">
                                     <span class="nav-icon">📦</span>
                                     <span>Archivos subidos</span>
                                 </a>

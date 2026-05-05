@@ -3,7 +3,6 @@ drop database igualdadconsulting;
 CREATE DATABASE IF NOT EXISTS igualdadconsulting;
 USE igualdadconsulting;
 -- --------------------------------------------------------
-
 --
 -- Esctrutura para la tabla ROL
 --
@@ -39,7 +38,7 @@ INDEX idx_usuario_rol (rol_id)
 -- Tokens para establecer la contraseña al crear o recuperar
 --
 
-CREATE TABLE IF NOT EXISTS password_reset_token (
+CREATE TABLE IF NOT EXISTS `password_reset_token` (
   `id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
   `email` VARCHAR(255) NOT NULL,
   `token` VARCHAR(255) NOT NULL UNIQUE,
@@ -57,19 +56,19 @@ SELECT * FROM password_reset_token;
 -- Estructura para la tablas de Reuniones
 --
 
-CREATE TABLE reuniones(
- id_reunion INT PRIMARY KEY AUTO_INCREMENT,
- objetivo TEXT DEFAULT NULL,
- hora_reunion VARCHAR(255) NOT NULL,
- fecha_reunion DATE NOT NULL
+CREATE TABLE `reuniones`(
+ `id_reunion` INT PRIMARY KEY AUTO_INCREMENT,
+ `objetivo` TEXT DEFAULT NULL,
+ `hora_reunion` VARCHAR(255) NOT NULL,
+ `fecha_reunion` DATE NOT NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE usuario_reunion(
- id_usuario INT NOT NULL,
- id_reunion INT NOT NULL,
+CREATE TABLE `usuario_reunion`(
+ `id_usuario` INT NOT NULL,
+ `id_reunion` INT NOT NULL,
  PRIMARY KEY (id_usuario, id_reunion),
- CONSTRAINT fk_ur_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
- CONSTRAINT fk_ur_reunion FOREIGN KEY (id_reunion) REFERENCES reuniones(id_reunion) ON DELETE CASCADE
+ CONSTRAINT `fk_ur_usuario` FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+ CONSTRAINT `fk_ur_reunion` FOREIGN KEY (id_reunion) REFERENCES reuniones(id_reunion) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 -- --------------------------------------------------------
 
@@ -138,7 +137,6 @@ CREATE TABLE `area_plan`(
 `nombre`VARCHAR(255) NOT NULL)ENGINE=InnoDB;
 
 -- --------------------------------------------------------
-
 --
 -- Estructura para la tabla medida
 --
@@ -255,7 +253,9 @@ CREATE TABLE `datos_empleados`(
   CONSTRAINT fk_ano_datos_datos_empleados FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
 INDEX idx_ano_datos_datos_empleados(id_ano_datos)
 )ENGINE=InnoDB;
-
+SELECT * FROM datos_empleados;
+SHOW COLUMNS FROM datos_empleados WHERE Field = 'porc_jornada';
+SHOW TRIGGERS LIKE 'datos_empleados%';
 -- --------------------------------------------------------
 
 --
@@ -533,7 +533,7 @@ CREATE TABLE `baja_temporales`(
   CONSTRAINT fk_bajastemporales_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
 `id_bajas`INT NOT NULL,
 CONSTRAINT fk_temporales_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)ON DELETE CASCADE)ENGINE=InnoDB;
-
+SELECT * FROM baja_temporales;
 -- --------------------------------------------------------
 
 --
@@ -836,7 +836,7 @@ CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL') NOT NULL,
+  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL','GENERADO WORD') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -853,6 +853,7 @@ CREATE TABLE `archivos`(
   INDEX idx_archivos_tipo (tipo),
   INDEX idx_archivos_cliente_medida_fecha (id_cliente_medida, subido_en)
 ) ENGINE=InnoDB;
+Select * from archivos;
 
 CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   id_descarga INT AUTO_INCREMENT PRIMARY KEY,
@@ -866,7 +867,7 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- --------------------------------------------------------
-
+select * from archivo_descarga_log;
 --
 --
 -- Insertar roles

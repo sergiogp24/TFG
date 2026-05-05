@@ -63,6 +63,22 @@ function generarImagenesPlantilla(TemplateProcessor $template, $spreadsheet): ar
 }
 
 /**
+ * Lee una celda usando el valor cacheado y solo recalcula si es formula.
+ */
+function leerValorCeldaExcelImagenes($cell)
+{
+    if (is_object($cell) && method_exists($cell, 'isFormula') && $cell->isFormula()) {
+        return $cell->getCalculatedValue();
+    }
+
+    if (is_object($cell) && method_exists($cell, 'getValue')) {
+        return $cell->getValue();
+    }
+
+    return null;
+}
+
+/**
  * Flujo independiente para ${IMAGEN0}.
  */
 function asignarImagen0(TemplateProcessor $template, $spreadsheet): ?string
@@ -99,8 +115,8 @@ function obtenerTotalesDesdeCeldas($spreadsheet, int $indiceHoja, string $celdaM
     }
 
     $sheet = $spreadsheet->getSheet($indiceHoja);
-    $m = normalizarNumeroExcel($sheet->getCell($celdaMujeres)->getCalculatedValue());
-    $h = normalizarNumeroExcel($sheet->getCell($celdaHombres)->getCalculatedValue());
+    $m = normalizarNumeroExcel(leerValorCeldaExcelImagenes($sheet->getCell($celdaMujeres)));
+    $h = normalizarNumeroExcel(leerValorCeldaExcelImagenes($sheet->getCell($celdaHombres)));
 
     if ($m === null || $h === null) {
         return null;
@@ -1202,7 +1218,7 @@ function obtenerDatosAgrupadosDesdeConfig($spreadsheet, array $cfg): ?array
     }
 
     for ($fila = $filaInicio; $fila <= $filaFin; $fila++) {
-        $textoCategoria = trim((string)$sheet->getCell($cfg['colCategorias'] . $fila)->getCalculatedValue());
+        $textoCategoria = trim((string)leerValorCeldaExcelImagenes($sheet->getCell($cfg['colCategorias'] . $fila)));
         if ($textoCategoria === '') {
             continue;
         }
@@ -1212,7 +1228,7 @@ function obtenerDatosAgrupadosDesdeConfig($spreadsheet, array $cfg): ?array
         $rellenarCerosSiNoNumerico = (bool)($cfg['rellenarCerosSiNoNumerico'] ?? false);
 
         foreach ($cfg['series'] as $serie) {
-            $valorRaw = $sheet->getCell($serie['columna'] . $fila)->getCalculatedValue();
+            $valorRaw = leerValorCeldaExcelImagenes($sheet->getCell($serie['columna'] . $fila));
             $valor = normalizarNumeroExcel($valorRaw);
             if ($valor === null) {
                 if ($rellenarCerosSiNoNumerico) {
@@ -1285,7 +1301,7 @@ function resolverRangoFilasDesdeTotales($sheet, array $cfg): array
 function buscarFilaPorEtiqueta($sheet, string $columna, string $etiqueta, int $filaInicio, int $filaFin): ?int
 {
     for ($fila = $filaInicio; $fila <= $filaFin; $fila++) {
-        $valor = strtoupper(trim((string)$sheet->getCell($columna . $fila)->getCalculatedValue()));
+        $valor = strtoupper(trim((string)leerValorCeldaExcelImagenes($sheet->getCell($columna . $fila))));
         if ($valor === $etiqueta) {
             return $fila;
         }

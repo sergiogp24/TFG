@@ -94,7 +94,7 @@ $sqlDescargaWordTecnico = $tablaDescargaExiste
   ? "EXISTS (\n      SELECT 1\n      FROM archivo_descarga_log dl\n      INNER JOIN usuario u3 ON u3.id_usuario = dl.id_usuario\n      INNER JOIN rol r3 ON r3.id = u3.rol_id\n      WHERE dl.id_empresa = e.id_empresa\n        AND UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'\n        AND UPPER(r3.nombre) LIKE 'TECNICO%'\n      LIMIT 1\n    )"
   : "0";
 
-$resOperational = db()->query("\n  SELECT\n    e.id_empresa,\n    e.razon_social,\n    COALESCE((\n      SELECT ce.tipo_contrato\n      FROM contrato_empresa ce\n      WHERE ce.id_empresa = e.id_empresa\n      ORDER BY ce.id_contrato_empresa DESC\n      LIMIT 1\n    ), 'SIN CONTRATO') AS tipo_contrato,\n    COALESCE((\n      SELECT u.nombre_usuario\n      FROM usuario_empresa ue\n      INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n      INNER JOIN rol r ON r.id = u.rol_id\n      WHERE ue.id_empresa = e.id_empresa\n        AND UPPER(r.nombre) LIKE 'TECNICO%'\n      ORDER BY ue.id_usuario ASC\n      LIMIT 1\n    ), 'Sin tecnico asignado') AS tecnico_nombre,\n    EXISTS (\n      SELECT 1 FROM archivos a1\n      WHERE a1.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a1.tipo)) = 'REGISTRO_RETRIBUTIVO'\n      LIMIT 1\n    ) AS tiene_registro,\n    EXISTS (\n      SELECT 1 FROM archivos a2\n      WHERE a2.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a2.tipo)) = 'TOMA DE DATOS'\n      LIMIT 1\n    ) AS tiene_toma_datos,\n    EXISTS (\n      SELECT 1 FROM archivos a3\n      WHERE a3.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a3.asunto, ''))) = 'GENERADO WORD'\n      LIMIT 1\n    ) AS tiene_word,\n    EXISTS (\n      SELECT 1 FROM archivos a4\n      WHERE a4.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a4.asunto, ''))) = 'GENERADO PORCENTAJES'\n      LIMIT 1\n    ) AS tiene_porcentajes,\n    {$sqlDescargaWordTecnico} AS tiene_descarga_word_tecnico\n  FROM empresa e\n  WHERE EXISTS (\n      SELECT 1\n      FROM usuario_empresa ue2\n      INNER JOIN usuario u2 ON u2.id_usuario = ue2.id_usuario\n      INNER JOIN rol r2 ON r2.id = u2.rol_id\n      WHERE ue2.id_empresa = e.id_empresa\n        AND UPPER(r2.nombre) LIKE 'TECNICO%'\n    )\n  ORDER BY e.razon_social ASC\n");
+$resOperational = db()->query("\n  SELECT\n    e.id_empresa,\n    e.razon_social,\n    COALESCE((\n      SELECT ce.tipo_contrato\n      FROM contrato_empresa ce\n      WHERE ce.id_empresa = e.id_empresa\n      ORDER BY ce.id_contrato_empresa DESC\n      LIMIT 1\n    ), 'SIN CONTRATO') AS tipo_contrato,\n    COALESCE((\n      SELECT u.nombre_usuario\n      FROM usuario_empresa ue\n      INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n      INNER JOIN rol r ON r.id = u.rol_id\n      WHERE ue.id_empresa = e.id_empresa\n        AND UPPER(r.nombre) LIKE 'TECNICO%'\n      ORDER BY ue.id_usuario ASC\n      LIMIT 1\n    ), 'Sin tecnico asignado') AS tecnico_nombre,\n    EXISTS (\n      SELECT 1 FROM archivos a1\n      WHERE a1.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a1.tipo)) = 'REGISTRO_RETRIBUTIVO'\n      LIMIT 1\n    ) AS tiene_registro,\n    EXISTS (\n      SELECT 1 FROM archivos a2\n      WHERE a2.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a2.tipo)) = 'TOMA DE DATOS'\n      LIMIT 1\n    ) AS tiene_toma_datos,\n    EXISTS (\n      SELECT 1 FROM archivos a3\n      WHERE a3.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a3.asunto, ''))) = 'GENERADO WORD'\n      LIMIT 1\n    ) AS tiene_word,\n    EXISTS (\n      SELECT 1 FROM archivos a4\n      WHERE a4.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a4.asunto, ''))) = 'GENERADO PORCENTAJES'\n      LIMIT 1\n    ) AS tiene_porcentajes,\n    EXISTS (\n      SELECT 1 FROM archivos a5\n      WHERE a5.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a5.tipo)) = 'WORD_FINAL'\n      LIMIT 1\n    ) AS tiene_word_final,\n    {$sqlDescargaWordTecnico} AS tiene_descarga_word_tecnico\n  FROM empresa e\n  WHERE EXISTS (\n      SELECT 1\n      FROM usuario_empresa ue2\n      INNER JOIN usuario u2 ON u2.id_usuario = ue2.id_usuario\n      INNER JOIN rol r2 ON r2.id = u2.rol_id\n      WHERE ue2.id_empresa = e.id_empresa\n        AND UPPER(r2.nombre) LIKE 'TECNICO%'\n    )\n  ORDER BY e.razon_social ASC\n");
 
 if ($resOperational) {
   while ($op = $resOperational->fetch_assoc()) {
@@ -111,6 +111,7 @@ if ($resOperational) {
     $tieneTomaDatos = ((int)($op['tiene_toma_datos'] ?? 0) === 1);
     $tieneWord = ((int)($op['tiene_word'] ?? 0) === 1);
     $tienePorcentajes = ((int)($op['tiene_porcentajes'] ?? 0) === 1);
+    $tieneWordFinal = ((int)($op['tiene_word_final'] ?? 0) === 1);
     $tieneDescargaWordTecnico = ((int)($op['tiene_descarga_word_tecnico'] ?? 0) === 1);
 
     $estado = 'Pendiente de registro';
@@ -128,7 +129,7 @@ if ($resOperational) {
       $estado = 'Word generado pendiente de descarga tecnico';
       $progreso = 75;
     }
-    if ($tieneDescargaWordTecnico) {
+    if ($tieneDescargaWordTecnico || $tieneWordFinal) {
       $estado = 'Completado';
       $progreso = 100;
     }
@@ -176,7 +177,56 @@ if ($view === 'seguimiento_tecnicos') {
   }
 
   if ($seguimientoTecnicoSeleccionadoId > 0) {
-    $stmtEmpresasSeg = db()->prepare("\n SELECT\n        e.id_empresa,\n        e.razon_social,\n        COALESCE((\n          SELECT ce.tipo_contrato\n          FROM contrato_empresa ce\n          WHERE ce.id_empresa = e.id_empresa\n          ORDER BY ce.id_contrato_empresa DESC\n          LIMIT 1\n        ), 'SIN CONTRATO') AS tipo_contrato,\n        EXISTS (\n          SELECT 1 FROM archivos a1\n          WHERE a1.id_empresa = e.id_empresa\n            AND UPPER(TRIM(a1.tipo)) = 'REGISTRO_RETRIBUTIVO'\n          LIMIT 1\n        ) AS tiene_registro,\n        EXISTS (\n          SELECT 1 FROM archivos a2\n          WHERE a2.id_empresa = e.id_empresa\n            AND UPPER(TRIM(a2.tipo)) = 'TOMA DE DATOS'\n          LIMIT 1\n        ) AS tiene_toma_datos,\n        EXISTS (\n          SELECT 1 FROM archivos a3\n          WHERE a3.id_empresa = e.id_empresa\n            AND UPPER(TRIM(COALESCE(a3.asunto, ''))) = 'GENERADO WORD'\n          LIMIT 1\n        ) AS tiene_word,\n        EXISTS (\n          SELECT 1 FROM archivo_descarga_log dl\n          INNER JOIN usuario u3 ON u3.id_usuario = dl.id_usuario\n          INNER JOIN rol r3 ON r3.id = u3.rol_id\n          WHERE dl.id_empresa = e.id_empresa\n            AND UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'\n            AND UPPER(r3.nombre) LIKE 'TECNICO%'\n          LIMIT 1\n        ) AS tiene_descarga_word_tecnico\n      FROM empresa e\n      INNER JOIN usuario_empresa ue ON ue.id_empresa = e.id_empresa\n      WHERE ue.id_usuario = ?\n      ORDER BY e.razon_social ASC\n    ");
+    $stmtEmpresasSeg = db()->prepare("SELECT 
+    e.id_empresa,
+    e.razon_social,
+
+    COALESCE(ce.tipo_contrato, 'SIN CONTRATO') AS tipo_contrato,
+
+    MAX(CASE WHEN UPPER(TRIM(a.tipo)) = 'REGISTRO_RETRIBUTIVO' THEN 1 ELSE 0 END) AS tiene_registro,
+    MAX(CASE WHEN UPPER(TRIM(a.tipo)) = 'TOMA DE DATOS' THEN 1 ELSE 0 END) AS tiene_toma_datos,
+    MAX(CASE WHEN UPPER(TRIM(COALESCE(a.asunto,''))) = 'GENERADO WORD' THEN 1 ELSE 0 END) AS tiene_word,
+    MAX(CASE WHEN UPPER(TRIM(a.tipo)) = 'WORD_FINAL' THEN 1 ELSE 0 END) AS tiene_word_final,
+
+    MAX(CASE 
+        WHEN UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'
+        AND UPPER(r.nombre) LIKE 'TECNICO%'
+        THEN 1 ELSE 0 
+    END) AS tiene_descarga_word_tecnico
+
+FROM empresa e
+
+INNER JOIN usuario_empresa ue 
+    ON ue.id_empresa = e.id_empresa
+
+LEFT JOIN archivos a 
+    ON a.id_empresa = e.id_empresa
+
+LEFT JOIN archivo_descarga_log dl 
+    ON dl.id_empresa = e.id_empresa
+
+LEFT JOIN usuario u 
+    ON u.id_usuario = dl.id_usuario
+
+LEFT JOIN rol r 
+    ON r.id = u.rol_id
+
+LEFT JOIN (
+    SELECT id_empresa, tipo_contrato
+    FROM contrato_empresa
+    WHERE (id_empresa, id_contrato_empresa) IN (
+        SELECT id_empresa, MAX(id_contrato_empresa)
+        FROM contrato_empresa
+        GROUP BY id_empresa
+    )
+) ce 
+    ON ce.id_empresa = e.id_empresa
+
+WHERE ue.id_usuario = ?
+
+GROUP BY e.id_empresa, e.razon_social, ce.tipo_contrato
+
+ORDER BY e.razon_social ASC");
 
     if ($stmtEmpresasSeg) {
       $stmtEmpresasSeg->bind_param('i', $seguimientoTecnicoSeleccionadoId);
@@ -195,6 +245,7 @@ if ($view === 'seguimiento_tecnicos') {
         $tieneRegistro = ((int)($rowEmpresaSeg['tiene_registro'] ?? 0) === 1);
         $tieneTomaDatos = ((int)($rowEmpresaSeg['tiene_toma_datos'] ?? 0) === 1);
         $tieneWord = ((int)($rowEmpresaSeg['tiene_word'] ?? 0) === 1);
+        $tieneWordFinal = ((int)($rowEmpresaSeg['tiene_word_final'] ?? 0) === 1);
         $tieneDescargaWordTecnico = ((int)($rowEmpresaSeg['tiene_descarga_word_tecnico'] ?? 0) === 1);
 
         $estado = 'Pendiente de registro';
@@ -211,7 +262,7 @@ if ($view === 'seguimiento_tecnicos') {
           $estado = 'Word generado pendiente de descarga tecnico';
           $progreso = 75;
         }
-        if ($tieneDescargaWordTecnico) {
+        if ($tieneDescargaWordTecnico || $tieneWordFinal) {
           $estado = 'Completado';
           $progreso = 100;
         }

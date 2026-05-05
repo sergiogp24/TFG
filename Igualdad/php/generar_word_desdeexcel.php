@@ -11,7 +11,7 @@ use PhpOffice\PhpWord\TemplateProcessor;
 /**
  * Rellena el Word plantilla SIN romper formato
  */
-function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?string $anioRegistro = null, ?int $idEmpresa = null): string
+function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?string $anioRegistro = null, ?int $idEmpresa = null, ?string $rutaWordDestino = null): string
 {
     try {
 
@@ -31,11 +31,19 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
             mkdir($destDirWord, 0755, true);
         }
 
-        $nombreArchivoEmpresa = normalizarNombreArchivoEmpresa($razonSocial);
-        $nombreArchivoEmpresa = ($anioRegistro !== null && $anioRegistro !== '')
-            ? $nombreArchivoEmpresa . '_' . $anioRegistro
-            : $nombreArchivoEmpresa;
-        $rutaWordFinal = $destDirWord . DIRECTORY_SEPARATOR . $nombreArchivoEmpresa . '_PLAN_IGUALDAD.docx';
+        if ($rutaWordDestino !== null && $rutaWordDestino !== '') {
+            $rutaWordFinal = $rutaWordDestino;
+            $dirDestino = dirname($rutaWordFinal);
+            if (!is_dir($dirDestino)) {
+                mkdir($dirDestino, 0755, true);
+            }
+        } else {
+            $nombreArchivoEmpresa = normalizarNombreArchivoEmpresa($razonSocial);
+            $nombreArchivoEmpresa = ($anioRegistro !== null && $anioRegistro !== '')
+                ? $nombreArchivoEmpresa . '_' . $anioRegistro
+                : $nombreArchivoEmpresa;
+            $rutaWordFinal = $destDirWord . DIRECTORY_SEPARATOR . $nombreArchivoEmpresa . '_PLAN_IGUALDAD.docx';
+        }
 
         // =========================
         // TEMPLATE (CLAVE)
@@ -82,30 +90,33 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         }
 
         // =========================
-        // EXCEL
+        // EXCEL Optimiazdo no calcula formulas y salta celdas vacias
         // =========================
-        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($rutaExcel);
+        // Aumentar timeout para lectura de Excel grande
+        set_time_limit(300);
+        
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($rutaExcel);
+        $reader->setReadDataOnly(true);
+        $reader->setReadEmptyCells(false);  // No leer celdas vacías (más rápido)
+        $spreadsheet = $reader->load($rutaExcel);
 
-        foreach ($spreadsheet->getWorksheetIterator() as $index => $sheet) {
+        foreach ($spreadsheet->getWorksheetIterator() as $sheet) {
+            $sheetIndex = $spreadsheet->getIndex($sheet, true);
+            if ($sheetIndex < 0) {
+                continue;
+            }
+
             foreach ($sheet->getRowIterator() as $row) {
                 $fila = $row->getRowIndex();
-                $valorBX = $sheet->getCell('BX' . $fila)->getCalculatedValue();
-                $valorCC = $sheet->getCell('CC' . $fila)->getCalculatedValue();
-
-                // Si BX o CC valen 0 (resultado calculado), no se procesa la fila.
-                if (esCeroNumerico($valorBX) || esCeroNumerico($valorCC)) {
-                    continue;
-                }
-
                 $cellIterator = $row->getCellIterator();
-                $cellIterator->setIterateOnlyExistingCells(false);
+                $cellIterator->setIterateOnlyExistingCells(true);
 
                 foreach ($cellIterator as $cell) {
 
                     $col = $cell->getColumn();
-                    $valor = $cell->getCalculatedValue();
+                    $valor = leerValorCeldaExcel($cell);
 
-                    $placeholder = $col . $fila . '_' . $index;
+                    $placeholder = $col . $fila . '_' . $sheetIndex;
 
                     $template->setValue($placeholder, formatearValorWord($valor));
                 }
@@ -154,6 +165,20 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
  */
 function escaparTextoWord($valor): string
 {
+    if (is_array($valor)) {
+        $valor = implode(', ', array_map(static function ($item): string {
+            if ($item === null) {
+                return '';
+            }
+            if (is_scalar($item)) {
+                return (string)$item;
+            }
+            return (string)json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }, $valor));
+    } elseif (is_object($valor) && !method_exists($valor, '__toString')) {
+        $valor = (string)json_encode($valor, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
     return htmlspecialchars((string)$valor, ENT_QUOTES | ENT_XML1, 'UTF-8');
 }
 
@@ -164,6 +189,18 @@ function formatearNumeroConComaSiAplica($valor, bool $vacioComoCero = true): str
 {
     if ($valor === null || $valor === '') {
         return $vacioComoCero ? '0' : '';
+    }
+
+    if (is_array($valor)) {
+        return escaparTextoWord($valor);
+    }
+
+    if (is_object($valor)) {
+        if (method_exists($valor, '__toString')) {
+            $valor = (string)$valor;
+        } else {
+            return escaparTextoWord($valor);
+        }
     }
 
     if (is_numeric($valor)) {
@@ -198,6 +235,22 @@ function formatearValorWord($valor): string
     }
 
     return formatearNumeroConComaSiAplica($valor, true);
+}
+
+/**
+ * Lee una celda usando el valor cacheado y solo recalcula si es formula.
+ */
+function leerValorCeldaExcel($cell)
+{
+    if (is_object($cell) && method_exists($cell, 'isFormula') && $cell->isFormula()) {
+        return $cell->getCalculatedValue();
+    }
+
+    if (is_object($cell) && method_exists($cell, 'getValue')) {
+        return $cell->getValue();
+    }
+
+    return null;
 }
 
 function esCeroNumerico($valor): bool
@@ -239,7 +292,7 @@ function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial, ?int $
     }
 
     if ($empresa === []) {
-        $stmt = $db->prepare(" SELECT * FROM empresa\n   WHERE UPPER(TRIM(razon_social)) = ?\n  LIMIT 1\n    ");
+        $stmt = $db->prepare(" SELECT * FROM empresa\n  WHERE UPPER(TRIM(razon_social)) = ?\n        LIMIT 1\n    ");
 
         if ($stmt) {
             $razonSocial = mb_strtoupper(trim($razonSocial));
@@ -266,8 +319,14 @@ function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial, ?int $
             if ($cnaeLegacy !== '') {
                 $empresa['cnae_list'] = [$cnaeLegacy];
                 $empresa['cnae'] = $cnaeLegacy;
+                
             }
         }
+    }
+
+    if ($cnaes === []) {
+        $empresa['cnae_list'] = [];
+        $empresa['cnae'] = '';
     }
 
     return $empresa;
@@ -342,11 +401,18 @@ function obtenerValoresCuestionariosDesdeBD(mysqli $db, string $razonSocial, ?st
         $fila = [];
 
         if ($anio !== null) {
-            $sqlAnio = " SELECT {$select} FROM `{$tabla}` q  INNER JOIN ano_datos ad ON ad.id_ano_datos = q.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-                WHERE q.id_empresa = ? AND ce.id_empresa = ? AND (YEAR(ad.fecha_inicio) = ? OR YEAR(ad.fecha_fin) = ?) ORDER BY q.id_ano_datos DESC LIMIT 1";
+            $sqlAnio = "
+                SELECT {$select}
+                FROM `{$tabla}` q
+                INNER JOIN ano_datos ad ON ad.id_ano_datos = q.id_ano_datos
+                WHERE q.id_empresa = ?
+                  AND (YEAR(ad.fecha_inicio) = ? OR YEAR(ad.fecha_fin) = ?)
+                ORDER BY q.id_ano_datos DESC
+                LIMIT 1
+            ";
             $stmtAnio = $db->prepare($sqlAnio);
             if ($stmtAnio) {
-                $stmtAnio->bind_param('iiii', $idEmpresa, $idEmpresa, $anio, $anio);
+                $stmtAnio->bind_param('iii', $idEmpresa, $anio, $anio);
                 $stmtAnio->execute();
                 $fila = $stmtAnio->get_result()->fetch_assoc() ?: [];
                 $stmtAnio->close();
@@ -496,8 +562,8 @@ function rellenarTablaDinamicaPorConfig(
     $colCategoriaPrincipal = (string)$cfg['columnas'][$cfg['ancla']];
 
     for ($fila = (int)$cfg['filaInicio']; $fila <= (int)$cfg['filaFin']; $fila++) {
-        $categoriaPrincipalRaw = $sheet->getCell($colCategoriaPrincipal . $fila)->getCalculatedValue();
-        $categoriaAltRaw = $sheet->getCell($cfg['colCategoriaAlt'] . $fila)->getCalculatedValue();
+        $categoriaPrincipalRaw = leerValorCeldaExcel($sheet->getCell($colCategoriaPrincipal . $fila));
+        $categoriaAltRaw = leerValorCeldaExcel($sheet->getCell($cfg['colCategoriaAlt'] . $fila));
         $categoriaPrincipal = trim((string)$categoriaPrincipalRaw);
         $categoriaAlt = trim((string)$categoriaAltRaw);
 
@@ -509,7 +575,7 @@ function rellenarTablaDinamicaPorConfig(
         $filaData = [];
 
         foreach ($cfg['columnas'] as $placeholder => $columna) {
-            $valor = $sheet->getCell($columna . $fila)->getCalculatedValue();
+            $valor = leerValorCeldaExcel($sheet->getCell($columna . $fila));
             $filaData[$placeholder] = formatearValorWord($valor);
         }
 

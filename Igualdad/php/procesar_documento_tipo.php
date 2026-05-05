@@ -70,7 +70,7 @@ if ($tamanoBytes > $maxTamanoBytes) {
     redirect_documentos('Tamano de archivo no valido (max 100MB).');
 }
 
-$uploadDir = __DIR__ . '/../uploads/documentos_tipo';
+$uploadDir = __DIR__ . '/../uploads';
 if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
     redirect_documentos('No se pudo crear la carpeta de subida.');
 }
@@ -145,7 +145,7 @@ if (!move_uploaded_file($tmpName, $rutaDestino)) {
     redirect_documentos('No se pudo guardar el archivo.');
 }
 
-$rutaRelativa = 'uploads/documentos_tipo/' . $nombreGuardado;
+$rutaRelativa = 'uploads/' . $nombreGuardado;
 $mime = mime_content_type($rutaDestino) ?: null;
 $sha256 = hash_file('sha256', $rutaDestino) ?: null;
 

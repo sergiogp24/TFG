@@ -447,7 +447,10 @@ if ($view === 'ver_empresa') {
           ];
         }
 
-        $tecnicosById[$idTecnico]['servicios'][] = 'SIN CONTRATO';
+        // Solo añadir 'SIN SERVICIOS' si no tiene ya servicios asignados
+        if (empty($tecnicosById[$idTecnico]['servicios'])) {
+          $tecnicosById[$idTecnico]['servicios'][] = 'SIN SERVICIOS';
+        }
       }
       $stmtTecnicosUE->close();
 
@@ -831,6 +834,41 @@ if ($view === 'add_contratos') {
     $areaId = (int)$m['id_plan'];
     if (!isset($medidasPorAreaContrato[$areaId])) $medidasPorAreaContrato[$areaId] = [];
     $medidasPorAreaContrato[$areaId][] = $m;
+  }
+
+  // Pre-popular áreas y medidas desde el Plan de Igualdad existente
+  // (sólo si el formulario está vacío, es decir, no viene de recuperación de error)
+  $idEmpresaPreFill = (int)($addContratoOld['id_empresa'] ?? 0);
+  if (empty($addContratoOld['areas']) && $idEmpresaPreFill > 0) {
+    $stmtPreFill = $db->prepare("
+      SELECT ac.id_plan, cm.id_medida
+      FROM areas_contratadas ac
+      INNER JOIN contrato_empresa ce
+        ON ce.id_empresa = ac.id_empresa
+        AND UPPER(TRIM(ce.tipo_contrato)) = 'PLAN IGUALDAD'
+      LEFT JOIN cliente_medida cm
+        ON cm.id_areas_contratadas = ac.id_areas_contratadas
+      WHERE ac.id_empresa = ?
+    ");
+    $stmtPreFill->bind_param('i', $idEmpresaPreFill);
+    $stmtPreFill->execute();
+    $resPreFill = $stmtPreFill->get_result();
+    while ($rowPF = $resPreFill->fetch_assoc()) {
+      $aidPF = (int)$rowPF['id_plan'];
+      if ($aidPF > 0 && !in_array($aidPF, $addContratoOld['areas'], true)) {
+        $addContratoOld['areas'][] = $aidPF;
+      }
+      $midPF = (int)($rowPF['id_medida'] ?? 0);
+      if ($midPF > 0) {
+        if (!isset($addContratoOld['medidas'][$aidPF])) {
+          $addContratoOld['medidas'][$aidPF] = [];
+        }
+        if (!in_array($midPF, $addContratoOld['medidas'][$aidPF], true)) {
+          $addContratoOld['medidas'][$aidPF][] = $midPF;
+        }
+      }
+    }
+    $stmtPreFill->close();
   }
 }
 

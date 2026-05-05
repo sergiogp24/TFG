@@ -17,10 +17,23 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  */
 function obtenerConteosPorRangoEdad(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
-    $stmt = $db->prepare("SELECT de.sexo, de.fecha_nacimiento, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.fecha_nacimiento IS NOT NULL
+    $stmt = $db->prepare(
+        "
+        SELECT
+            de.sexo,
+            de.fecha_nacimiento,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ?
+          AND de.id_ano_datos = ?
+          AND de.fecha_nacimiento IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0");
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        "
+    );
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de edades.');
@@ -79,9 +92,6 @@ function obtenerConteosPorRangoEdad(mysqli $db, int $idEmpresa, int $idAnoDatos)
  * 7: 50-54
  * 8: 55-59
  * 9: 60
- * 10: 61
- * 11: 62
- * 12: 63
  */
 function obtenerIndiceRangoEdad(int $edad): int
 {
@@ -95,10 +105,8 @@ function obtenerIndiceRangoEdad(int $edad): int
     if ($edad >= 45 && $edad <= 49) return 6;
     if ($edad >= 50 && $edad <= 54) return 7;
     if ($edad >= 55 && $edad <= 59) return 8;
-    if ($edad === 60) return 9;
-    if ($edad === 61) return 10;
-    if ($edad === 62) return 11;
-    if ($edad >= 63) return 12;
+    if ($edad >= 60) return 9;
+
     return -1;
 }
 
@@ -113,9 +121,23 @@ function obtenerIndiceRangoEdad(int $edad): int
  */
 function obtenerConteosPorRangoAntiguedad(mysqli $db, int $idEmpresa, int $idAnoDatos, string $fechaReferencia): array
 {
-    $stmt = $db->prepare("SELECT de.sexo, de.inicio_contratacion, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ? AND de.id_ano_datos = ?
-          AND de.inicio_contratacion IS NOT NULL AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 ");
+    $stmt = $db->prepare(
+        "
+        SELECT
+            de.sexo,
+            de.inicio_contratacion,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ?
+          AND de.id_ano_datos = ?
+          AND de.inicio_contratacion IS NOT NULL
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        "
+    );
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de antigüedad.');
@@ -196,8 +218,16 @@ function obtenerIndiceRangoAntiguedad(int $antiguedad): int
 function obtenerConteosPorModalidadContrato(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "SELECT de.sexo, de.clave_contrato, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ?
+        "
+        SELECT
+            de.sexo,
+            de.clave_contrato,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ?
           AND de.id_ano_datos = ?
           AND de.clave_contrato IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
@@ -252,10 +282,25 @@ function obtenerConteosPorModalidadContrato(mysqli $db, int $idEmpresa, int $idA
 function obtenerConteosPorModalidadContratoEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "SELECT de.sexo, de.clave_contrato, de.inicio_contratacion, ad.fecha_inicio, ad.fecha_fin, de.salario_base_eq, de.salario_base_ef  FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.clave_contrato IS NOT NULL AND de.inicio_contratacion IS NOT NULL
-          AND ad.fecha_inicio IS NOT NULL AND ad.fecha_fin IS NOT NULL  AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        "
+        SELECT
+            de.sexo,
+            de.clave_contrato,
+            de.inicio_contratacion,
+            ad.fecha_inicio,
+            ad.fecha_fin,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ?
+          AND de.id_ano_datos = ?
+          AND de.clave_contrato IS NOT NULL
+          AND de.inicio_contratacion IS NOT NULL
+          AND ad.fecha_inicio IS NOT NULL
+          AND ad.fecha_fin IS NOT NULL
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
     );
@@ -377,9 +422,17 @@ function obtenerIndiceModalidadContrato(int $claveContrato): ?int
 function obtenerConteosPorPorcentajeJornada(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        " SELECT de.sexo, de.porc_jornada, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
+        "
+        SELECT
+            de.sexo,
+            de.porc_jornada,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
-        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa WHERE ce.id_empresa = ? AND de.id_ano_datos = ?
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ?
+          AND de.id_ano_datos = ?
           AND de.porc_jornada IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
@@ -453,11 +506,29 @@ function obtenerConteosPorPorcentajeJornada(mysqli $db, int $idEmpresa, int $idA
 function obtenerConteosPorPorcentajeJornadaEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "SELECT de.sexo, de.porc_jornada, de.inicio_contratacion, ad.fecha_inicio, ad.fecha_fin, de.salario_base_eq, de.salario_base_ef
-        FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.porc_jornada IS NOT NULL AND de.inicio_contratacion IS NOT NULL AND ad.fecha_inicio IS NOT NULL
-          AND ad.fecha_fin IS NOT NULL AND de.inicio_contratacion BETWEEN ad.fecha_inicio AND ad.fecha_fin
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 ");
+        "
+        SELECT
+            de.sexo,
+            de.porc_jornada,
+            de.inicio_contratacion,
+            ad.fecha_inicio,
+            ad.fecha_fin,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ?
+          AND de.id_ano_datos = ?
+          AND de.porc_jornada IS NOT NULL
+          AND de.inicio_contratacion IS NOT NULL
+          AND ad.fecha_inicio IS NOT NULL
+          AND ad.fecha_fin IS NOT NULL
+          AND de.inicio_contratacion BETWEEN ad.fecha_inicio AND ad.fecha_fin
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        "
+    );
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de porcentaje de jornada en periodo.');
@@ -517,10 +588,21 @@ function obtenerConteosPorPorcentajeJornadaEnPeriodo(mysqli $db, int $idEmpresa,
 function obtenerConteosPorPuestoProfesional(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "SELECT de.sexo, de.puesto_empresa, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
-        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ? AND de.id_ano_datos = ?  AND de.puesto_empresa IS NOT NULL
-          AND TRIM(de.puesto_empresa) <> '' AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        "
+        SELECT
+            de.sexo,
+            de.puesto_empresa,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+        WHERE ce.id_empresa = ?
+          AND de.id_ano_datos = ?
+          AND de.puesto_empresa IS NOT NULL
+          AND TRIM(de.puesto_empresa) <> ''
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
     );
 
@@ -593,8 +675,14 @@ function obtenerConteosPorPuestoProfesional(mysqli $db, int $idEmpresa, int $idA
 function obtenerConteosPorPuestoProfesionalEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        " SELECT de.sexo, de.puesto_empresa, de.salario_base_eq, de.salario_base_ef
-        FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        "
+        SELECT
+            de.sexo,
+            de.puesto_empresa,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
         WHERE ce.id_empresa = ?
           AND de.id_ano_datos = ?
@@ -709,7 +797,14 @@ function normalizarTipoBaja(string $texto): string
 function obtenerConteosPuestosDirectivosGrupo01(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        " SELECT de.sexo, de.puesto_empresa, de.agrup_class_prof, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
+        "
+        SELECT
+            de.sexo,
+            de.puesto_empresa,
+            de.agrup_class_prof,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
         WHERE ce.id_empresa = ?
@@ -809,10 +904,24 @@ function esGrupo01(string $valor): bool
 function obtenerConteosPorAreaFuncional(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        " SELECT de.sexo, de.dpto_empresa, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
+        "
+        SELECT
+            de.sexo,
+            de.dpto_empresa,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
+        INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.dpto_empresa IS NOT NULL AND TRIM(de.dpto_empresa) <> ''
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0  AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 " );
+        WHERE ce.id_empresa = ?
+          AND de.id_ano_datos = ?
+          AND de.dpto_empresa IS NOT NULL
+          AND TRIM(de.dpto_empresa) <> ''
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+           
+        "
+    );
 
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de areas funcionales.');
@@ -882,7 +991,13 @@ function obtenerConteosPorAreaFuncional(mysqli $db, int $idEmpresa, int $idAnoDa
 function obtenerConteosPorAreaFuncionalEnPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "SELECT de.sexo, de.dpto_empresa, de.salario_base_eq, de.salario_base_ef FROM datos_empleados de
+        "
+        SELECT
+            de.sexo,
+            de.dpto_empresa,
+            de.salario_base_eq,
+            de.salario_base_ef
+        FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
         WHERE ce.id_empresa = ?
@@ -967,11 +1082,23 @@ function obtenerConteosPorAreaFuncionalEnPeriodo(mysqli $db, int $idEmpresa, int
 function obtenerConteosPorHijos(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "SELECT de.sexo, de.hijos, de.salario_base_eq, de.salario_base_efb FROM datos_empleados de
+        "
+     
+SELECT
+    de.sexo,
+    de.hijos,
+    de.salario_base_eq,
+    de.salario_base_ef
+FROM datos_empleados de
 INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
 INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
 WHERE ce.id_empresa = ?
-  AND de.id_ano_datos = ? AND de.hijos IS NOT NULL AND COALESCE(de.salario_base_eq, 0) <> 0 AND COALESCE(de.salario_base_ef, 0) <> 0; " );
+  AND de.id_ano_datos = ?
+    AND de.hijos IS NOT NULL
+    AND COALESCE(de.salario_base_eq, 0) <> 0
+    AND COALESCE(de.salario_base_ef, 0) <> 0;
+        "
+    );
     if (!$stmt) {
         throw new RuntimeException('No se pudo preparar la consulta de hijos.');
     }
@@ -1028,7 +1155,12 @@ WHERE ce.id_empresa = ?
 function obtenerConteosPorGrupoProfesional(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        " SELECT de.sexo, de.grupo_profesional, de.salario_base_eq, de.salario_base_ef
+        "
+        SELECT
+            de.sexo,
+            de.grupo_profesional,
+            de.salario_base_eq,
+            de.salario_base_ef
         FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
@@ -1131,8 +1263,15 @@ function obtenerIndiceGrupoProfesional(string $valor): ?int
 function obtenerConteosEdadContratacionPeriodo(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        " SELECT de.sexo, de.fecha_nacimiento, de.inicio_contratacion, ad.fecha_inicio,
-            ad.fecha_fin, de.salario_base_eq, de.salario_base_ef
+        "
+        SELECT
+            de.sexo,
+            de.fecha_nacimiento,
+            de.inicio_contratacion,
+            ad.fecha_inicio,
+            ad.fecha_fin,
+            de.salario_base_eq,
+            de.salario_base_ef
         FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
@@ -1209,9 +1348,8 @@ function obtenerIndiceEdadHoja17(int $edad): ?int
     if ($edad <= 49) return 6;
     if ($edad <= 54) return 7;
     if ($edad <= 59) return 8;
-    if ($edad === 60) return 9;
-    if ($edad === 61) return 10;
-    if ($edad === 62) return 11;
+    if ($edad >= 60) return 9;
+
     return null;
 }
 
@@ -1295,7 +1433,8 @@ function obtenerIndiceEdadHoja17(int $edad): ?int
 function generarCuadroPorcentajesEmpresa(mysqli $db, int $idEmpresa, int $idAnoDatos, string $razonSocial): string
 {
     $stmt = $db->prepare(
-        "SELECT
+        "
+SELECT
     SUM(CASE WHEN t.sexo_normalizado = 'MUJER' THEN 1 ELSE 0 END) AS total_mujeres,
     SUM(CASE WHEN t.sexo_normalizado = 'HOMBRE' THEN 1 ELSE 0 END) AS total_hombres
 FROM (
@@ -1352,7 +1491,7 @@ FROM (
 
     $destinoDir = __DIR__ . '/../uploads';
     if (!is_dir($destinoDir) && !mkdir($destinoDir, 0755, true)) {
-        throw new RuntimeException('No se pudo crear el directorio empresa_porcentajes.');
+        throw new RuntimeException('No se pudo crear el directorio uploads.');
     }
 
     $spreadsheet = IOFactory::load($plantillaPath);
@@ -1376,7 +1515,7 @@ FROM (
         }
 
         // Primer bloque: C3:C16 para mujeres, G3:G15 para hombres
-        $filasRangos = ['C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15'];
+        $filasRangos = ['C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12'];
         // Añadir columna de Total Franja (L) y su suma total
         $numFilasEdad = count($filasRangos);
         for ($i = 0; $i < $numFilasEdad; $i++) {
@@ -1386,8 +1525,8 @@ FROM (
         // Fila de total general de franja
         $filaTotalEdad = 3 + $numFilasEdad;
         $sheetEdad->setCellValue('L' . $filaTotalEdad, '=SUM(L3:L' . ($filaTotalEdad - 1) . ')');
-        $filasRangos = ['C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15'];
-        $filasRangosHombres = ['G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15'];
+        $filasRangos = ['C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12'];
+        $filasRangosHombres = ['G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];
 
         foreach ($conteosEdad['mujeres'] as $indice => $conteo) {
             if (isset($filasRangos[$indice])) {
@@ -1403,8 +1542,8 @@ FROM (
 
 
         // Segundo bloque: D20:D32 para mujeres, E20:E32 para hombres (sin totales)
-        $filasBloque2 = ['D20', 'D21', 'D22', 'D23', 'D24', 'D25', 'D26', 'D27', 'D28', 'D29', 'D30', 'D31', 'D32'];
-        $filasBloque2Hombres = ['E20', 'E21', 'E22', 'E23', 'E24', 'E25', 'E26', 'E27', 'E28', 'E29', 'E30', 'E31', 'E32'];
+        $filasBloque2 = ['D17', 'D18', 'D19', 'D20', 'D21', 'D22', 'D23', 'D24', 'D25', 'D26'];
+        $filasBloque2Hombres = ['E17', 'E18', 'E19', 'E20', 'E21', 'E22', 'E23', 'E24', 'E25', 'E26'];
 
         foreach ($conteosEdad['mujeres'] as $indice => $conteo) {
             if (isset($filasBloque2[$indice])) {
@@ -1926,8 +2065,8 @@ FROM (
             $sheetHoja17 = $spreadsheet->getSheet(17);
         }
 
-        $filasMujeres = ['C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14'];
-        $filasHombres = ['G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14'];
+        $filasMujeres = ['C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12'];
+        $filasHombres = ['G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];
 
         foreach ($conteosEdadContratacionPeriodo['mujeres'] as $indice => $conteo) {
             if (isset($filasMujeres[$indice])) {
@@ -2172,8 +2311,7 @@ function tablaTieneColumna(mysqli $db, string $tabla, string $columna): bool
 function obtenerConteosEstudiosDinamico(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
+        "SELECT
             TRIM(de.estudios) AS estudio,
             de.sexo,
             de.salario_base_eq,
@@ -2233,8 +2371,7 @@ function area_Permisos_retribuidos(mysqli $db, int $idEmpresa, $sheet): bool
 {
     // Consultar la tabla area_Permisos_retribuidos en la BD agrupando por tipo.
     $stmt = $db->prepare(
-        "
-        SELECT 
+        "SELECT 
             tipo,
             COALESCE(SUM(n_mujeres), 0) AS n_mujeres,
             COALESCE(SUM(n_hombres), 0) AS n_hombres
@@ -2306,8 +2443,7 @@ function area_Permisos_retribuidos(mysqli $db, int $idEmpresa, $sheet): bool
 function area_formaciones(mysqli $db, int $idEmpresa, $sheet): bool
 {
     $stmt = $db->prepare(
-        "
-        SELECT
+        "SELECT
             tipo,
             COALESCE(SUM(n_mujeres), 0) AS n_mujeres,
             COALESCE(SUM(n_hombres), 0) AS n_hombres
@@ -2437,8 +2573,7 @@ function area_excedencias(mysqli $db, int $idEmpresa, $sheet): bool
 {
     // Consultar la tabla area_excedencias en la BD agrupando por tipo.
     $stmt = $db->prepare(
-        "
-        SELECT 
+        "SELECT 
             tipo,
             COALESCE(SUM(n_mujeres), 0) AS n_mujeres,
             COALESCE(SUM(n_hombres), 0) AS n_hombres
@@ -2514,8 +2649,7 @@ function area_bajas(mysqli $db, int $idEmpresa, $sheet): bool
     if ($tablaTemporales !== null) {
         if (tablaTieneColumna($db, $tablaTemporales, 'id_empresa')) {
             $stmtTemporales = $db->prepare(
-                "
-                SELECT
+                "SELECT
                     tipo,
                     COALESCE(SUM(num_mujeres), 0) AS n_mujeres,
                     COALESCE(SUM(num_hombres), 0) AS n_hombres
@@ -2526,8 +2660,7 @@ function area_bajas(mysqli $db, int $idEmpresa, $sheet): bool
             );
         } elseif ($tablaBajas !== null && tablaTieneColumna($db, $tablaTemporales, 'id_bajas') && tablaTieneColumna($db, $tablaBajas, 'id_empresa')) {
             $stmtTemporales = $db->prepare(
-                "
-                SELECT
+                "SELECT
                     t.tipo,
                     COALESCE(SUM(t.num_mujeres), 0) AS n_mujeres,
                     COALESCE(SUM(t.num_hombres), 0) AS n_hombres
@@ -2565,8 +2698,7 @@ function area_bajas(mysqli $db, int $idEmpresa, $sheet): bool
     if ($tablaDefinitivas !== null) {
         if (tablaTieneColumna($db, $tablaDefinitivas, 'id_empresa')) {
             $stmtDefinitivas = $db->prepare(
-                "
-                SELECT
+                " SELECT
                     tipo,
                     COALESCE(SUM(num_mujeres), 0) AS n_mujeres,
                     COALESCE(SUM(num_hombres), 0) AS n_hombres
@@ -2577,8 +2709,7 @@ function area_bajas(mysqli $db, int $idEmpresa, $sheet): bool
             );
         } elseif ($tablaBajas !== null && tablaTieneColumna($db, $tablaDefinitivas, 'id_bajas') && tablaTieneColumna($db, $tablaBajas, 'id_empresa')) {
             $stmtDefinitivas = $db->prepare(
-                "
-                SELECT
+                "SELECT
                     d.tipo,
                     COALESCE(SUM(d.num_mujeres), 0) AS n_mujeres,
                     COALESCE(SUM(d.num_hombres), 0) AS n_hombres
@@ -2634,4 +2765,87 @@ function area_bajas(mysqli $db, int $idEmpresa, $sheet): bool
     }
 
     return true;
+}
+
+/**
+ * Actualiza únicamente las hojas de datos cuantitativos (Bajas, Excedencias, Permisos, Formaciones) 
+ * en un Excel de CUADRO_PORCENTAJES ya existente.
+ * Útil para la regeneración del Word con datos de los forms sin recalcular todo el registro retributivo.
+ *
+ * @param mysqli $db
+ * @param string $rutaExcel
+ * @param int $idEmpresa
+ * @return void
+ * @throws RuntimeException
+ */
+function actualizarDatosCuantitativosExcel(mysqli $db, string $rutaExcel, int $idEmpresa): void
+{
+    if (!file_exists($rutaExcel)) {
+        throw new RuntimeException("El archivo Excel no existe: " . $rutaExcel);
+    }
+
+    set_time_limit(300);
+
+    $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($rutaExcel);
+    $spreadsheet = $reader->load($rutaExcel);
+
+    // ================== HOJA 11: BAJAS ==================
+    $sheetBajas = null;
+    foreach (['BAJAS', 'Bajas'] as $name) {
+        $sheet = $spreadsheet->getSheetByName($name);
+        if ($sheet !== null) { $sheetBajas = $sheet; break; }
+    }
+    if ($sheetBajas === null) {
+        try { $sheetBajas = $spreadsheet->getSheet(11); } catch (\Exception $e) {}
+    }
+    if ($sheetBajas !== null) {
+        area_bajas($db, $idEmpresa, $sheetBajas);
+    }
+
+    // ================== HOJA 12: EXCEDENCIAS ==================
+    $sheetExcedencias = null;
+    foreach (['EXCEDENCIAS', 'Excedencias'] as $name) {
+        $sheet = $spreadsheet->getSheetByName($name);
+        if ($sheet !== null) { $sheetExcedencias = $sheet; break; }
+    }
+    if ($sheetExcedencias === null) {
+        try { $sheetExcedencias = $spreadsheet->getSheet(12); } catch (\Exception $e) {}
+    }
+    if ($sheetExcedencias !== null) {
+        area_excedencias($db, $idEmpresa, $sheetExcedencias);
+    }
+
+    // ================== HOJA 13: PERMISOS ==================
+    $sheetPermisos = null;
+    foreach (['PERMISOS RETRIBUIDOS', 'Permisos Retribuidos'] as $name) {
+        $sheet = $spreadsheet->getSheetByName($name);
+        if ($sheet !== null) { $sheetPermisos = $sheet; break; }
+    }
+    if ($sheetPermisos === null) {
+        try { $sheetPermisos = $spreadsheet->getSheet(13); } catch (\Exception $e) {}
+    }
+    if ($sheetPermisos !== null) {
+        area_Permisos_retribuidos($db, $idEmpresa, $sheetPermisos);
+    }
+
+    // ================== HOJA 14: FORMACIONES ==================
+    $sheetFormaciones = null;
+    foreach (['FORMACIONES', 'Formaciones', 'FORMACION', 'Formacion', 'FORMACIÓN', 'Formación'] as $name) {
+        $sheet = $spreadsheet->getSheetByName($name);
+        if ($sheet !== null) { $sheetFormaciones = $sheet; break; }
+    }
+    if ($sheetFormaciones === null) {
+        try { $sheetFormaciones = $spreadsheet->getSheet(14); } catch (\Exception $e) {}
+    }
+    if ($sheetFormaciones !== null) {
+        area_formaciones($db, $idEmpresa, $sheetFormaciones);
+    }
+
+    $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+    // Para no romper fórmulas previas
+    $writer->setPreCalculateFormulas(false);
+    $writer->save($rutaExcel);
+
+    $spreadsheet->disconnectWorksheets();
+    unset($spreadsheet);
 }
