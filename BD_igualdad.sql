@@ -971,69 +971,6 @@ INSERT INTO empresa (
  'Educación', 'Convenio Enseñanza', 28, 12, 40, 1,
  'Reuniones y actas', '2025-2027', NULL);
  
- -- INSERTS PARA LA BASE DE DATOS IGUALDAD AREAS
-
--- ========================================================
--- ÁREAS DEL PLAN
--- ========================================================
-
-INSERT INTO area_plan (nombre)
-SELECT 'Responsable de igualdad' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Responsable de igualdad');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Proceso de selección y contratación' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Proceso de selección y contratación');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Clasificación profesional' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Clasificación profesional');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Formación' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Formación');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Promoción y ascenso personal' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Promoción y ascenso personal');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Condiciones de trabajo' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Condiciones de trabajo');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Salud laboral' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Salud laboral');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Ejercicio corresponsable de los derechos de la vida personal, familiar y laboral' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Ejercicio corresponsable de los derechos de la vida personal, familiar y laboral');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Infrarrepresentación femenina' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Infrarrepresentación femenina');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Retribuciones y auditoría salarial' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Retribuciones y auditoría salarial');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Prevención del acoso sexual y por razón de sexo' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Prevención del acoso sexual y por razón de sexo');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Violencia de género' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Violencia de género');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Comunicación y de sensibilización' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Comunicación y de sensibilización');
-
-INSERT INTO area_plan (nombre)
-SELECT 'Colectivo LGTBI' FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM area_plan WHERE nombre = 'Colectivo LGTBI');
-
-
 
  -- INSERTS PARA LA BASE DE DATOS IGUALDAD AREAS
 
@@ -2279,7 +2216,4 @@ SELECT ap.id_plan, 'Implementación de las medidas y protocolo según lo dispues
 FROM area_plan ap
 WHERE ap.nombre = 'Colectivo LGTBI'
 AND NOT EXISTS (SELECT 1 FROM medida m WHERE m.id_plan = ap.id_plan AND m.descripcion = 'Implementación de las medidas y protocolo según lo dispuesto en la normativa vigente');
-
-
-
 
