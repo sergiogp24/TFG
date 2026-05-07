@@ -233,8 +233,11 @@ if ($accion === 'crear') {
     $_SESSION['add_user_error'] = 'Error al crear usuario. Intentalo de nuevo.';
     redirect_view('add');
   }
-  $newUserId = (int)$stmt->insert_id;
-  $stmt->close();
+  $newUserId = 0;
+  if (isset($stmt) && $stmt instanceof mysqli_stmt) {
+    $newUserId = (int)$stmt->insert_id;
+    $stmt->close();
+  }
 
   // Generar token temporal (válido por 7 días)
   $token = bin2hex(random_bytes(32)); // Token seguro de 64 caracteres

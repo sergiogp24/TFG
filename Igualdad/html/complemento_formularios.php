@@ -604,7 +604,7 @@ if ($idEmpresaSeleccionada > 0) {
 
                     <?php if (!empty($erroresListado)): ?>
                         <div class="alert alert-warning py-2">
-                            <?php foreach ($erroresListado as $err): ?>
+                            <?php foreach (($erroresListado ?? []) as $err): ?>
                                 <div><?= h($err) ?></div>
                             <?php endforeach; ?>
                         </div>
@@ -617,7 +617,7 @@ if ($idEmpresaSeleccionada > 0) {
                         <?php else: ?>
                             <select class="form-select w-auto" onchange="window.location.href='complemento_formularios.php?tab=<?= h($tab) ?><?= $embed ? '&embed=1' : '' ?>&id_empresa=' + this.value;">
                                 <option value="">-- Seleccionar --</option>
-                                <?php foreach ($empresasDisponibles as $empresa): ?>
+                                <?php foreach (($empresasDisponibles ?? []) as $empresa): ?>
                                     <option value="<?= (int)$empresa['id_empresa'] ?>" <?= ((int)$empresa['id_empresa'] === $idEmpresaSeleccionada) ? 'selected' : '' ?>><?= h($empresa['razon_social']) ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -646,7 +646,7 @@ if ($idEmpresaSeleccionada > 0) {
                         <div class="mb-4 mt-3">
                             <h6 class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Cuestionarios Cualitativos</h6>
                             <div class="d-flex flex-wrap gap-2">
-                                <?php foreach ($cuestionarioTabs as $tabCuestionario => $configCuestionario): ?>
+                                <?php foreach (($cuestionarioTabs ?? []) as $tabCuestionario => $configCuestionario): ?>
                                     <a class="btn <?= $tab === $tabCuestionario ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=' . urlencode($tabCuestionario) . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>"><?= h((string)($configCuestionario['label'] ?? $tabCuestionario)) ?></a>
                                 <?php endforeach; ?>
                             </div>
@@ -760,7 +760,7 @@ if ($idEmpresaSeleccionada > 0) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($bajasRows as $row): ?>
+                                            <?php foreach (($bajasRows ?? []) as $row): ?>
                                                 <?php
                                                 $tipoBaja = (string)($row['tipo_baja'] ?? '');
                                                 $tipoTemporal = (string)($row['tipo_temporal'] ?? '');
@@ -856,7 +856,7 @@ if ($idEmpresaSeleccionada > 0) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($formacionRows as $row): ?>
+                                            <?php foreach (($formacionRows ?? []) as $row): ?>
                                                 <tr>
                                                     <td><?= (int)($row['id_registro'] ?? 0) ?></td>
                                                     <td><?= h((string)($row['tipo'] ?? '')) ?></td>
@@ -950,7 +950,7 @@ if ($idEmpresaSeleccionada > 0) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($excedenciasRows as $row): ?>
+                                            <?php foreach (($excedenciasRows ?? []) as $row): ?>
                                                 <tr>
                                                     <td><?= (int)($row['id_registro'] ?? 0) ?></td>
                                                     <td><?= h((string)($row['motivo'] ?? '')) ?></td>
@@ -1045,7 +1045,7 @@ if ($idEmpresaSeleccionada > 0) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($permisosRows as $row): ?>
+                                            <?php foreach (($permisosRows ?? []) as $row): ?>
                                                 <tr>
                                                     <td><?= (int)($row['id_registro'] ?? 0) ?></td>
                                                     <td><?= h((string)($row['motivo'] ?? '')) ?></td>
@@ -1095,7 +1095,7 @@ if ($idEmpresaSeleccionada > 0) {
                                 <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
                                 <div class="row g-3">
-                                    <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                    <?php foreach (($camposCuestionarioActivo ?? []) as $campo): ?>
                                         <div class="col-12 col-md-6">
                                             <label class="form-label"><?= h((string)($campo['label'] ?? 'Campo')) ?></label>
                                             <input type="text" name="<?= h((string)($campo['name'] ?? '')) ?>" class="form-control">
@@ -1121,17 +1121,17 @@ if ($idEmpresaSeleccionada > 0) {
                                         <thead>
                                             <tr>
                                                 <th>ID</th>
-                                                <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                <?php foreach (($camposCuestionarioActivo ?? []) as $campo): ?>
                                                     <th><?= h((string)($campo['label'] ?? 'Campo')) ?></th>
                                                 <?php endforeach; ?>
                                                 <th>Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($filasCuestionarioActivo as $fila): ?>
+                                            <?php foreach (($filasCuestionarioActivo ?? []) as $fila): ?>
                                                 <tr>
                                                     <td><?= (int)($fila['id_registro'] ?? 0) ?></td>
-                                                    <?php foreach ($camposCuestionarioActivo as $campo): ?>
+                                                    <?php foreach (($camposCuestionarioActivo ?? []) as $campo): ?>
                                                         <td><?= h((string)($fila[(string)($campo['name'] ?? '')] ?? '')) ?></td>
                                                     <?php endforeach; ?>
                                                     <td>

@@ -151,22 +151,6 @@ $rs = $stmt->get_result();
 while ($row = $rs->fetch_assoc()) $checked[] = (int)$row['id_empresa'];
 $stmt->close();
 
-// ELIMINAR EMPRESA
-if ($accion === 'eliminar') {
-  $id = (int)($_POST['id_empresa'] ?? 0);
-  if ($id <= 0) redirect_view('delete', 'ID inválido');
-
-  $stmt = db()->prepare("DELETE FROM empresa WHERE id_empresa = ?");
-  $stmt->bind_param('i', $id);
-
-  try {
-    $stmt->execute();
-    $stmt->close();
-    redirect_menu('Empresa Eliminada');
-  } catch (Throwable $e) {
-    error_log(sprintf('[lista_empresa.eliminar] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
-    redirect_view('delete', 'No se pudo eliminar. Intentalo de nuevo.');
-  }
-}
 
 require __DIR__ . '/../html/lista_empresa.html.php';
+?>

@@ -166,7 +166,7 @@ if ($view === 'seguimiento_tecnicos') {
     $seguimientoTecnicoSeleccionadoId = (int)($seguimientoTecnicos[0]['id_usuario'] ?? 0);
   }
 
-  foreach ($seguimientoTecnicos as $tecnicoSeg) {
+  foreach (($seguimientoTecnicos ?? []) as $tecnicoSeg) {
     if ((int)($tecnicoSeg['id_usuario'] ?? 0) === $seguimientoTecnicoSeleccionadoId) {
       $seguimientoTecnicoSeleccionado = $tecnicoSeg;
       break;

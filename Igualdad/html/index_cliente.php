@@ -311,7 +311,7 @@ if ($usuarioId > 0) {
 if (!empty($empresasDisponibles)) {
     $empresaAsignada = null;
 
-    foreach ($empresasDisponibles as $empresaDisponible) {
+    foreach (($empresasDisponibles ?? []) as $empresaDisponible) {
         $idEmpresaDisponible = (int)($empresaDisponible['id_empresa'] ?? 0);
         if ($idEmpresaDisponible > 0 && empresa_tiene_registro_retributivo($idEmpresaDisponible)) {
             $empresaAsignada = $empresaDisponible;
@@ -324,7 +324,7 @@ if (!empty($empresasDisponibles)) {
     }
 
     if ($idEmpresaSeleccionada > 0) {
-        foreach ($empresasDisponibles as $empresaDisponible) {
+        foreach (($empresasDisponibles ?? []) as $empresaDisponible) {
             if ((int)($empresaDisponible['id_empresa'] ?? 0) === $idEmpresaSeleccionada) {
                 $empresaAsignada = $empresaDisponible;
                 break;
@@ -342,7 +342,7 @@ $idEmpresaWordFinalSeleccionada = (int)($_GET['id_empresa_word_final'] ?? 0);
 $wordFinalPorEmpresa = [];
 
 if (!empty($empresasDisponibles)) {
-    foreach ($empresasDisponibles as $empresaDisponible) {
+    foreach (($empresasDisponibles ?? []) as $empresaDisponible) {
         $idEmpresaDisponible = (int)($empresaDisponible['id_empresa'] ?? 0);
         if ($idEmpresaDisponible <= 0) {
             continue;
@@ -359,7 +359,7 @@ if (!empty($empresasDisponibles)) {
     }
 
     $empresaWordFinalValida = false;
-    foreach ($empresasDisponibles as $empresaDisponible) {
+    foreach (($empresasDisponibles ?? []) as $empresaDisponible) {
         if ((int)($empresaDisponible['id_empresa'] ?? 0) === $idEmpresaWordFinalSeleccionada) {
             $empresaWordFinalValida = true;
             break;
@@ -376,7 +376,7 @@ $wordFinalSeleccionado = $wordFinalPorEmpresa[$idEmpresaWordFinalSeleccionada] ?
 $pendientesEspacio = 0;
 $empresasPendientesLista = [];
 if (!empty($empresasDisponibles)) {
-    foreach ($empresasDisponibles as $empresa) {
+    foreach (($empresasDisponibles ?? []) as $empresa) {
         $idEmp = (int)($empresa['id_empresa'] ?? 0);
         if ($idEmp > 0 && !empresa_tiene_registro_retributivo($idEmp)) {
             $pendientesEspacio++;
@@ -535,7 +535,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                         <?php elseif ($view === 'reuniones'): ?>
                             <?php
                             $clienteCalendarEvents = [];
-                            foreach ($clienteReuniones as $reunion) {
+                            foreach (($clienteReuniones ?? []) as $reunion) {
                                 $idReunion = (int)($reunion['id_reunion'] ?? 0);
                                 $objetivoReunion = trim((string)($reunion['objetivo'] ?? ''));
                                 $fechaReunion = (string)($reunion['fecha_reunion'] ?? '');
@@ -569,7 +569,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                             <label class="form-label">🏢 Empresa</label>
                                             <select class="form-select" id="clienteSelectEmpresaReunion" name="id_empresa_reunion" required>
                                                 <option value="0">Selecciona una empresa</option>
-                                                <?php foreach ($empresasDisponibles as $empresaReunion): ?>
+                                                <?php foreach (($empresasDisponibles ?? []) as $empresaReunion): ?>
                                                     <option value="<?= (int)($empresaReunion['id_empresa'] ?? 0) ?>">
                                                         <?= h((string)($empresaReunion['razon_social'] ?? '')) ?>
                                                     </option>
@@ -610,7 +610,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                         <div class="alert alert-light border mb-0">El calendario se muestra aunque no tengas reuniones asignadas.</div>
                                     <?php else: ?>
                                         <div class="citas-list d-grid gap-3">
-                                            <?php foreach ($clienteReuniones as $reunionLista): ?>
+                                            <?php foreach (($clienteReuniones ?? []) as $reunionLista): ?>
                                                 <?php
                                                 $idReunionLista = (int)($reunionLista['id_reunion'] ?? 0);
                                                 $objetivoLista = trim((string)($reunionLista['objetivo'] ?? ''));
@@ -779,7 +779,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                                 <div class="col-12">
                                                                     <label for="id_empresa_word_final" class="form-label small mb-1">Selecciona empresa</label>
                                                                     <select id="id_empresa_word_final" name="id_empresa_word_final" class="form-select form-select-sm">
-                                                                        <?php foreach ($empresasDisponibles as $empresaDisponible): ?>
+                                                                        <?php foreach (($empresasDisponibles ?? []) as $empresaDisponible): ?>
                                                                             <?php $idEmpresaOpcionWord = (int)($empresaDisponible['id_empresa'] ?? 0); ?>
                                                                             <option value="<?= $idEmpresaOpcionWord ?>" <?= ($idEmpresaOpcionWord === $idEmpresaWordFinalSeleccionada) ? 'selected' : '' ?>>
                                                                                 <?= h((string)($empresaDisponible['razon_social'] ?? '')) ?>
@@ -809,7 +809,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                             </div>
 
                                                             <div id="wordFinalData" class="d-none">
-                                                                <?php foreach ($empresasDisponibles as $empresaDisponible): ?>
+                                                                <?php foreach (($empresasDisponibles ?? []) as $empresaDisponible): ?>
                                                                     <?php $idEmpresaOpcionWord = (int)($empresaDisponible['id_empresa'] ?? 0); ?>
                                                                     <?php $wordFinalEmpresa = $wordFinalPorEmpresa[$idEmpresaOpcionWord] ?? null; ?>
                                                                     <?php $downloadWordUrl = ''; ?>
@@ -856,7 +856,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                         <label for="nombre_empresa_cliente" class="form-label">Empresa / Referencia</label>
                                                         <select id="nombre_empresa_cliente" name="id_empresa" class="form-select" required>
                                                             <option value="" selected>-- seleccionar --</option>
-                                                            <?php foreach ($empresasDisponibles as $empresaDisponible): ?>
+                                                            <?php foreach (($empresasDisponibles ?? []) as $empresaDisponible): ?>
                                                                 <?php $idEmpresaOpcion = (int)($empresaDisponible['id_empresa'] ?? 0); ?>
                                                                 <option value="<?= $idEmpresaOpcion ?>">
                                                                     <?= h((string)($empresaDisponible['razon_social'] ?? '')) ?>
@@ -1018,7 +1018,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                     return;
                 }
 
-                const events = <?= json_encode($clienteCalendarEvents, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+                const events = <?= json_encode($clienteCalendarEvents ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
                 const detalleFecha = document.getElementById('clienteDetalleFecha');
                 const detalleHora = document.getElementById('clienteDetalleHora');
                 const detalleObjetivo = document.getElementById('clienteDetalleObjetivo');

@@ -150,7 +150,7 @@ $idEmpresaFormulario = 0;
 $nombreEmpresaFormulario = '';
 if (!empty($empresasDisponibles)) {
     if ($idEmpresaSeleccionada > 0) {
-        foreach ($empresasDisponibles as $empresa) {
+        foreach (($empresasDisponibles ?? []) as $empresa) {
             if ((int)($empresa['id_empresa'] ?? 0) === $idEmpresaSeleccionada) {
                 $idEmpresaFormulario = (int)$empresa['id_empresa'];
                 $nombreEmpresaFormulario = trim((string)$empresa['razon_social']);
@@ -324,7 +324,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                         <?php if (!$sinEmpresaFormulario): ?>
                             <select id="nombre_empresa_staff" name="id_empresa" class="form-control mb-3" required>
                                 <option value="">-- seleccionar empresa --</option>
-                                <?php foreach ($empresasDisponibles as $empresa): ?>
+                                <?php foreach (($empresasDisponibles ?? []) as $empresa): ?>
                                     <option value="<?= (int)$empresa['id_empresa'] ?>" <?= ((int)$empresa['id_empresa'] === $idEmpresaFormulario) ? 'selected' : '' ?>>
                                         <?= h($empresa['razon_social']) ?>
                                     </option>

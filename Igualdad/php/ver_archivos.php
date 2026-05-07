@@ -107,12 +107,12 @@ if ($userId > 0) {
 }
 
 $mapEmpresasNorm = [];
-foreach ($empresasUsuario as $empresa) {
+foreach (($empresasUsuario ?? []) as $empresa) {
   $mapEmpresasNorm[archivo_subido_normalizar_empresa((string)($empresa['razon_social'] ?? ''))] = (string)($empresa['razon_social'] ?? '');
 }
 
 $idsEmpresaPermitidas = [];
-foreach ($empresasUsuario as $empresa) {
+foreach (($empresasUsuario ?? []) as $empresa) {
   $idEmpresaPermitida = (int)($empresa['id_empresa'] ?? 0);
   if ($idEmpresaPermitida > 0) {
     $idsEmpresaPermitidas[$idEmpresaPermitida] = true;
@@ -120,7 +120,7 @@ foreach ($empresasUsuario as $empresa) {
 }
 
 if ($idEmpresaFiltro > 0) {
-  foreach ($empresasUsuario as $empresa) {
+  foreach (($empresasUsuario ?? []) as $empresa) {
     if ((int)($empresa['id_empresa'] ?? 0) === $idEmpresaFiltro) {
       $empresaFiltroNombre = (string)($empresa['razon_social'] ?? '');
       break;

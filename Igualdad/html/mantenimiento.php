@@ -217,7 +217,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = (string)($searchQ ?? '');
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -338,7 +338,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = (string)($searchQ ?? '');
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -477,7 +477,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = (string)($searchQ ?? ($_GET['q'] ?? ''));
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -610,7 +610,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = (string)($searchQ ?? '');
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -737,7 +737,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = (string)($searchQ ?? '');
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -894,7 +894,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = (string)($searchQ ?? '');
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -1018,7 +1018,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = isset($searchQ) ? (string)$searchQ : (string)($_GET['q'] ?? '');
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -1136,7 +1136,8 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                // Ensure $qParam is defined even if $searchQ is not set
+                                $qParam = (string)($searchQ ?? ($_GET['q'] ?? ''));
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -1251,7 +1252,7 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
-                                $qParam = (string)$searchQ;
+                                $qParam = (string)($searchQ ?? '');
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                     <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>
@@ -1395,6 +1396,8 @@
                                 <?php
                                 $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                                 $end = min($currentPage * $perPage, $totalRows);
+                                // Ensure $searchQ is defined to avoid undefined variable notices
+                                $searchQ = $searchQ ?? '';
                                 $qParam = (string)$searchQ;
                                 ?>
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
@@ -1517,7 +1520,7 @@
                             <?php
                             $start = ($totalRows === 0) ? 0 : (($currentPage - 1) * $perPage + 1);
                             $end = min($currentPage * $perPage, $totalRows);
-                            $qParam = (string)$searchQ;
+                            $qParam = (string)($searchQ ?? '');
                             ?>
                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
                                 <div class="text-muted small">Mostrando <?= $start ?> a <?= $end ?> de <?= $totalRows ?> Entradas</div>

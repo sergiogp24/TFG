@@ -1418,7 +1418,9 @@ if ($accion === 'delete_contratos') {
 
     redirect_view_empresas('ver_contratos', 'Contrato eliminado correctamente.', $idEmpresaContrato);
   } catch (Throwable $e) {
-    @$db->rollback();
+    if (isset($db) && $db instanceof mysqli) {
+      $db->rollback();
+    }
     log_internal_error_empresa('empresa.delete_contrato', $e);
     redirect_view_empresas('ver_contratos', 'No se pudo eliminar el contrato. Intentalo de nuevo.');
   }

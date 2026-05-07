@@ -147,7 +147,7 @@
                                 <?php if (empty($adminOperationalSummary)): ?>
                                     <div class="alert alert-light border mb-0">No hay empresas con contratos para mostrar en el resumen.</div>
                                 <?php else: ?>
-                                    <?php foreach ($adminOperationalSummary as $item): ?>
+                                    <?php foreach (($adminOperationalSummary ?? []) as $item): ?>
                                         <article class="operational-item">
                                             <div class="operational-top">
                                                 <div>
@@ -198,7 +198,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($usuarios as $u): ?>
+                                    <?php foreach (($usuarios ?? []) as $u): ?>
                                         <tr>
                                             <td><?= h($u['nombre_usuario'] ?? '') ?></td>
                                             <td><?= h($u['apellidos'] ?? '') ?></td>
@@ -225,7 +225,7 @@
                             </table>
                             <?php
                             $perPage = 10;
-                            $totalUsuarios = (int)($totalUsuarios ?? count($usuarios));
+                            $totalUsuarios = (int)($totalUsuarios ?? (isset($usuarios) ? count($usuarios) : 0));
                             $currentPage = (int)($currentPage ?? 1);
                             $totalPages = (int)($totalPages ?? 1);
 
@@ -289,7 +289,7 @@
                                     <div class="alert alert-light border mt-3 mb-0">No hay técnicos asignados para mostrar.</div>
                                 <?php else: ?>
                                     <div class="seguimiento-tecnicos-grid">
-                                        <?php foreach ($seguimientoTecnicos as $tecnicoSeg): ?>
+                                        <?php foreach (($seguimientoTecnicos ?? []) as $tecnicoSeg): ?>
                                             <?php
                                             $tecnicoIdActual = (int)($tecnicoSeg['id_usuario'] ?? 0);
                                             $tecnicoEsActivo = ($tecnicoIdActual === (int)($seguimientoTecnicoSeleccionadoId ?? 0));
@@ -309,7 +309,7 @@
                                         <?php if (empty($seguimientoTecnicoEmpresas)): ?>
                                             <div class="alert alert-light border mb-0">Este técnico no tiene empresas asignadas.</div>
                                         <?php else: ?>
-                                            <?php foreach ($seguimientoTecnicoEmpresas as $empresaSeg): ?>
+                                            <?php foreach (($seguimientoTecnicoEmpresas ?? []) as $empresaSeg): ?>
                                                 <article class="seguimiento-empresa-item">
                                                     <div class="seguimiento-empresa-top">
                                                         <div>
@@ -377,7 +377,7 @@
                                     <label class="form-label">Rol *</label>
                                     <select class="form-select" id="addUserRol" name="rol_id" required>
                                         <option value="">-- seleccionar --</option>
-                                        <?php foreach ($roles as $r): ?>
+                                        <?php foreach (($roles ?? []) as $r): ?>
                                             <?php
                                             $rolNombreNormalizado = strtoupper(str_replace(['Á', 'É', 'Í', 'Ó', 'Ú'], ['A', 'E', 'I', 'O', 'U'], trim((string)($r['nombre'] ?? ''))));
                                             ?>
@@ -395,7 +395,7 @@
                                         <?php if (empty($empresas)): ?>
                                             <div class="text-muted small">No hay empresas disponibles.</div>
                                         <?php else: ?>
-                                            <?php foreach ($empresas as $e): ?>
+                                            <?php foreach (($empresas ?? []) as $e): ?>
                                                 <?php
                                                 $isChecked = in_array((int)$e['id_empresa'], array_map('intval', $addOld['empresas'] ?? []), true);
                                                 ?>
@@ -428,7 +428,7 @@
                             <?php
                             $selectedId = isset($_GET['id_usuario']) ? (int)$_GET['id_usuario'] : 0;
                             $selectedUser = null;
-                            foreach ($usuarios as $uu) {
+                            foreach (($usuarios ?? []) as $uu) {
                                 if ((int)$uu['id_usuario'] === $selectedId) {
                                     $selectedUser = $uu;
                                     break;
@@ -492,7 +492,7 @@
                                         <div class="col-12 col-md-4">
                                             <label class="form-label text-center w-100">Tipo de usuario</label>
                                             <select class="form-select edit-input" name="rol_id" required>
-                                                <?php foreach ($roles as $r): ?>
+                                                <?php foreach (($roles ?? []) as $r): ?>
                                                     <option value="<?= (int)$r['id'] ?>" <?= ((int)$r['id'] === (int)($selectedUser['rol_id'] ?? 0)) ? 'selected' : '' ?>>
                                                         <?= h($r['nombre']) ?>
                                                     </option>
@@ -524,7 +524,7 @@
                             <h6 class="text-center mb-3">Eliminar usuarios</h6>
 
                             <div class="vstack gap-2">
-                                <?php foreach ($usuarios as $u): ?>
+                                <?php foreach (($usuarios ?? []) as $u): ?>
                                     <form method="post" action="../controller/admin_controller.php"
                                         class="border rounded bg-light p-2"
                                         onsubmit="return confirm('¿Seguro que quieres eliminar el usuario <?= h($u['nombre_usuario'] ?? '') ?>?');">
@@ -605,7 +605,7 @@
 
                             <?php
                             $adminCalendarEvents = [];
-                            foreach ($adminTodasReuniones as $reunion) {
+                            foreach (($adminTodasReuniones ?? []) as $reunion) {
                                 $idReunion = (int)($reunion['id_reunion'] ?? 0);
                                 $objetivoReunion = trim((string)($reunion['objetivo'] ?? ''));
                                 $fechaReunion = (string)($reunion['fecha_reunion'] ?? '');
@@ -652,7 +652,7 @@
                                                 <?php if (empty($adminClientesReunion)): ?>
                                                     <option value="0" disabled>Sin clientes disponibles</option>
                                                 <?php else: ?>
-                                                    <?php foreach ($adminClientesReunion as $clienteReunion): ?>
+                                                    <?php foreach (($adminClientesReunion ?? []) as $clienteReunion): ?>
                                                         <?php
                                                         $idClienteReunion = (int)($clienteReunion['id_usuario'] ?? 0);
                                                         $nombreClienteReunion = trim((string)($clienteReunion['nombre_usuario'] ?? ''));
@@ -700,7 +700,7 @@
                                         <div class="alert alert-light border mb-0">El calendario se muestra aunque no tengas reuniones asignadas.</div>
                                     <?php else: ?>
                                         <div class="vstack gap-3">
-                                            <?php foreach ($adminReuniones as $reunionLista): ?>
+                                            <?php foreach (($adminReuniones ?? []) as $reunionLista): ?>
                                                 <?php
                                                 $idReunionLista = (int)($reunionLista['id_reunion'] ?? 0);
                                                 $objetivoLista = trim((string)($reunionLista['objetivo'] ?? ''));
@@ -762,7 +762,7 @@
                                 <div class="alert alert-light border mb-0">No hay reuniones registradas.</div>
                             <?php else: ?>
                                 <div class="vstack gap-3">
-                                    <?php foreach ($adminTodasReuniones as $reunionGlobal): ?>
+                                    <?php foreach (($adminTodasReuniones ?? []) as $reunionGlobal): ?>
                                         <?php
                                         $objetivoGlobal = trim((string)($reunionGlobal['objetivo'] ?? ''));
                                         $fechaGlobalRaw = (string)($reunionGlobal['fecha_reunion'] ?? '');
@@ -893,7 +893,7 @@
                     return;
                 }
 
-                const events = <?= json_encode($adminCalendarEvents, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+                const events = <?= json_encode($adminCalendarEvents ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
                 const detalleFecha = document.getElementById('adminDetalleFecha');
                 const detalleHora = document.getElementById('adminDetalleHora');
                 const detalleObjetivo = document.getElementById('adminDetalleObjetivo');

@@ -66,6 +66,7 @@ if ($base === false) {
 
 $userId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 $downloadEmpresaId = 0;
+$fullPath = '';
 
 if ($kind === 'archivos') {
   if ($id <= 0) {

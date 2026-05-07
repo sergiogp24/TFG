@@ -16,6 +16,7 @@ $fromPanel = (string)($_GET['from'] ?? ($isTecnico ? 'tecnico' : ($isCliente ? '
 $fromParam = $fromPanel !== '' ? '&from=' . urlencode($fromPanel) : '';
 $soloMedidasEmbed = ((string)($_GET['solo_medidas_embed'] ?? '') === '1');
 $soloMedidasEmbedMode = ($soloMedidasEmbed && $view === 'edit_contratos');
+$tipoContratoFiltro = (string)($_GET['tipo_contrato'] ?? '');
 $volverLink = '';
 $volverLinkText = '';
 
@@ -954,7 +955,7 @@ if ($fromPanel === 'tecnico') {
                                 <a class="btn btn-primary btn-sm" href="../model/empresa.php?view=add_contratos&tipo_contrato=PLAN%20IGUALDAD<?= ($idEmpresaContexto > 0) ? '&id_empresa=' . (int)$idEmpresaContexto : '' ?>">Añadir Plan igualdad</a>
                             <?php endif; ?>
                             <?php if (($empresaContexto ?? null) !== null): ?>
-                                <a class="btn btn-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$empresaContexto['id_empresa'] ?>">Volver a la empresa</a>
+                                <a class="btn btn-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)($empresaContexto['id_empresa'] ?? 0) ?>">Volver a la empresa</a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1008,7 +1009,7 @@ if ($fromPanel === 'tecnico') {
                                 </thead>
                                 <tbody>
                                     <?php $i = 1 + (((int)($currentPagePlanes ?? 1) - 1) * 10); ?>
-                                    <?php foreach ($planes as $p): ?>
+                                    <?php foreach (($planes ?? []) as $p): ?>
                                         <tr>
                                             <td><?= $i++ ?></td>
                                             <td><?= h($p['razon_social']) ?></td>
@@ -1121,7 +1122,7 @@ if ($fromPanel === 'tecnico') {
                             <div class="border rounded p-3 bg-light">
                                 <div class="small text-muted mb-2">Vista de solo lectura con las áreas y medidas ya seleccionadas.</div>
 
-                                <?php foreach ($verMedidasAreas as $areaId => $area): ?>
+                                <?php foreach (($verMedidasAreas ?? []) as $areaId => $area): ?>
                                     <?php
                                         $medidasArea = $area['medidas'] ?? [];
                                     ?>
@@ -1141,7 +1142,7 @@ if ($fromPanel === 'tecnico') {
                                             <?php if (empty($medidasArea)): ?>
                                                 <div class="small text-muted">Sin medidas para esta área.</div>
                                             <?php else: ?>
-                                                <?php foreach ($medidasArea as $m): ?>
+                                                <?php foreach (($medidasArea ?? []) as $m): ?>
                                                     <div class="form-check mb-1">
                                                         <input
                                                             class="form-check-input"
@@ -1222,7 +1223,9 @@ if ($fromPanel === 'tecnico') {
                                 <label class="form-label fw-semibold">Área del Plan y sus medidas</label>
                                 <div class="small text-muted mb-2">Marca las áreas y sus medidas. Se guardarán todas en esta empresa.</div>
 
-                                <?php foreach ($editAreasPlan as $area): ?>
+                                <?php $editAreasPlan = $editAreasPlan ?? []; ?>
+                                <?php $editAreasSeleccionadas = $editAreasSeleccionadas ?? []; ?>
+                                <?php foreach (($editAreasPlan ?? []) as $area): ?>
                                     <?php
                                     $areaId     = (int)$area['id_plan'];
                                     $checkedArea = in_array($areaId, $editAreasSeleccionadas, true);
@@ -1247,7 +1250,7 @@ if ($fromPanel === 'tecnico') {
                                             <?php if (empty($medidasArea)): ?>
                                                 <div class="small text-muted">Sin medidas para esta área.</div>
                                             <?php else: ?>
-                                                <?php foreach ($medidasArea as $m): ?>
+                                                <?php foreach (($medidasArea ?? []) as $m): ?>
                                                     <?php $idMedida = (int)$m['id_medida']; ?>
                                                     <div class="form-check mb-1">
                                                         <input
@@ -1291,12 +1294,13 @@ if ($fromPanel === 'tecnico') {
 
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="mb-0"><?= (($tipoContratoFiltro ?? '') === 'MANTENIMIENTO') ? 'Mantenimientos de empresas' : 'Servicios aceptados' ?></h6>
-                        <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2">
                             <?php if (($empresaContexto ?? null) !== null): ?>
-                                <a class="btn btn-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$empresaContexto['id_empresa'] ?><?= $fromParam ?>">Volver a la empresa</a>
+                                <a class="btn btn-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)($empresaContexto['id_empresa'] ?? 0) ?><?= $fromParam ?>">Volver a la empresa</a>
                             <?php endif; ?>
                             <?php if (!$isTecnico): ?>
-                                <a class="btn btn-primary btn-sm" href="../model/empresa.php?view=add_contratos<?= ($idEmpresaContexto > 0) ? '&id_empresa=' . (int)$idEmpresaContexto : '' ?><?= (($tipoContratoFiltro ?? '') !== '') ? '&tipo_contrato=' . urlencode((string)$tipoContratoFiltro) : '' ?><?= $fromParam ?>"><?= (($tipoContratoFiltro ?? '') === 'MANTENIMIENTO') ? 'Añadir Mantenimiento' : ((($tipoContratoFiltro ?? '') === 'PLAN IGUALDAD') ? 'Añadir Plan igualdad' : 'Añadir Servicios') ?></a>
+                                <?php $__tipoContrato = isset($tipoContratoFiltro) ? $tipoContratoFiltro : ''; ?>
+                                <a class="btn btn-primary btn-sm" href="../model/empresa.php?view=add_contratos<?= ($idEmpresaContexto > 0) ? '&id_empresa=' . (int)$idEmpresaContexto : '' ?><?= ($__tipoContrato !== '') ? '&tipo_contrato=' . urlencode((string)$__tipoContrato) : '' ?><?= $fromParam ?>"><?= ($__tipoContrato === 'MANTENIMIENTO') ? 'Añadir Mantenimiento' : (($__tipoContrato === 'PLAN IGUALDAD') ? 'Añadir Plan igualdad' : 'Añadir Servicios') ?></a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1321,7 +1325,7 @@ if ($fromPanel === 'tecnico') {
                                     <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaContexto ?>">
                                 <?php endif; ?>
                                 <?php if (($tipoContratoFiltro ?? '') !== ''): ?>
-                                    <input type="hidden" name="tipo_contrato" value="<?= h((string)$tipoContratoFiltro) ?>">
+                                    <input type="hidden" name="tipo_contrato" value="<?= h((string)($tipoContratoFiltro ?? '')) ?>">
                                 <?php endif; ?>
                                 <?php if (($fromPanel ?? '') !== ''): ?>
                                     <input type="hidden" name="from" value="<?= h((string)$fromPanel) ?>">
@@ -1330,7 +1334,7 @@ if ($fromPanel === 'tecnico') {
                                 <input class="form-control form-control-sm" name="q" value="<?= h($searchContratoQ ?? '') ?>" style="width: 220px;">
                                 <button class="btn btn-primary btn-sm" type="submit">Buscar</button>
                                 <?php if (!empty($searchContratoQ)): ?>
-                                    <a class="btn btn-danger btn-sm" href="../model/empresa.php?view=ver_contratos<?= ($idEmpresaContexto > 0) ? '&id_empresa=' . (int)$idEmpresaContexto : '' ?><?= (($tipoContratoFiltro ?? '') !== '') ? '&tipo_contrato=' . urlencode((string)$tipoContratoFiltro) : '' ?><?= $fromParam ?>">Limpiar</a>
+                                    <a class="btn btn-danger btn-sm" href="../model/empresa.php?view=ver_contratos<?= ($idEmpresaContexto > 0) ? '&id_empresa=' . (int)$idEmpresaContexto : '' ?><?= (($tipoContratoFiltro ?? '') !== '') ? '&tipo_contrato=' . urlencode((string)($tipoContratoFiltro ?? '')) : '' ?><?= $fromParam ?? '' ?>">Limpiar</a>
                                 <?php endif; ?>
                             </form>
                         </div>
@@ -1355,7 +1359,14 @@ if ($fromPanel === 'tecnico') {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php $i = 1 + (((int)($currentPageContratos ?? 1) - 1) * 10); ?>
+                                    <?php
+                                        // Ensure variables are defined to avoid undefined variable notices
+                                        $tipoContratoFiltro = $tipoContratoFiltro ?? '';
+                                        $idEmpresaContexto = $idEmpresaContexto ?? 0;
+                                        $fromParam = $fromParam ?? '';
+                                        $fromPanel = $fromPanel ?? '';
+                                        $i = 1 + (((int)($currentPageContratos ?? 1) - 1) * 10);
+                                    ?>
                                     <?php foreach (($contratos ?? []) as $c): ?>
                                         <tr>
                                             <td><?= $i++ ?></td>
@@ -1382,7 +1393,7 @@ if ($fromPanel === 'tecnico') {
                                                                 <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaContexto ?>">
                                                             <?php endif; ?>
                                                             <?php if (($tipoContratoFiltro ?? '') !== ''): ?>
-                                                                <input type="hidden" name="tipo_contrato" value="<?= h((string)$tipoContratoFiltro) ?>">
+                                                                <input type="hidden" name="tipo_contrato" value="<?= h((string)($tipoContratoFiltro ?? '')) ?>">
                                                             <?php endif; ?>
                                                             <?php if (($fromPanel ?? '') !== ''): ?>
                                                                 <input type="hidden" name="from" value="<?= h((string)$fromPanel) ?>">
@@ -1476,7 +1487,7 @@ if ($fromPanel === 'tecnico') {
                             <input type="hidden" name="id_contrato_empresa" value="<?= (int)($selectedContrato['id_contrato_empresa'] ?? 0) ?>">
                             <input type="hidden" name="id_empresa" value="<?= (int)($selectedContrato['id_empresa'] ?? 0) ?>">
                             <?php if (($tipoContratoFiltro ?? '') !== ''): ?>
-                                <input type="hidden" name="tipo_contrato_context" value="<?= h((string)$tipoContratoFiltro) ?>">
+                                <input type="hidden" name="tipo_contrato_context" value="<?= h((string)($tipoContratoFiltro ?? '')) ?>">
                             <?php endif; ?>
                             <?php if (($fromPanel ?? '') !== ''): ?>
                                 <input type="hidden" name="from" value="<?= h((string)$fromPanel) ?>">
@@ -1696,12 +1707,12 @@ if ($fromPanel === 'tecnico') {
 
                         <div>
                             <label class="form-label">Inicio contratación</label>
-                            <input class="form-control" type="date" name="inicio_contratacion" required value="<?= h($selectedContrato['inicio_contratacion'] ?? '') ?>">
+                            <input class="form-control" type="date" name="inicio_contratacion" required value="<?= h($addContratoOld['inicio_contratacion'] ?? '') ?>">
                         </div>
 
                         <div>
                             <label class="form-label">Fin contratación</label>
-                            <input class="form-control" type="date" name="fin_contratacion" required value="<?= h($selectedContrato['fin_contratacion'] ?? '') ?>">
+                            <input class="form-control" type="date" name="fin_contratacion" required value="<?= h($addContratoOld['fin_contratacion'] ?? '') ?>">
                         </div>
 
                         <?php $tipoContratoActualAdd = strtoupper(trim((string)((($tipoContratoForzadoAdd ?? '') !== '') ? $tipoContratoForzadoAdd : ($addContratoOld['tipo_contrato'] ?? 'PLAN IGUALDAD')))); ?>

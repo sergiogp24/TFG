@@ -120,7 +120,7 @@
                             <!-- NOTIFICACIONES -->
                             <?php if (!empty($avisosTecnico)): ?>
                                 <div class="alerts-section">
-                                    <?php foreach ($avisosTecnico as $aviso): ?>
+                                    <?php foreach (($avisosTecnico ?? []) as $aviso): ?>
                                         <div class="alert alert-info alert-with-icon">
                                             <span class="icon">ℹ️</span>
                                             <div>
@@ -214,7 +214,7 @@
                                                 <label class="form-label">Empresa</label>
                                                 <select class="form-select" name="id_empresa" required>
                                                     <option value="">-- Seleccionar empresa --</option>
-                                                    <?php foreach ($tecnicoEmpresasContacto as $empresaContacto): ?>
+                                                    <?php foreach (($tecnicoEmpresasContacto ?? []) as $empresaContacto): ?>
                                                         <?php $emailEmpresaContacto = trim((string)($empresaContacto['email'] ?? '')); ?>
                                                         <option value="<?= (int)($empresaContacto['id_empresa'] ?? 0) ?>">
                                                             <?= h((string)($empresaContacto['razon_social'] ?? '')) ?><?= $emailEmpresaContacto !== '' ? ' · ' . h($emailEmpresaContacto) : ' · Sin correo asignado' ?>
@@ -337,7 +337,7 @@
                                             <label class="form-label">🏢 Empresa</label>
                                             <select class="form-select" id="tecnicoSelectEmpresa" name="id_empresa" required <?= $sinEmpresasAsignadas ? 'disabled' : '' ?>>
                                                 <option value="0">Selecciona una empresa</option>
-                                                <?php foreach ($tecnicoEmpresas as $empresa): ?>
+                                                <?php foreach (($tecnicoEmpresas ?? []) as $empresa): ?>
                                                     <option value="<?= (int)$empresa['id_empresa'] ?>">
                                                         <?= h($empresa['razon_social']) ?>
                                                     </option>
@@ -378,7 +378,7 @@
 
                                 <?php
                                 $tecnicoCalendarEvents = [];
-                                foreach ($tecnicoTodasReuniones as $reunion) {
+                                foreach (($tecnicoTodasReuniones ?? []) as $reunion) {
                                     $idReunion = (int)($reunion['id_reunion'] ?? 0);
                                     $objetivoReunion = trim((string)($reunion['objetivo'] ?? ''));
                                     $fechaReunion = (string)($reunion['fecha_reunion'] ?? '');
@@ -417,7 +417,7 @@
                                         </div>
                                     <?php else: ?>
                                         <div class="citas-list">
-                                            <?php foreach ($tecnicoReuniones as $reunionLista): ?>
+                                            <?php foreach (($tecnicoReuniones ?? []) as $reunionLista): ?>
                                                 <?php
                                                 $idReunionLista = (int)($reunionLista['id_reunion'] ?? 0);
                                                 $objetivoLista = trim((string)($reunionLista['objetivo'] ?? ''));
@@ -480,7 +480,7 @@
                                         </div>
                                     <?php else: ?>
                                         <div class="citas-list">
-                                            <?php foreach ($tecnicoTodasReuniones as $reunionEmpresa): ?>
+                                            <?php foreach (($tecnicoTodasReuniones ?? []) as $reunionEmpresa): ?>
                                                 <?php
                                                 $objetivoEmpresa = trim((string)($reunionEmpresa['objetivo'] ?? ''));
                                                 $fechaEmpresa = (string)($reunionEmpresa['fecha_reunion'] ?? '');
@@ -580,7 +580,7 @@
                     return;
                 }
 
-                const events = <?= json_encode($tecnicoCalendarEvents, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+                const events = <?= json_encode($tecnicoCalendarEvents ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
                 const detalleFecha = document.getElementById('tecnicoDetalleFecha');
                 const detalleHora = document.getElementById('tecnicoDetalleHora');
                 const detalleObjetivo = document.getElementById('tecnicoDetalleObjetivo');
@@ -627,7 +627,7 @@
                     return;
                 }
 
-                const clientes = <?= json_encode($tecnicoClientesEmpresa, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+                const clientes = <?= json_encode($tecnicoClientesEmpresa ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
                 function renderClientes(idEmpresa) {
                     selectCliente.innerHTML = '';

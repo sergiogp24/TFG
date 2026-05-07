@@ -163,7 +163,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
                     </tr>
                   </thead>
                   <tbody>
-                    <?php foreach ($archivosListado as $archivo): ?>
+                    <?php foreach (($archivosListado ?? []) as $archivo): ?>
                       <tr>
                         <td class="text-start"><?= h((string)($archivo['categoria'] ?? '')) ?></td>
                         <td class="text-start"><?= h((string)($archivo['empresa'] ?? '')) ?></td>

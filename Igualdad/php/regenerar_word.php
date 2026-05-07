@@ -106,8 +106,7 @@ try {
     $stmtWordAnterior = $db->prepare(
         'SELECT id_archivo, ruta_relativa
          FROM archivos
-         WHERE id_empresa = ?
-           AND UPPER(TRIM(tipo)) = 'GENERADO WORD'
+            WHERE id_empresa = ? AND UPPER(TRIM(tipo)) = \'GENERADO WORD\'
          ORDER BY subido_en DESC, id_archivo DESC
          LIMIT 1'
     );
