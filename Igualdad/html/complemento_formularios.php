@@ -18,10 +18,7 @@ $panelCss = ($rol === 'TECNICO')
     : (($rol === 'CLIENTE') ? '../css/empresa.css' : '../css/admin.css');
 $empresasDisponibles = [];
 
-function h($s): string
-{
-    return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-}
+require_once __DIR__ . '/../php/helpers.php';
 
 function complemento_has_column(string $table, string $column): bool
 {
@@ -205,9 +202,42 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
     return $ok;
 }
 
+function complemento_contrato_id_para_medidas(int $idEmpresa): int
+{
+    if ($idEmpresa <= 0) {
+        return 0;
+    }
+
+    $sql = '
+        SELECT id_contrato_empresa
+        FROM contrato_empresa
+        WHERE id_empresa = ?
+        ORDER BY
+            CASE
+                WHEN UPPER(TRIM(tipo_contrato)) LIKE "PLAN IGUALDAD%" THEN 0
+                WHEN UPPER(TRIM(tipo_contrato)) LIKE "MANTENIMIENTO%" THEN 1
+                ELSE 2
+            END,
+            id_contrato_empresa DESC
+        LIMIT 1';
+
+    $stmt = db()->prepare($sql);
+    if (!$stmt) {
+        return 0;
+    }
+
+    $stmt->bind_param('i', $idEmpresa);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return (int)($row['id_contrato_empresa'] ?? 0);
+}
+
 $msg = trim((string)($_GET['msg'] ?? ''));
 $tab = trim((string)($_GET['tab'] ?? 'bajas'));
 $embed = ((string)($_GET['embed'] ?? '') === '1');
+$soloMedidas = ((string)($_GET['solo_medidas'] ?? '') === '1');
 $idEmpresaSeleccionada = (int)($_GET['id_empresa'] ?? 0);
 
 $cuestionarioTabs = [
@@ -342,8 +372,13 @@ if (!in_array($tab, $tabsPermitidas, true)) {
     $tab = 'bajas';
 }
 
+if ($soloMedidas) {
+    $tab = 'bajas';
+}
+
 $tabHrefExtra = $embed ? '&embed=1' : '';
-$urlVolverRegistro = $esStaff ? 'index_staff.php' : 'index_cliente.php';
+$tabHrefExtra .= $soloMedidas ? '&solo_medidas=1' : '';
+$urlVolverRegistro = $esStaff ? 'subir_registro.html.php' : 'index_cliente.php';
 
 if ($esAdmin) {
     $stmtEmpresas = db()->prepare(
@@ -423,9 +458,14 @@ if ($empresaFijada) {
 }
 
 $empresaTieneRegistro = ($idEmpresaSeleccionada > 0) ? complemento_empresa_tiene_registro_retributivo($idEmpresaSeleccionada) : false;
+$idContratoMedidas = ($soloMedidas && $idEmpresaSeleccionada > 0) ? complemento_contrato_id_para_medidas($idEmpresaSeleccionada) : 0;
+$fromMedidas = ($rol === 'TECNICO') ? 'tecnico' : (($rol === 'ADMINISTRADOR') ? 'admin' : 'empresa');
+$urlEdicionMedidas = ($idContratoMedidas > 0)
+    ? app_path('/model/empresa.php?view=edit_contratos&id_contrato=' . $idContratoMedidas . '&from=' . urlencode($fromMedidas) . '&solo_medidas_embed=1')
+    : '';
 
 
-$complementosBloqueados = (!$empresaFijada || !$empresaTieneRegistro);
+$complementosBloqueados = (!$empresaFijada || (!$soloMedidas && !$empresaTieneRegistro));
 
 $bajasRows = [];
 $formacionRows = [];
@@ -541,7 +581,7 @@ if ($idEmpresaSeleccionada > 0) {
                                     </a>
                                 <?php endif; ?>
 
-                                <a class="nav-button" href="index_documentos_tipo.php">
+                                <a class="nav-button" href="subir_documento_tipo.html.php">
                                     <span class="nav-icon">📁</span>
                                     <span>Subir Documentos</span>
                                 </a>
@@ -557,7 +597,6 @@ if ($idEmpresaSeleccionada > 0) {
 
             <main class="<?= $embed ? 'col-12' : 'col-12 col-lg-9 col-xl-10' ?>">
                 <div class="card p-4 shadow-sm border-0">
-                    <h5 class="mb-3">Complemento Formularios</h5>
 
                     <?php if ($msg !== ''): ?>
                         <div class="alert alert-info py-2"><?= h($msg) ?></div>
@@ -587,34 +626,55 @@ if ($idEmpresaSeleccionada > 0) {
 
                     <?php if ($complementosBloqueados): ?>
                         <div class="alert alert-warning mb-4">
-                            Debes subir primero el Registro Retributivo en esta empresa para desbloquear los complementos de formularios.
+                            <?= $soloMedidas
+                                ? 'Selecciona una empresa para continuar con las medidas.'
+                                : 'Debes subir primero el Registro Retributivo en esta empresa para desbloquear los complementos de formularios.' ?>
                         </div>
                     <?php endif; ?>
 
-                    <div class="mb-2">
-                        <h6 class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Datos Cuantitativos</h6>
-                        <div class="d-flex flex-wrap gap-2">
-                            <a class="btn <?= $tab === 'bajas' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=bajas' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Bajas</a>
-                            <a class="btn <?= $tab === 'formacion' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=formacion' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Formacion</a>
-                            <a class="btn <?= $tab === 'excedencias' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=excedencias' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Excedencias</a>
-                            <a class="btn <?= $tab === 'permisos' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=permisos' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Permisos retributivos</a>
+                    <?php if (!$soloMedidas): ?>
+                        <div class="mb-2">
+                            <h6 class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Datos Cuantitativos</h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn <?= $tab === 'bajas' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=bajas' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Bajas</a>
+                                <a class="btn <?= $tab === 'formacion' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=formacion' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Formacion</a>
+                                <a class="btn <?= $tab === 'excedencias' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=excedencias' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Excedencias</a>
+                                <a class="btn <?= $tab === 'permisos' ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=permisos' . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>">Permisos retributivos</a>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="mb-4 mt-3">
-                        <h6 class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Cuestionarios Cualitativos</h6>
-                        <div class="d-flex flex-wrap gap-2">
-                            <?php foreach ($cuestionarioTabs as $tabCuestionario => $configCuestionario): ?>
-                                <a class="btn <?= $tab === $tabCuestionario ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=' . urlencode($tabCuestionario) . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>"><?= h((string)($configCuestionario['label'] ?? $tabCuestionario)) ?></a>
-                            <?php endforeach; ?>
+                        <div class="mb-4 mt-3">
+                            <h6 class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Cuestionarios Cualitativos</h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                <?php foreach ($cuestionarioTabs as $tabCuestionario => $configCuestionario): ?>
+                                    <a class="btn <?= $tab === $tabCuestionario ? 'btn-primary' : 'btn-outline-primary' ?><?= $complementosBloqueados ? ' disabled opacity-50' : '' ?>" href="<?= $complementosBloqueados ? '#' : 'complemento_formularios.php?tab=' . urlencode($tabCuestionario) . $tabHrefExtra ?>" tabindex="<?= $complementosBloqueados ? '-1' : '0' ?>"><?= h((string)($configCuestionario['label'] ?? $tabCuestionario)) ?></a>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                    </div>
+                    <?php endif; ?>
 
                     <?php if ($complementosBloqueados): ?>
                         <div class="alert alert-secondary mb-0">
-                            Selecciona una empresa que ya haya subido su Registro Retributivo para ver y usar sus complementos.
+                            <?= $soloMedidas
+                                ? 'Selecciona una empresa para ver y usar sus medidas.'
+                                : 'Selecciona una empresa que ya haya subido su Registro Retributivo para ver y usar sus complementos.' ?>
                         </div>
                     <?php else: ?>
+
+                        <?php if ($soloMedidas): ?>
+                            <?php if ($idContratoMedidas <= 0): ?>
+                                <div class="alert alert-warning mb-0">
+                                    No se ha encontrado un contrato para esta empresa. Crea o asigna el contrato y vuelve a intentarlo.
+                                </div>
+                            <?php else: ?>
+                                <iframe
+                                    id="medidasEditorFrame"
+                                    title="Editor de medidas"
+                                    src="<?= h($urlEdicionMedidas) ?>"
+                                    style="width: 100%; min-height: 74vh; border: 1px solid #dee2e6; border-radius: 0.5rem; background: #fff;"
+                                    loading="lazy"></iframe>
+                            <?php endif; ?>
+                        <?php else: ?>
 
                         <?php if ($tab === 'bajas'): ?>
                             <form action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
@@ -717,46 +777,18 @@ if ($idEmpresaSeleccionada > 0) {
                                                     <td><?= (int)($row['num_hombres'] ?? 0) ?></td>
                                                     <td>
                                                         <?php if ($puedeEditarTablas): ?>
-                                                            <details>
-                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                    <input type="hidden" name="accion" value="editar_baja">
-                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                    <input type="hidden" name="id_bajas" value="<?= (int)($row['id_bajas'] ?? 0) ?>">
-
-                                                                    <select name="tipo_baja" class="form-control form-control-sm" required>
-                                                                        <option value="TEMPORALES" <?= $esTemporal ? 'selected' : '' ?>>Temporales</option>
-                                                                        <option value="DEFINITIVAS" <?= !$esTemporal ? 'selected' : '' ?>>Definitivas</option>
-                                                                    </select>
-                                                                    <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>" placeholder="Motivo">
-                                                                    <select name="tipo_temporal" class="form-control form-control-sm">
-                                                                        <option value="">-- Tipo temporal --</option>
-                                                                        <option value="Enfermedad Común" <?= $tipoTemporal === 'Enfermedad Común' ? 'selected' : '' ?>>Enfermedad Común</option>
-                                                                        <option value="Accidente Laboral" <?= $tipoTemporal === 'Accidente Laboral' ? 'selected' : '' ?>>Accidente Laboral</option>
-                                                                        <option value="Riesgo embarazo" <?= $tipoTemporal === 'Riesgo embarazo' ? 'selected' : '' ?>>Riesgo embarazo</option>
-                                                                        <option value="COVID" <?= $tipoTemporal === 'COVID' ? 'selected' : '' ?>>COVID</option>
-                                                                    </select>
-                                                                    <select name="tipo_definitiva" class="form-control form-control-sm">
-                                                                        <option value="">-- Tipo definitiva --</option>
-                                                                        <option value="Despido" <?= $tipoDefinitiva === 'Despido' ? 'selected' : '' ?>>Despido</option>
-                                                                        <option value="Fallecimiento" <?= $tipoDefinitiva === 'Fallecimiento' ? 'selected' : '' ?>>Fallecimiento</option>
-                                                                        <option value="Jubilación" <?= $tipoDefinitiva === 'Jubilación' ? 'selected' : '' ?>>Jubilación</option>
-                                                                        <option value="Finalización contrato" <?= $tipoDefinitiva === 'Finalización contrato' ? 'selected' : '' ?>>Finalización contrato</option>
-                                                                        <option value="No superación de periodo de prueba" <?= $tipoDefinitiva === 'No superación de periodo de prueba' ? 'selected' : '' ?>>No superación de periodo de prueba</option>
-                                                                        <option value="Baja voluntaria" <?= $tipoDefinitiva === 'Baja voluntaria' ? 'selected' : '' ?>>Baja voluntaria</option>
-                                                                    </select>
-                                                                    <div class="row g-2">
-                                                                        <div class="col-6">
-                                                                            <input type="number" min="0" name="num_mujeres" class="form-control form-control-sm" value="<?= (int)($row['num_mujeres'] ?? 0) ?>" required>
-                                                                        </div>
-                                                                        <div class="col-6">
-                                                                            <input type="number" min="0" name="num_hombres" class="form-control form-control-sm" value="<?= (int)($row['num_hombres'] ?? 0) ?>" required>
-                                                                        </div>
-                                                                    </div>
-                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                                </form>
-                                                            </details>
+                                                            <button 
+                                                                type="button" 
+                                                                class="btn btn-outline-primary btn-sm btn-edit-baja"
+                                                                data-id="<?= (int)($row['id_bajas'] ?? 0) ?>"
+                                                                data-tipo-baja="<?= h($tipoBaja) ?>"
+                                                                data-motivo="<?= h((string)($row['motivo'] ?? '')) ?>"
+                                                                data-tipo-temporal="<?= h($tipoTemporal) ?>"
+                                                                data-tipo-definitiva="<?= h($tipoDefinitivaDb) ?>"
+                                                                data-num-mujeres="<?= (int)($row['num_mujeres'] ?? 0) ?>"
+                                                                data-num-hombres="<?= (int)($row['num_hombres'] ?? 0) ?>">
+                                                                Editar
+                                                            </button>
                                                         <?php endif; ?>
 
                                                         <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar esta baja?');">
@@ -832,21 +864,15 @@ if ($idEmpresaSeleccionada > 0) {
                                                     <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
                                                     <td>
                                                         <?php if ($puedeEditarTablas): ?>
-                                                            <details>
-                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                    <input type="hidden" name="accion" value="editar_formacion">
-                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                    <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                                    <input type="text" name="tipo" class="form-control form-control-sm" value="<?= h((string)($row['tipo'] ?? '')) ?>" required>
-                                                                    <div class="row g-2">
-                                                                        <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
-                                                                        <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
-                                                                    </div>
-                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                                </form>
-                                                            </details>
+                                                            <button 
+                                                                type="button" 
+                                                                class="btn btn-outline-primary btn-sm btn-edit-formacion"
+                                                                data-id="<?= (int)($row['id_registro'] ?? 0) ?>"
+                                                                data-tipo="<?= h((string)($row['tipo'] ?? '')) ?>"
+                                                                data-n-mujeres="<?= (int)($row['n_mujeres'] ?? 0) ?>"
+                                                                data-n-hombres="<?= (int)($row['n_hombres'] ?? 0) ?>">
+                                                                Editar
+                                                            </button>
                                                         <?php endif; ?>
                                                         <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este registro de formación?');">
                                                             <input type="hidden" name="accion" value="eliminar_formacion">
@@ -933,26 +959,16 @@ if ($idEmpresaSeleccionada > 0) {
                                                     <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
                                                     <td>
                                                         <?php if ($puedeEditarTablas): ?>
-                                                            <details>
-                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                    <input type="hidden" name="accion" value="editar_excedencia">
-                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                    <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                                    <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>">
-                                                                    <select name="tipo" class="form-control form-control-sm" required>
-                                                                        <option value="Excedencias Voluntarias" <?= (string)($row['tipo'] ?? '') === 'Excedencias Voluntarias' ? 'selected' : '' ?>>Excedencias Voluntarias</option>
-                                                                        <option value="Excedencias Cuidado Menores" <?= (string)($row['tipo'] ?? '') === 'Excedencias Cuidado Menores' ? 'selected' : '' ?>>Excedencias Cuidado Menores</option>
-                                                                        <option value="Excedencias Cuidado de Personas Mayores" <?= (string)($row['tipo'] ?? '') === 'Excedencias Cuidado de Personas Mayores' ? 'selected' : '' ?>>Excedencias Cuidado de Personas Mayores</option>
-                                                                    </select>
-                                                                    <div class="row g-2">
-                                                                        <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
-                                                                        <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
-                                                                    </div>
-                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                                </form>
-                                                            </details>
+                                                            <button 
+                                                                type="button" 
+                                                                class="btn btn-outline-primary btn-sm btn-edit-excedencia"
+                                                                data-id="<?= (int)($row['id_registro'] ?? 0) ?>"
+                                                                data-motivo="<?= h((string)($row['motivo'] ?? '')) ?>"
+                                                                data-tipo="<?= h((string)($row['tipo'] ?? '')) ?>"
+                                                                data-n-mujeres="<?= (int)($row['n_mujeres'] ?? 0) ?>"
+                                                                data-n-hombres="<?= (int)($row['n_hombres'] ?? 0) ?>">
+                                                                Editar
+                                                            </button>
                                                         <?php endif; ?>
                                                         <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este registro de excedencia?');">
                                                             <input type="hidden" name="accion" value="eliminar_excedencia">
@@ -1038,25 +1054,16 @@ if ($idEmpresaSeleccionada > 0) {
                                                     <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
                                                     <td>
                                                         <?php if ($puedeEditarTablas): ?>
-                                                            <details>
-                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                    <input type="hidden" name="accion" value="editar_permiso">
-                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                    <input type="hidden" name="id_registro" value="<?= (int)($row['id_registro'] ?? 0) ?>">
-                                                                    <input type="text" name="motivo" class="form-control form-control-sm" value="<?= h((string)($row['motivo'] ?? '')) ?>">
-                                                                    <select name="tipo" class="form-control form-control-sm" required>
-                                                                        <option value="Lactancia" <?= (string)($row['tipo'] ?? '') === 'Lactancia' ? 'selected' : '' ?>>Lactancia</option>
-                                                                        <option value="Nacimiento" <?= (string)($row['tipo'] ?? '') === 'Nacimiento' ? 'selected' : '' ?>>Nacimiento</option>
-                                                                    </select>
-                                                                    <div class="row g-2">
-                                                                        <div class="col-6"><input type="number" min="0" name="n_mujeres" class="form-control form-control-sm" value="<?= (int)($row['n_mujeres'] ?? 0) ?>" required></div>
-                                                                        <div class="col-6"><input type="number" min="0" name="n_hombres" class="form-control form-control-sm" value="<?= (int)($row['n_hombres'] ?? 0) ?>" required></div>
-                                                                    </div>
-                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                                </form>
-                                                            </details>
+                                                            <button 
+                                                                type="button" 
+                                                                class="btn btn-outline-primary btn-sm btn-edit-permiso"
+                                                                data-id="<?= (int)($row['id_registro'] ?? 0) ?>"
+                                                                data-motivo="<?= h((string)($row['motivo'] ?? '')) ?>"
+                                                                data-tipo="<?= h((string)($row['tipo'] ?? '')) ?>"
+                                                                data-n-mujeres="<?= (int)($row['n_mujeres'] ?? 0) ?>"
+                                                                data-n-hombres="<?= (int)($row['n_hombres'] ?? 0) ?>">
+                                                                Editar
+                                                            </button>
                                                         <?php endif; ?>
                                                         <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este permiso retributivo?');">
                                                             <input type="hidden" name="accion" value="eliminar_permiso">
@@ -1129,26 +1136,14 @@ if ($idEmpresaSeleccionada > 0) {
                                                     <?php endforeach; ?>
                                                     <td>
                                                         <?php if ($puedeEditarTablas): ?>
-                                                            <details>
-                                                                <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                                <form class="mt-2 vstack gap-2" action="../controller/complemento_formulario_controler.php" method="POST">
-                                                                    <input type="hidden" name="accion" value="<?= h('editar_' . $tab) ?>">
-                                                                    <?= csrf_input() ?>
-                                                                    <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
-                                                                    <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
-                                                                    <input type="hidden" name="id_registro" value="<?= (int)($fila['id_registro'] ?? 0) ?>">
-                                                                    <?php foreach ($camposCuestionarioActivo as $campo): ?>
-                                                                        <?php $nombreCampo = (string)($campo['name'] ?? ''); ?>
-                                                                        <input
-                                                                            type="text"
-                                                                            name="<?= h($nombreCampo) ?>"
-                                                                            class="form-control form-control-sm"
-                                                                            placeholder="<?= h((string)($campo['label'] ?? $nombreCampo)) ?>"
-                                                                            value="<?= h((string)($fila[$nombreCampo] ?? '')) ?>">
-                                                                    <?php endforeach; ?>
-                                                                    <button type="submit" class="btn btn-sm btn-success">Guardar cambios</button>
-                                                                </form>
-                                                            </details>
+                                                            <button 
+                                                                type="button" 
+                                                                class="btn btn-outline-primary btn-sm btn-edit-cuestionario"
+                                                                data-id="<?= (int)($fila['id_registro'] ?? 0) ?>"
+                                                                data-tab="<?= h($tab) ?>"
+                                                                data-values='<?= h(json_encode($fila)) ?>'>
+                                                                Editar
+                                                            </button>
                                                         <?php endif; ?>
                                                         <form class="mt-2" action="../controller/complemento_formulario_controler.php" method="POST" onsubmit="return confirm('¿Eliminar este cuestionario?');">
                                                             <input type="hidden" name="accion" value="<?= h('eliminar_' . $tab) ?>">
@@ -1167,49 +1162,236 @@ if ($idEmpresaSeleccionada > 0) {
                             <?php endif; ?>
                         <?php endif; ?>
 
+                        <?php endif; ?>
+
                     <?php endif; ?>
+
                 </div>
             </main>
         </div>
     </div>
 
-    <script>
-        (function() {
-            const tipoBaja = document.getElementById('tipo_baja');
-            const bloqueTemporales = document.getElementById('bloque_temporales');
-            const bloqueDefinitivas = document.getElementById('bloque_definitivas');
-            const tipoTemporal = document.getElementById('tipo_temporal');
-            const tipoDefinitiva = document.getElementById('tipo_definitiva');
+    <!-- MODALES DE EDICION -->
+    <div class="modal fade" id="modalEditarGenerico" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Editar Registro</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="formEditarGenerico" action="../controller/complemento_formulario_controler.php" method="POST" class="vstack gap-3">
+                        <input type="hidden" name="accion" id="edit_accion" value="">
+                        <?= csrf_input() ?>
+                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                        <input type="hidden" name="id_registro" id="edit_id_registro" value="">
+                        <input type="hidden" name="id_bajas" id="edit_id_baja" value="">
 
-            if (!tipoBaja || !bloqueTemporales || !bloqueDefinitivas || !tipoTemporal || !tipoDefinitiva) {
-                return;
-            }
+                        <div id="edit_fields_container">
+                            <!-- Los campos se inyectarán aquí vía JS -->
+                        </div>
 
-            function actualizarBaja() {
-                const valor = (tipoBaja.value || '').toUpperCase();
-                const esTemporal = valor === 'TEMPORALES';
-                const esDefinitiva = valor === 'DEFINITIVAS';
-
-                bloqueTemporales.classList.toggle('d-none', !esTemporal);
-                bloqueDefinitivas.classList.toggle('d-none', !esDefinitiva);
-
-                tipoTemporal.required = esTemporal;
-                tipoDefinitiva.required = esDefinitiva;
-
-                if (!esTemporal) {
-                    tipoTemporal.value = '';
-                }
-                if (!esDefinitiva) {
-                    tipoDefinitiva.value = '';
-                }
-            }
-
-            tipoBaja.addEventListener('change', actualizarBaja);
-            actualizarBaja();
-        })();
-    </script>
+                        <div class="pt-3">
+                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">GUARDAR CAMBIOS</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modalEditar = new bootstrap.Modal(document.getElementById('modalEditarGenerico'));
+            const formEditar = document.getElementById('formEditarGenerico');
+            const container = document.getElementById('edit_fields_container');
+            const inputAccion = document.getElementById('edit_accion');
+            const inputIdRegistro = document.getElementById('edit_id_registro');
+            const inputIdBaja = document.getElementById('edit_id_baja');
 
+            // Bajas
+            document.querySelectorAll('.btn-edit-baja').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    container.innerHTML = `
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold">Tipo de baja</label>
+                                <select name="tipo_baja" class="form-select" required>
+                                    <option value="TEMPORALES" ${this.dataset.tipoBaja === 'TEMPORALES' ? 'selected' : ''}>Temporales</option>
+                                    <option value="DEFINITIVAS" ${this.dataset.tipoBaja === 'DEFINITIVAS' ? 'selected' : ''}>Definitivas</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold">Motivo</label>
+                                <input type="text" name="motivo" class="form-control" value="${this.dataset.motivo}">
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold">Tipo temporal</label>
+                                <select name="tipo_temporal" class="form-select">
+                                    <option value="">-- Selecciona --</option>
+                                    <option value="Enfermedad Común" ${this.dataset.tipoTemporal === 'Enfermedad Común' ? 'selected' : ''}>Enfermedad Común</option>
+                                    <option value="Accidente Laboral" ${this.dataset.tipoTemporal === 'Accidente Laboral' ? 'selected' : ''}>Accidente Laboral</option>
+                                    <option value="Riesgo embarazo" ${this.dataset.tipoTemporal === 'Riesgo embarazo' ? 'selected' : ''}>Riesgo embarazo</option>
+                                    <option value="COVID" ${this.dataset.tipoTemporal === 'COVID' ? 'selected' : ''}>COVID</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold">Tipo definitiva</label>
+                                <select name="tipo_definitiva" class="form-select">
+                                    <option value="">-- Selecciona --</option>
+                                    <option value="Despido" ${this.dataset.tipoDefinitiva === 'Despido' ? 'selected' : ''}>Despido</option>
+                                    <option value="Fallecimiento" ${this.dataset.tipoDefinitiva === 'Fallecimiento' ? 'selected' : ''}>Fallecimiento</option>
+                                    <option value="Jubilación" ${this.dataset.tipoDefinitiva === 'Jubilación' ? 'selected' : ''}>Jubilación</option>
+                                    <option value="Finalización contrato" ${this.dataset.tipoDefinitiva === 'Finalización contrato' ? 'selected' : ''}>Finalización contrato</option>
+                                    <option value="No superación de periodo de prueba" ${this.dataset.tipoDefinitiva === 'No superación de periodo de prueba' ? 'selected' : ''}>No superación de periodo de prueba</option>
+                                    <option value="Baja voluntaria" ${this.dataset.tipoDefinitiva === 'Baja voluntaria' ? 'selected' : ''}>Baja voluntaria</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Mujeres</label>
+                                <input type="number" name="num_mujeres" class="form-control" value="${this.dataset.numMujeres}" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Hombres</label>
+                                <input type="number" name="num_hombres" class="form-control" value="${this.dataset.numHombres}" required>
+                            </div>
+                        </div>
+                    `;
+                    inputAccion.value = 'editar_baja';
+                    inputIdBaja.value = this.dataset.id;
+                    inputIdRegistro.value = '';
+                    modalEditar.show();
+                });
+            });
+
+            // Formacion
+            document.querySelectorAll('.btn-edit-formacion').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    container.innerHTML = `
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tipo de formación</label>
+                            <input type="text" name="tipo" class="form-control" value="${this.dataset.tipo}" required>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Mujeres</label>
+                                <input type="number" name="n_mujeres" class="form-control" value="${this.dataset.nMujeres}" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Hombres</label>
+                                <input type="number" name="n_hombres" class="form-control" value="${this.dataset.nHombres}" required>
+                            </div>
+                        </div>
+                    `;
+                    inputAccion.value = 'editar_formacion';
+                    inputIdRegistro.value = this.dataset.id;
+                    inputIdBaja.value = '';
+                    modalEditar.show();
+                });
+            });
+
+            // Excedencias
+            document.querySelectorAll('.btn-edit-excedencia').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    container.innerHTML = `
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Motivo</label>
+                            <input type="text" name="motivo" class="form-control" value="${this.dataset.motivo}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tipo de excedencia</label>
+                            <select name="tipo" class="form-select" required>
+                                <option value="Excedencias Voluntarias" ${this.dataset.tipo === 'Excedencias Voluntarias' ? 'selected' : ''}>Excedencias Voluntarias</option>
+                                <option value="Excedencias Cuidado Menores" ${this.dataset.tipo === 'Excedencias Cuidado Menores' ? 'selected' : ''}>Excedencias Cuidado Menores</option>
+                                <option value="Excedencias Cuidado de Personas Mayores" ${this.dataset.tipo === 'Excedencias Cuidado de Personas Mayores' ? 'selected' : ''}>Excedencias Cuidado de Personas Mayores</option>
+                            </select>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Mujeres</label>
+                                <input type="number" name="n_mujeres" class="form-control" value="${this.dataset.nMujeres}" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Hombres</label>
+                                <input type="number" name="n_hombres" class="form-control" value="${this.dataset.nHombres}" required>
+                            </div>
+                        </div>
+                    `;
+                    inputAccion.value = 'editar_excedencia';
+                    inputIdRegistro.value = this.dataset.id;
+                    inputIdBaja.value = '';
+                    modalEditar.show();
+                });
+            });
+
+            // Permisos
+            document.querySelectorAll('.btn-edit-permiso').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    container.innerHTML = `
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Motivo</label>
+                            <input type="text" name="motivo" class="form-control" value="${this.dataset.motivo}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tipo de permiso</label>
+                            <select name="tipo" class="form-select" required>
+                                <option value="Lactancia" ${this.dataset.tipo === 'Lactancia' ? 'selected' : ''}>Lactancia</option>
+                                <option value="Nacimiento" ${this.dataset.tipo === 'Nacimiento' ? 'selected' : ''}>Nacimiento</option>
+                            </select>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Mujeres</label>
+                                <input type="number" name="n_mujeres" class="form-control" value="${this.dataset.nMujeres}" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Nº Hombres</label>
+                                <input type="number" name="n_hombres" class="form-control" value="${this.dataset.nHombres}" required>
+                            </div>
+                        </div>
+                    `;
+                    inputAccion.value = 'editar_permiso';
+                    inputIdRegistro.value = this.dataset.id;
+                    inputIdBaja.value = '';
+                    modalEditar.show();
+                });
+            });
+
+            // Cuestionarios
+            const cuestionarioFields = <?= json_encode($cuestionarioTabs) ?>;
+            document.querySelectorAll('.btn-edit-cuestionario').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tab = this.dataset.tab;
+                    const values = JSON.parse(this.dataset.values);
+                    const config = cuestionarioFields[tab];
+                    
+                    let fieldsHtml = '<div class="row g-3">';
+                    config.fields.forEach(f => {
+                        fieldsHtml += `
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-bold">${f.label}</label>
+                                <input type="text" name="${f.name}" class="form-control" value="${values[f.name] || ''}">
+                            </div>
+                        `;
+                    });
+                    fieldsHtml += '</div>';
+
+                    container.innerHTML = fieldsHtml;
+                    inputAccion.value = 'editar_' + tab;
+                    inputIdRegistro.value = this.dataset.id;
+                    inputIdBaja.value = '';
+                    modalEditar.show();
+                });
+            });
+        });
+
+        // Copia de la lógica de visibilidad de bajas para el Modal si fuera necesario (aunque ya está precargado)
+    </script>
+</body>
 </html>

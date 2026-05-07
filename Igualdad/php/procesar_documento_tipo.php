@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 require __DIR__ . '/auth.php';
 require_login();
+require_once __DIR__ . '/helpers.php';
 require __DIR__ . '/../config/config.php';
 
 function redirect_documentos(string $msg): void
 {
-    header('Location: ' . app_path('/html/index_documentos_tipo.php?msg=') . urlencode($msg));
+    $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
+    $baseUrl = '/html/subir_documento_tipo.html.php';
+    header('Location: ' . app_path($baseUrl . '?msg=') . urlencode($msg));
     exit;
 }
 
@@ -33,19 +36,20 @@ if (!in_array($tipo, $tiposPermitidos, true)) {
     redirect_documentos('Tipo de archivo no valido.');
 }
 
-if (!isset($_FILES['archivo'])) {
-    redirect_documentos('No se recibio archivo.');
+if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
+    $errorMsg = 'No se recibio archivo.';
+    if (isset($_FILES['archivo'])) {
+        $error = (int)$_FILES['archivo']['error'];
+        if ($error === UPLOAD_ERR_INI_SIZE || $error === UPLOAD_ERR_FORM_SIZE) {
+            $errorMsg = 'El archivo supera el tamano permitido por el servidor/formulario.';
+        } elseif ($error !== UPLOAD_ERR_OK) {
+            $errorMsg = 'Error en la subida del archivo (Cod: ' . $error . ').';
+        }
+    }
+    redirect_documentos($errorMsg);
 }
 
 $archivo = $_FILES['archivo'];
-$error = (int)($archivo['error'] ?? UPLOAD_ERR_NO_FILE);
-
-if ($error !== UPLOAD_ERR_OK) {
-    if ($error === UPLOAD_ERR_INI_SIZE || $error === UPLOAD_ERR_FORM_SIZE) {
-        redirect_documentos('El archivo supera el tamano permitido por el servidor/formulario.');
-    }
-    redirect_documentos('Error en la subida del archivo.');
-}
 
 $nombreOriginal = trim((string)($archivo['name'] ?? ''));
 $tmpName = (string)($archivo['tmp_name'] ?? '');
@@ -158,6 +162,28 @@ if ($ext !== '') {
 }
 
 try {
+    // LIMPIEZA DE ARCHIVOS ANTIGUOS: Borrar archivos del mismo tipo para esta empresa si ya existen
+    if ($idEmpresaContexto > 0) {
+        $stmtOld = $db->prepare("SELECT id_archivo, ruta_relativa FROM archivos WHERE id_empresa = ? AND tipo = ?");
+        if ($stmtOld) {
+            $stmtOld->bind_param('is', $idEmpresaContexto, $tipo);
+            $stmtOld->execute();
+            $resOld = $stmtOld->get_result();
+            while ($rowOld = $resOld->fetch_assoc()) {
+                $idOld = (int)$rowOld['id_archivo'];
+                $rutaOld = (string)$rowOld['ruta_relativa'];
+                if ($rutaOld !== '') {
+                    $absPathOld = __DIR__ . '/../' . $rutaOld;
+                    if (is_file($absPathOld)) {
+                        @unlink($absPathOld);
+                    }
+                }
+                $db->query("DELETE FROM archivos WHERE id_archivo = $idOld");
+            }
+            $stmtOld->close();
+        }
+    }
+
     $stmt = $db->prepare(
         'INSERT INTO archivos (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'

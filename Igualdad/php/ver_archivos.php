@@ -352,10 +352,6 @@ while ($row = $res->fetch_assoc()) {
     // registros válidos de archivos generados ya guardados en la tabla.
   }
 
-  if (!$archivoDisponible) {
-    continue;
-  }
-
   $archivosListado[] = [
     'source' => 'archivos',
     'id_archivo' => $idArchivo,
@@ -364,7 +360,9 @@ while ($row = $res->fetch_assoc()) {
     'categoria' => $tipoArchivo !== '' ? $tipoArchivo : 'Documento',
     'empresa' => $empresaNombreRow,
     'propietario' => '',
-    'asunto' => (string)($row['asunto'] ?? ''),
+    'asunto' => $archivoDisponible
+      ? (string)($row['asunto'] ?? '')
+      : trim(((string)($row['asunto'] ?? '')) . ' [Archivo no disponible en disco]'),
     'nombre' => (string)($row['nombre_original'] ?? ''),
     'tipo' => strtoupper((string)(pathinfo((string)($row['nombre_original'] ?? ''), PATHINFO_EXTENSION) ?: '')),
     'tamano' => archivo_subido_tamano_humano((int)($row['tamano_bytes'] ?? 0)),
@@ -396,7 +394,6 @@ foreach ($roots as $kind => $dirPath) {
     $stem = pathinfo($basename, PATHINFO_FILENAME);
     $matchedEmpresa = '';
     $categoria = '';
-    $downloadKind = $kind;
     $rutaRelativaDisco = strtolower('uploads/' . $basename);
 
     if (isset($rutasYaIncluidas[$rutaRelativaDisco])) {
@@ -418,7 +415,6 @@ foreach ($roots as $kind => $dirPath) {
         $stem = substr($stem, 0, -strlen('_PLAN_IGUALDAD'));
         $stem = archivo_subido_quitar_sufijo_anio($stem);
         $categoria = 'Generado Word';
-        $downloadKind = 'empresa_word';
       } else {
         // Otros archivos en uploads, ignorar
         continue;
@@ -446,7 +442,7 @@ foreach ($roots as $kind => $dirPath) {
 
     $descargaUrl = '';
     if ($kind === 'uploads') {
-      $descargaUrl = app_path('/php/download_archivo_subido.php?kind=') . urlencode($downloadKind) . '&file=' . urlencode($basename);
+      $descargaUrl = app_path('/php/download_archivo_subido.php?kind=uploads&file=') . urlencode($basename);
     } else {
       $descargaUrl = app_path('/php/download_archivo_subido.php?kind=') . urlencode($kind) . '&file=' . urlencode($basename);
     }
@@ -474,4 +470,4 @@ usort($archivosListado, static function (array $left, array $right): int {
   return ($right['sort_ts'] ?? 0) <=> ($left['sort_ts'] ?? 0);
 });
 
-require __DIR__ . '/../html/index_archivos_subidos.php';
+require __DIR__ . '/../html/lista_archivos.html.php';

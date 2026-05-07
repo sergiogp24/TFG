@@ -167,19 +167,24 @@ if ($accion === 'crear') {
 
   // Validaciones
   if ($username === '' || $email === '' || $rol_id <= 0) {
-    redirect_view('add', 'Obligatorio rellenar usuario, email y rol');
+    $_SESSION['add_user_error'] = 'Obligatorio rellenar usuario, email y rol';
+    redirect_view('add');
   }
   if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-    redirect_view('add', 'Email inválido. Debe tener formato ejemplo@dominio.com');
+    $_SESSION['add_user_error'] = 'Email inválido. Debe tener formato ejemplo@dominio.com';
+    redirect_view('add');
   }
   if ($apellidos !== '' && !preg_match('/^[\p{L}\s\-\'\.]{2,60}$/u', $apellidos)) {
-    redirect_view('add', 'Apellidos inválidos: solo letras y espacios (sin números).');
+    $_SESSION['add_user_error'] = 'Apellidos inválidos: solo letras y espacios (sin números).';
+    redirect_view('add');
   }
   if ($localidad !== '' && !preg_match('/^[\p{L}\s\-\'\.]{2,60}$/u', $localidad)) {
-    redirect_view('add', 'Localidad inválida: solo letras y espacios (sin números).');
+    $_SESSION['add_user_error'] = 'Localidad inválida: solo letras y espacios (sin números).';
+    redirect_view('add');
   }
   if ($telefono !== '' && !preg_match('/^\d{6,15}$/', $telefono)) {
-    redirect_view('add', 'Teléfono inválido: solo números (6 a 15 dígitos).');
+    $_SESSION['add_user_error'] = 'Teléfono inválido: solo números (6 a 15 dígitos).';
+    redirect_view('add');
   }
 
   $db = db();
@@ -194,14 +199,16 @@ if ($accion === 'crear') {
   }
 
   if ($rolNombreNormalizado === '') {
-    redirect_view('add', 'Rol inválido');
+    $_SESSION['add_user_error'] = 'Rol inválido';
+    redirect_view('add');
   }
 
   $esRolCliente = ($rolNombreNormalizado === 'CLIENTE');
   $esRolTecnico = str_starts_with($rolNombreNormalizado, 'TECNICO');
 
   if ($esRolCliente && empty($empresaIds)) {
-    redirect_view('add', 'Para rol Cliente es obligatorio asignar al menos una empresa.');
+    $_SESSION['add_user_error'] = 'Para rol Cliente es obligatorio asignar al menos una empresa.';
+    redirect_view('add');
   }
 
   // Crear usuario con contraseña temporal hasheada.
@@ -216,12 +223,15 @@ if ($accion === 'crear') {
   } catch (mysqli_sql_exception $e) {
     log_internal_error('admin.crear_usuario', $e);
     if ((int)$e->getCode() === 1062) {
-      redirect_view('add', 'No se pudo crear el usuario: el nombre de usuario o email ya existe.');
+      $_SESSION['add_user_error'] = 'No se pudo crear el usuario: el nombre de usuario o email ya existe.';
+      redirect_view('add');
     }
-    redirect_view('add', 'Error al crear usuario. Revisa los datos e intentalo de nuevo.');
+    $_SESSION['add_user_error'] = 'Error al crear usuario. Revisa los datos e intentalo de nuevo.';
+    redirect_view('add');
   } catch (Throwable $e) {
     log_internal_error('admin.crear_usuario', $e);
-    redirect_view('add', 'Error al crear usuario. Intentalo de nuevo.');
+    $_SESSION['add_user_error'] = 'Error al crear usuario. Intentalo de nuevo.';
+    redirect_view('add');
   }
   $newUserId = (int)$stmt->insert_id;
   $stmt->close();
@@ -250,7 +260,8 @@ if ($accion === 'crear') {
     $stmtVerify->close();
   } catch (Throwable $e) {
     log_internal_error('admin.guardar_token_reset', $e);
-    redirect_view('add', 'No se pudo guardar el token de reset. Intentalo de nuevo.');
+    $_SESSION['add_user_error'] = 'No se pudo guardar el token de reset. Intentalo de nuevo.';
+    redirect_view('add');
   }
 
   try {
@@ -298,7 +309,8 @@ if ($accion === 'crear') {
   } catch (Throwable $e) {
     $db->rollback();
     log_internal_error('admin.crear_reunion_usuario', $e);
-    redirect_view('add', 'No se pudo crear la reunion o asignar empresas. Intentalo de nuevo.');
+    $_SESSION['add_user_error'] = 'No se pudo crear la reunion o asignar empresas. Intentalo de nuevo.';
+    redirect_view('add');
   }
 
   $assignedCompanies = [];
@@ -327,7 +339,8 @@ if ($accion === 'crear') {
     }
   } catch (Throwable $e) {
     log_internal_error('admin.enviar_email_reset', $e);
-    redirect_view('add', 'Usuario creado, pero hubo un error al enviar el email. Contacta al administrador.');
+    $_SESSION['add_user_error'] = 'Usuario creado, pero hubo un error al enviar el email. Contacta al administrador.';
+    redirect_view('add');
   }
 
   if ($esRolTecnico && !empty($empresaIds)) {
@@ -555,7 +568,7 @@ if ($accion === 'editar_reunion') {
   try {
     $objetivoDb = ($objetivo === '') ? null : $objetivo;
     $stmt = $db->prepare("UPDATE reuniones SET objetivo = ?, hora_reunion = ?, fecha_reunion = ? WHERE id_reunion = ?");
-    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idEmpresa, $idReunion);
+    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idReunion);
     $stmt->execute();
     $stmt->close();
 

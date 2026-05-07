@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 require __DIR__ . '/../php/auth.php';
@@ -52,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute();
     $rs = $stmt->get_result();
     while ($row = $rs->fetch_assoc()) {
-        $empresasAntes[] = (int)$row['id_empresa'];
+      $empresasAntes[] = (int)$row['id_empresa'];
     }
     $stmt->close();
 
@@ -82,56 +83,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       // 2. Si hay nuevas, obtener datos y enviar mails
       if (!empty($nuevas)) {
-          // 2a. Obtener info de las nuevas empresas
-          require_once __DIR__ . '/../php/mails.php';
-          $db = db();
-          $empresasNuevas = correo_obtener_empresas_asignadas($db, $userId, $nuevas);
+        // 2a. Obtener info de las nuevas empresas
+        require_once __DIR__ . '/../php/mails.php';
+        $db = db();
+        $empresasNuevas = correo_obtener_empresas_asignadas($db, $userId, $nuevas);
 
-          $stmt = $db->prepare("SELECT email, nombre_usuario FROM usuario WHERE id_usuario = ?");
-          $stmt->bind_param("i", $userId);
-          $stmt->execute();
-          $usuarioData = $stmt->get_result()->fetch_assoc();
-          $stmt->close();
+        $stmt = $db->prepare("SELECT email, nombre_usuario FROM usuario WHERE id_usuario = ?");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $usuarioData = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
 
-            if ($usuarioData) {
-              $empresaReferencia = $empresasNuevas[0] ?? null;
-              if (is_array($empresaReferencia)) {
-                // Un solo correo por operacion de edicion/asignacion.
-                correo_enviar_nueva_empresa_asignada(
-                  (string)$usuarioData['email'],
-                  (string)$usuarioData['nombre_usuario'],
-                  (string)($empresaReferencia['razon_social'] ?? ''),
-                  (string)($empresaReferencia['tipo_contrato'] ?? 'SIN CONTRATO'),
-                  '#' // Puedes poner aquí el enlace a la empresa
-                );
-              }
+        if ($usuarioData) {
+          $empresaReferencia = $empresasNuevas[0] ?? null;
+          if (is_array($empresaReferencia)) {
+            // Un solo correo por operacion de edicion/asignacion.
+            correo_enviar_nueva_empresa_asignada(
+              (string)$usuarioData['email'],
+              (string)$usuarioData['nombre_usuario'],
+              (string)($empresaReferencia['razon_social'] ?? ''),
+              (string)($empresaReferencia['tipo_contrato'] ?? 'SIN CONTRATO'),
+              '#' // Puedes poner aquí el enlace a la empresa
+            );
+          }
 
-$stmt = $db->prepare("
+          $stmt = $db->prepare("
     SELECT email, nombre_usuario
     FROM usuario
     WHERE id_usuario = ?
     LIMIT 1
 ");
-$stmt->bind_param("i", $userId);
-$stmt->execute();
-$tecnicoData = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+          $stmt->bind_param("i", $userId);
+          $stmt->execute();
+          $tecnicoData = $stmt->get_result()->fetch_assoc();
+          $stmt->close();
 
-if ($tecnicoData && filter_var($tecnicoData['email'], FILTER_VALIDATE_EMAIL)) {
+          if ($tecnicoData && filter_var($tecnicoData['email'], FILTER_VALIDATE_EMAIL)) {
 
-    correo_enviar_notificacion_tecnico_nueva_empresa(
-        $tecnicoData['email'],              //  técnico real
-        $tecnicoData['nombre_usuario'],     //  nombre del técnico
-        $usuarioData['nombre_usuario'],     //  usuario editado
-        $empresasNuevas
-    );
-}
+            correo_enviar_notificacion_tecnico_nueva_empresa(
+              $tecnicoData['email'],              //  técnico real
+              $tecnicoData['nombre_usuario'],     //  nombre del técnico
+              $usuarioData['nombre_usuario'],     //  usuario editado
+              $empresasNuevas
+            );
           }
+        }
       }
     } catch (Throwable $e) {
       db()->rollback();
-      error_log(sprintf('[lista_empresa.asignar] %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
-      $error = 'No se pudieron asignar las empresas. Intentalo de nuevo.';
+      error_log(sprintf('[lista_empresa] Error al asignar empresas: %s in %s:%d', $e->getMessage(), $e->getFile(), $e->getLine()));
+      $error = 'No se pudieron asignar las empresas o el correo es inválido.';
     }
   }
 }
@@ -168,4 +169,4 @@ if ($accion === 'eliminar') {
   }
 }
 
-require __DIR__ . '/../html/ver_empresa.php';
+require __DIR__ . '/../html/lista_empresa.html.php';

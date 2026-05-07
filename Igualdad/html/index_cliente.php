@@ -129,7 +129,7 @@ if (!in_array($view, ['menu', 'mi_espacio', 'privada', 'perfil', 'reuniones'], t
 }
 
 $msg = (string)($_GET['msg'] ?? '');
-$sessionUsername = (string)($_SESSION['user']['username'] ?? $_SESSION['user']['nombre_usuario'] ?? 'usuario');
+$sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? 'CLIENTE'));
 $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
@@ -752,7 +752,13 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                     </a>
                                                 </div>
                                                 <div class="col-12 col-md-4">
-                                                    <a class="space-quick-card h-100" href="mantenimiento.php">
+                                                    <?php
+                                                    $idEmpresaMantenimiento = (int)($empresasDisponibles[0]['id_empresa'] ?? 0);
+                                                    $mantenimientoHref = ($idEmpresaMantenimiento > 0) 
+                                                        ? "../model/mantenimiento.php?id_empresa=" . $idEmpresaMantenimiento 
+                                                        : "javascript:alert('No tienes empresas asignadas para el mantenimiento');";
+                                                    ?>
+                                                    <a class="space-quick-card h-100" href="<?= $mantenimientoHref ?>">
                                                         <div class="space-quick-icon">🔧</div>
                                                         <div class="space-quick-title">Mantenimiento</div>
                                                         <div class="space-quick-text">Áreas, medidas y formularios del mantenimiento.</div>

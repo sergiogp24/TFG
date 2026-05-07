@@ -11,7 +11,7 @@ use PhpOffice\PhpWord\TemplateProcessor;
 /**
  * Rellena el Word plantilla SIN romper formato
  */
-function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?string $anioRegistro = null, ?int $idEmpresa = null, ?string $rutaWordDestino = null): string
+function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?string $anioRegistro = null, ?int $idEmpresa = null, ?string $rutaWordDestino = null, ?string $rutaExcelOriginal = null): string
 {
     try {
 
@@ -90,11 +90,44 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         }
 
         // =========================
+        // MEDIDAS SELECCIONADAS
+        // =========================
+        if (function_exists('db')) {
+            $dbConn = db();
+            if ($dbConn instanceof mysqli) {
+                $idEmpresaConsulta = $idEmpresa;
+                if (($idEmpresaConsulta === null || $idEmpresaConsulta <= 0) && function_exists('obtenerIdEmpresaPorRazonSocial')) {
+                    $idEmpresaConsulta = obtenerIdEmpresaPorRazonSocial($dbConn, $razonSocial);
+                }
+
+                if ($idEmpresaConsulta !== null && $idEmpresaConsulta > 0) {
+                    $medidasSeleccionadas = obtenerMedidasSelec($dbConn, $idEmpresaConsulta);
+                    error_log("DEBUG: Empresa ID=$idEmpresaConsulta, Medidas encontradas: " . count($medidasSeleccionadas));
+                    if (!empty($medidasSeleccionadas)) {
+                        foreach ($medidasSeleccionadas as $area => $medidas) {
+                            error_log("  Area $area: " . count($medidas) . " medidas");
+                        }
+                    }
+                    rellenarMedidasSeleccionadasEnWord($template, $medidasSeleccionadas);
+
+                    // Después de la llamada a rellenarMedidasSeleccionadasEnWord
+                    error_log("=== MEDIDAS SELECCIONADAS DEBUG ===");
+                    foreach ($medidasSeleccionadas as $area => $medidas) {
+                        error_log("Área ID: $area");
+                        foreach ($medidas as $idx => $datos) {
+                            error_log("  Medida $idx: {$datos['medida']} - {$datos['indicador']}");
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================
         // EXCEL Optimiazdo no calcula formulas y salta celdas vacias
         // =========================
         // Aumentar timeout para lectura de Excel grande
         set_time_limit(300);
-        
+
         $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($rutaExcel);
         $reader->setReadDataOnly(true);
         $reader->setReadEmptyCells(false);  // No leer celdas vacías (más rápido)
@@ -135,6 +168,33 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         rellenarTablaDinamicaHoja21($template, $spreadsheet);
 
         // =========================
+        // TABLA DE PROMEDIO (Hoja 6 - Lectura Dinámica)
+        // =========================
+        // Leer de $rutaExcelOriginal si existe (el Excel del registro retributivo subido),
+        // de lo contrario usar el spreadsheet del cuadro de porcentajes
+        $datosTablaPromedio = [];
+        if ($rutaExcelOriginal !== null && $rutaExcelOriginal !== '' && file_exists($rutaExcelOriginal)) {
+            try {
+                $readerOriginal = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($rutaExcelOriginal);
+                $readerOriginal->setReadDataOnly(true);
+                $readerOriginal->setReadEmptyCells(false);
+                $spreadsheetOriginal = $readerOriginal->load($rutaExcelOriginal);
+                $datosTablaPromedio = leerTablaHoja6Dinamicamente($spreadsheetOriginal);
+                $spreadsheetOriginal->disconnectWorksheets();
+                unset($spreadsheetOriginal);
+            } catch (\Throwable $e) {
+                error_log('Error cargando Excel original para tabla de promedio: ' . $e->getMessage());
+                // Fallback: intentar con el spreadsheet actual
+                $datosTablaPromedio = leerTablaHoja6Dinamicamente($spreadsheet);
+            }
+        } else {
+            // Si no hay Excel original, usar el del cuadro de porcentajes
+            $datosTablaPromedio = leerTablaHoja6Dinamicamente($spreadsheet);
+        }
+
+        // El placeholder tabla_promedio se resuelve después, directamente sobre el DOCX.
+
+        // =========================
         // IMAGENES DE LA PLANTILLA
         // =========================
         $imagenes = generarImagenesPlantilla($template, $spreadsheet);
@@ -143,9 +203,56 @@ function rellenarWordPlanIgualdad(string $rutaExcel, string $razonSocial, ?strin
         unset($spreadsheet);
 
         // =========================
+        // Asegurarnos de que TODAS las medidas no seleccionadas queden vacías o en "0"
+        // =========================
+        $maxAreas = 20;
+        $maxMedidasPorArea = 40;
+        
+        // Iterar sobre TODAS las áreas y medidas posibles
+        for ($area = 1; $area <= $maxAreas; $area++) {
+            // Si el área no está seleccionada, blanquear completamente (0 a 40)
+            if (!isset($medidasSeleccionadas[$area])) {
+                for ($med = 1; $med <= $maxMedidasPorArea; $med++) {
+                    $template->setValue('Area' . $area . 'Med' . $med, '');
+                    $template->setValue('Area' . $area . 'Med' . $med . 'Ind', '');
+                }
+            } else {
+                // El área SÍ está seleccionada, pero podría tener menos de 40 medidas seleccionadas
+                // Contar cuántas medidas fueron realmente seleccionadas en esta área
+                $medidasReales = $medidasSeleccionadas[$area];
+                $maxMedidaSeleccionada = count($medidasReales);
+                
+                // Blanquear las medidas NO seleccionadas (de maxMedidaSeleccionada+1 a 40)
+                for ($med = $maxMedidaSeleccionada + 1; $med <= $maxMedidasPorArea; $med++) {
+                    $template->setValue('Area' . $area . 'Med' . $med, '');
+                    $template->setValue('Area' . $area . 'Med' . $med . 'Ind', '');
+                }
+            }
+        }
+
+        // =========================
         // GUARDAR
         // =========================
+        if (file_exists($rutaWordFinal)) {
+            @unlink($rutaWordFinal);
+        }
         $template->saveAs($rutaWordFinal);
+
+        // Post-procesamiento: insertar tabla de promedio si existe
+        if (!empty($datosTablaPromedio)) {
+            try {
+                procesarTablaPromediaEnDocx($rutaWordFinal, $datosTablaPromedio);
+            } catch (\Throwable $e) {
+                error_log('Advertencia: No se pudo insertar tabla de promedio: ' . $e->getMessage());
+                // Continuar sin insertar la tabla, el documento está guardado con el placeholder
+            }
+        }
+
+        $mensajeRuta = 'DEBUG WORD: archivo generado en ' . $rutaWordFinal;
+        error_log($mensajeRuta);
+        if (isset($debugWrite) && is_callable($debugWrite)) {
+            $debugWrite($mensajeRuta);
+        }
 
         // Limpiar imágenes temporales
         foreach ($imagenes as $img) {
@@ -292,7 +399,7 @@ function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial, ?int $
     }
 
     if ($empresa === []) {
-        $stmt = $db->prepare(" SELECT * FROM empresa\n  WHERE UPPER(TRIM(razon_social)) = ?\n        LIMIT 1\n    ");
+        $stmt = $db->prepare("\n        SELECT * FROM empresa\n        WHERE UPPER(TRIM(razon_social)) = ?\n        LIMIT 1\n    ");
 
         if ($stmt) {
             $razonSocial = mb_strtoupper(trim($razonSocial));
@@ -309,6 +416,7 @@ function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial, ?int $
     }
 
     $idEmpresaReal = (int)($empresa['id_empresa'] ?? 0);
+    $cnaes = [];
     if ($idEmpresaReal > 0) {
         $cnaes = obtenerCnaesEmpresaDesdeBD($db, $idEmpresaReal);
         if (!empty($cnaes)) {
@@ -319,14 +427,8 @@ function obtenerReemplazosEmpresaDesdeBD(mysqli $db, string $razonSocial, ?int $
             if ($cnaeLegacy !== '') {
                 $empresa['cnae_list'] = [$cnaeLegacy];
                 $empresa['cnae'] = $cnaeLegacy;
-                
             }
         }
-    }
-
-    if ($cnaes === []) {
-        $empresa['cnae_list'] = [];
-        $empresa['cnae'] = '';
     }
 
     return $empresa;
@@ -359,6 +461,116 @@ function obtenerCnaesEmpresaDesdeBD(mysqli $db, int $idEmpresa): array
 
     return $cnaes;
 }
+
+function obtenerMedidasSelec(mysqli $db, int $idEmpresa): array
+{
+    if ($idEmpresa <= 0) {
+        error_log("DEBUG: ID empresa inválido: " . $idEmpresa);
+        return [];
+    }
+
+    $stmt = $db->prepare(
+        "SELECT
+            ap.id_plan,
+            ap.nombre AS nombre_plan,
+            m.id_medida,
+            m.descripcion AS medida_seleccionada,
+            m.indicador AS indicador_seleccionado,
+            cm.id_cliente_medida
+        FROM areas_contratadas ac
+        INNER JOIN area_plan ap ON ac.id_plan = ap.id_plan
+        INNER JOIN cliente_medida cm ON ac.id_areas_contratadas = cm.id_areas_contratadas
+        INNER JOIN medida m ON cm.id_medida = m.id_medida
+        WHERE ac.id_empresa = ?
+        ORDER BY ap.id_plan, m.id_medida, cm.id_cliente_medida"
+    );
+    
+    if (!$stmt) {
+        error_log("ERROR: Falló la preparación de la consulta: " . $db->error);
+        return [];
+    }
+
+    $stmt->bind_param('i', $idEmpresa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $medidasPorArea = [];
+    $idPlanActual = null;
+    $indiceMedida = 0;
+    
+    while ($fila = $result->fetch_assoc()) {
+        $idPlan = (int)($fila['id_plan'] ?? 0);
+        
+        // Si cambiamos de área, reiniciamos el índice de medida
+        if ($idPlan !== $idPlanActual) {
+            $idPlanActual = $idPlan;
+            $indiceMedida = 0;
+            if (!isset($medidasPorArea[$idPlan])) {
+                $medidasPorArea[$idPlan] = [];
+            }
+        }
+
+        $medida = trim((string)($fila['medida_seleccionada'] ?? ''));
+        $indicador = trim((string)($fila['indicador_seleccionado'] ?? ''));
+        
+        if ($medida !== '' || $indicador !== '') {
+            $indiceMedida++;
+            $medidasPorArea[$idPlan][$indiceMedida] = [
+                'medida' => $medida,
+                'indicador' => $indicador,
+            ];
+            error_log("DEBUG BD: Área $idPlan, Medida $indiceMedida: " . substr($medida, 0, 50));
+        }
+    }
+
+    $stmt->close();
+    
+    error_log("DEBUG BD: Total áreas encontradas: " . count($medidasPorArea));
+    
+    return $medidasPorArea;
+}
+
+/**
+ * Reemplaza placeholders del tipo Area1Med1, Area1Med2, etc. con las medidas seleccionadas.
+ */
+function rellenarMedidasSeleccionadasEnWord(TemplateProcessor $template, array $medidasPorArea): void
+{
+    $maxMedidasPorArea = 40;
+
+    // Rellenar con los datos reales usando los IDs de área REALES de la BD
+    foreach ($medidasPorArea as $idPlanReal => $medidas) {
+        if (!is_array($medidas)) {
+            continue;
+        }
+
+        error_log("DEBUG WORD: Procesando área real ID: " . $idPlanReal . " con " . count($medidas) . " medidas");
+
+        foreach ($medidas as $indiceMedida => $datosMedida) {
+            if (!is_array($datosMedida)) {
+                continue;
+            }
+
+            // Placeholders SIN ${} - TemplateProcessor los maneja automáticamente
+            $placeholderMedida = 'Area' . $idPlanReal . 'Med' . $indiceMedida;
+            $placeholderIndicador = 'Area' . $idPlanReal . 'Med' . $indiceMedida . 'Ind';
+
+            $textoMedida = (string)($datosMedida['medida'] ?? '');
+            $textoIndicador = (string)($datosMedida['indicador'] ?? '');
+
+            error_log("DEBUG WORD: Seteando '{$placeholderMedida}' = '" . substr($textoMedida, 0, 50) . "...'");
+            error_log("DEBUG WORD: Seteando '{$placeholderIndicador}' = '" . substr($textoIndicador, 0, 50) . "...'");
+
+            // Usar setValue directamente
+            $template->setValue($placeholderMedida, escaparTextoWord($textoMedida));
+            $template->setValue($placeholderIndicador, escaparTextoWord($textoIndicador));
+        }
+    }
+    
+    // Debug: Verificar que los placeholders se establecieron
+    error_log("DEBUG WORD: Total áreas procesadas: " . count($medidasPorArea));
+}
+
+
 
 /**
  * Obtiene los valores de cuestionarios permitidos para una empresa.
@@ -897,4 +1109,312 @@ function obtenerCamposCuestionariosConfigurados(): array
     }
 
     return array_keys($campos);
+}
+
+/**
+ * Lee dinámicamente la tabla de la hoja 6 desde B8 en adelante.
+ * Determina automáticamente las filas y columnas con datos.
+ * 
+ * @param \PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet
+ * @return array<int, array<string, mixed>>
+ */
+function leerTablaHoja6Dinamicamente(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet): array
+{
+    if ($spreadsheet->getSheetCount() <= 6) {
+        return [];
+    }
+
+    try {
+        $sheet = $spreadsheet->getSheet(6);
+        $datos = [];
+        
+        // Empezar desde fila 8, columna B
+        $filaInicio = 8;
+        $colInicio = 'B';
+        $filaFin = $sheet->getHighestDataRow();
+        $colFin = $sheet->getHighestColumn();
+        
+        // Si no hay datos, retornar vacío
+        if ($filaFin < $filaInicio) {
+            return [];
+        }
+        
+        // Leer encabezados de la primera fila (fila 8)
+        $encabezados = [];
+        $colIndice = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($colInicio);
+        $colFinIndice = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($colFin);
+        
+        for ($c = $colIndice; $c <= $colFinIndice; $c++) {
+            $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
+            $valor = leerValorCeldaExcel($sheet->getCell($col . $filaInicio));
+            $valorStr = convertirValorAStringSeguro($valor);
+            if ($valorStr !== '') {
+                $encabezados[$col] = $valorStr;
+            }
+        }
+        
+        if (empty($encabezados)) {
+            return [];
+        }
+        
+        // Leer filas de datos (desde fila 9 en adelante)
+        for ($fila = $filaInicio + 1; $fila <= $filaFin; $fila++) {
+            $filaData = [];
+            $tieneAlgunDato = false;
+            
+            foreach ($encabezados as $col => $encabezado) {
+                $valor = leerValorCeldaExcel($sheet->getCell($col . $fila));
+                $valorStr = convertirValorAStringSeguro($valor);
+
+                if ($valorStr !== '') {
+                    $tieneAlgunDato = true;
+                    $filaData[$encabezado] = formatearValorWord($valorStr);
+                } else {
+                    $filaData[$encabezado] = '';
+                }
+            }
+            
+            // Solo agregar fila si tiene al menos un dato
+            if ($tieneAlgunDato) {
+                $datos[] = $filaData;
+            }
+        }
+        
+        return $datos;
+    } catch (\Throwable $e) {
+        error_log('Error leyendo tabla hoja 6: ' . $e->getMessage());
+        return [];
+    }
+}
+/**
+ * Genera una tabla HTML5 a partir de los datos leídos.
+ * Diseñada para ser compatible con Word y mostrar correctamente.
+ * 
+ * @param array<int, array<string, mixed>> $datosTabla
+ * @return string HTML de la tabla
+ */
+function generarTablaPromediaHTML(array $datosTabla): string
+{
+    if (empty($datosTabla)) {
+        return '';
+    }
+    
+    $encabezados = array_keys($datosTabla[0]);
+    
+    $html = '<table border="1" cellpadding="5" cellspacing="0">' . PHP_EOL;
+    
+    // Encabezados
+    $html .= '<tr>' . PHP_EOL;
+    foreach ($encabezados as $encabezado) {
+        $html .= '<td style="background-color:#D3D3D3; text-align:center; font-weight:bold;">' 
+            . htmlspecialchars((string)$encabezado, ENT_QUOTES, 'UTF-8') 
+            . '</td>' . PHP_EOL;
+    }
+    $html .= '</tr>' . PHP_EOL;
+    
+    // Filas de datos
+    foreach ($datosTabla as $fila) {
+        $html .= '<tr>' . PHP_EOL;
+        foreach ($encabezados as $encabezado) {
+            $valor = $fila[$encabezado] ?? '';
+            $valorStr = convertirValorAStringSeguro($valor);
+            
+            $esNumerico = is_numeric($valorStr) && $valorStr !== '';
+            $alineacion = $esNumerico ? 'right' : 'left';
+            
+            $html .= '<td style="text-align:' . $alineacion . ';">'
+                . htmlspecialchars($valorStr, ENT_QUOTES, 'UTF-8')
+                . '</td>' . PHP_EOL;
+        }
+        $html .= '</tr>' . PHP_EOL;
+    }
+    
+    $html .= '</table>' . PHP_EOL;
+    return $html;
+}
+/**
+ * Post-procesa el DOCX para insertar la tabla de promedio en el XML.
+ * Busca ${tabla_promedio} en document.xml y lo reemplaza con una tabla Word XML.
+ * 
+ * @param string $rutaDocx Ruta al archivo DOCX
+ * @param array<int, array<string, mixed>> $datosTabla Datos de la tabla
+ * @throws RuntimeException
+ */
+function procesarTablaPromediaEnDocx(string $rutaDocx, array $datosTabla): void
+{
+    if (!file_exists($rutaDocx)) {
+        throw new RuntimeException('El archivo DOCX no existe: ' . $rutaDocx);
+    }
+
+    if (!class_exists('ZipArchive')) {
+        throw new RuntimeException('ZipArchive no está disponible');
+    }
+
+    if (empty($datosTabla)) {
+        return;
+    }
+
+    // Crear temporal para descomprimir
+    $zip = new \ZipArchive();
+    if ($zip->open($rutaDocx) !== true) {
+        throw new RuntimeException('No se pudo abrir el DOCX: ' . $rutaDocx);
+    }
+
+    // Leer document.xml
+    $xmlContent = $zip->getFromName('word/document.xml');
+    if ($xmlContent === false) {
+        $zip->close();
+        throw new RuntimeException('No se encontró word/document.xml en el DOCX');
+    }
+
+    // Generar tabla en XML de Word
+    $tablaXml = generarTablaPromediaXML($datosTabla);
+
+    // Reemplazar el párrafo completo que contiene el placeholder por la tabla XML.
+    // El placeholder está dividido en varios <w:t>, por lo que no se puede sustituir solo el texto.
+    $patron = '/<w:p\b[^>]*>.*?\$\{.*?tabla_promedio.*?\}.*?<\/w:p>/s';
+    $xmlContentNuevo = preg_replace($patron, $tablaXml, $xmlContent, 1);
+
+    if ($xmlContentNuevo === null || $xmlContentNuevo === $xmlContent) {
+        $zip->close();
+        throw new RuntimeException('No se pudo reemplazar el párrafo de la tabla_promedio en document.xml');
+    }
+
+    $xmlContent = $xmlContentNuevo;
+
+    // Escribir de vuelta al DOCX
+    $zip->addFromString('word/document.xml', $xmlContent);
+    $zip->close();
+}
+
+/**
+ * Genera una tabla en formato XML de Word 2007+ (w:tbl).
+ * 
+ * @param array<int, array<string, mixed>> $datosTabla
+ * @return string XML válido para insertar en document.xml
+ */
+function generarTablaPromediaXML(array $datosTabla): string
+{
+    if (empty($datosTabla)) {
+        return '';
+    }
+
+    $encabezados = array_keys($datosTabla[0]);
+    $numColumnas = count($encabezados);
+    $anchoColumna = (int)(9000 / max(1, $numColumnas));
+
+    $xml = '<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" 
+                  xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">' . PHP_EOL;
+
+    // Propiedades de la tabla
+    $xml .= '<w:tblPr>' . PHP_EOL;
+    $xml .= '<w:tblW w:w="9000" w:type="dxa"/>' . PHP_EOL;
+    $xml .= '<w:tblBorders>' . PHP_EOL;
+    $xml .= '<w:top w:val="single" w:sz="12" w:space="0" w:color="000000"/>' . PHP_EOL;
+    $xml .= '<w:left w:val="single" w:sz="12" w:space="0" w:color="000000"/>' . PHP_EOL;
+    $xml .= '<w:bottom w:val="single" w:sz="12" w:space="0" w:color="000000"/>' . PHP_EOL;
+    $xml .= '<w:right w:val="single" w:sz="12" w:space="0" w:color="000000"/>' . PHP_EOL;
+    $xml .= '<w:insideH w:val="single" w:sz="12" w:space="0" w:color="000000"/>' . PHP_EOL;
+    $xml .= '<w:insideV w:val="single" w:sz="12" w:space="0" w:color="000000"/>' . PHP_EOL;
+    $xml .= '</w:tblBorders>' . PHP_EOL;
+    $xml .= '</w:tblPr>' . PHP_EOL;
+
+    // Grid
+    $xml .= '<w:tblGrid>' . PHP_EOL;
+    for ($i = 0; $i < $numColumnas; $i++) {
+        $xml .= '<w:gridCol w:w="' . $anchoColumna . '"/>' . PHP_EOL;
+    }
+    $xml .= '</w:tblGrid>' . PHP_EOL;
+
+    // Encabezado
+    $xml .= '<w:tr>' . PHP_EOL;
+    $xml .= '<w:trPr><w:trHeight w:val="400" w:type="atLeast"/></w:trPr>' . PHP_EOL;
+    foreach ($encabezados as $encabezado) {
+        $xml .= '<w:tc>' . PHP_EOL;
+        $xml .= '<w:tcPr>' . PHP_EOL;
+        $xml .= '<w:shd w:fill="D3D3D3"/>' . PHP_EOL;
+        $xml .= '<w:tcW w:w="' . $anchoColumna . '" w:type="dxa"/>' . PHP_EOL;
+        $xml .= '<w:vAlign w:val="center"/>' . PHP_EOL;
+        $xml .= '</w:tcPr>' . PHP_EOL;
+        $xml .= '<w:p>' . PHP_EOL;
+        $xml .= '<w:pPr>' . PHP_EOL;
+        $xml .= '<w:jc w:val="center"/>' . PHP_EOL;
+        $xml .= '<w:spacing w:before="0" w:after="0"/>' . PHP_EOL;
+        $xml .= '</w:pPr>' . PHP_EOL;
+        $xml .= '<w:r>' . PHP_EOL;
+        $xml .= '<w:rPr><w:b/></w:rPr>' . PHP_EOL;
+        $xml .= '<w:t>' . escaparXMLWord((string)$encabezado) . '</w:t>' . PHP_EOL;
+        $xml .= '</w:r>' . PHP_EOL;
+        $xml .= '</w:p>' . PHP_EOL;
+        $xml .= '</w:tc>' . PHP_EOL;
+    }
+    $xml .= '</w:tr>' . PHP_EOL;
+
+    // Datos
+    foreach ($datosTabla as $fila) {
+        $xml .= '<w:tr>' . PHP_EOL;
+        $xml .= '<w:trPr><w:trHeight w:val="300" w:type="atLeast"/></w:trPr>' . PHP_EOL;
+        foreach ($encabezados as $encabezado) {
+            $valor = $fila[$encabezado] ?? '';
+            $valorStr = convertirValorAStringSeguro($valor);
+
+            $esNumerico = is_numeric($valorStr) && $valorStr !== '';
+            $alineacion = $esNumerico ? 'right' : 'left';
+
+            $xml .= '<w:tc>' . PHP_EOL;
+            $xml .= '<w:tcPr>' . PHP_EOL;
+            $xml .= '<w:tcW w:w="' . $anchoColumna . '" w:type="dxa"/>' . PHP_EOL;
+            $xml .= '</w:tcPr>' . PHP_EOL;
+            $xml .= '<w:p>' . PHP_EOL;
+            $xml .= '<w:pPr>' . PHP_EOL;
+            $xml .= '<w:jc w:val="' . $alineacion . '"/>' . PHP_EOL;
+            $xml .= '</w:pPr>' . PHP_EOL;
+            $xml .= '<w:r>' . PHP_EOL;
+            $xml .= '<w:t xml:space="preserve">' . escaparXMLWord($valorStr) . '</w:t>' . PHP_EOL;
+            $xml .= '</w:r>' . PHP_EOL;
+            $xml .= '</w:p>' . PHP_EOL;
+            $xml .= '</w:tc>' . PHP_EOL;
+        }
+        $xml .= '</w:tr>' . PHP_EOL;
+    }
+
+    $xml .= '</w:tbl>' . PHP_EOL;
+    return $xml;
+}
+
+/**
+ * Escapa caracteres especiales en XML.
+ */
+function escaparXMLWord(string $texto): string
+{
+    $texto = str_replace('&', '&amp;', $texto);
+    $texto = str_replace('<', '&lt;', $texto);
+    $texto = str_replace('>', '&gt;', $texto);
+    $texto = str_replace('"', '&quot;', $texto);
+    $texto = str_replace("'", '&apos;', $texto);
+    return $texto;
+}
+
+/**
+ * Convierte cualquier valor (nulo, array anidado, objeto) en string seguro.
+ */
+function convertirValorAStringSeguro($valor): string
+{
+    if ($valor === null) {
+        return '';
+    }
+    if (is_array($valor)) {
+        // Procesa recursivamente cada elemento
+        $partes = array_map(function ($item) {
+            return convertirValorAStringSeguro($item);
+        }, $valor);
+        return implode(', ', $partes);
+    }
+    if (is_object($valor)) {
+        if (method_exists($valor, '__toString')) {
+            return (string)$valor;
+        }
+        return json_encode($valor, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+    return (string)$valor;
 }

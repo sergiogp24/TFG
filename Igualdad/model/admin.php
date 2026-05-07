@@ -8,10 +8,7 @@ require_role('ADMINISTRADOR');
 
 require __DIR__ . '/../config/config.php';
 
-function enviarRecordatoriosRRReunionesVencidas(mysqli $db): void
-{
-  correo_enviar_recordatorio_rr_reuniones_vencidas($db);
-}
+
 
 // Views SOLO de ADMIN (usuarios/perfil/reuniones)
 $view = (string)($_GET['view'] ?? 'ver_usuarios');
@@ -415,7 +412,7 @@ $adminTodasReuniones = [];
 $adminClientesReunion = [];
 
 if (in_array($view, ['privada', 'reuniones'], true) && $adminId > 0) {
-  enviarRecordatoriosRRReunionesVencidas(db());
+  correo_enviar_recordatorio_rr_reuniones_vencidas(db());
   db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
   $stmt = db()->prepare("\n    SELECT\n      r.id_reunion,\n      r.objetivo,\n      r.hora_reunion,\n      r.fecha_reunion\n    FROM reuniones r\n    INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion\n    WHERE ur.id_usuario = ?\n    ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC\n  ");
   $stmt->bind_param('i', $adminId);

@@ -61,7 +61,7 @@ function redirigirMenuSubida(string $urlMenuSubida, string $mensaje, ?int $exito
     exit;
 }
 // ================== FUNCIONES ==================
-function convertirFechaExcel($valor)
+function convertirFechaExcel(mixed $valor): ?string
 {
     if ($valor === null || $valor === '') return null;
     if (is_numeric($valor)) return date('Y-m-d', Date::excelToTimestamp((float)$valor));
@@ -69,7 +69,7 @@ function convertirFechaExcel($valor)
     return $timestamp !== false ? date('Y-m-d', $timestamp) : null;
 }
 
-function limpiarRazonSocial($texto)
+function limpiarRazonSocial(mixed $texto): ?string
 {
     if (empty($texto)) return null;
     $texto = preg_replace('/\s+/', ' ', trim((string)$texto));
@@ -185,10 +185,8 @@ function registrarArchivoGeneradoEnTabla(
 // ================== VALIDACIONES INICIALES ==================
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
 $debeGenerarDerivados = false;
-$urlMenuSubida = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true)
-    ? app_path('/html/index_staff.php')
-    : app_path('/html/index_cliente.php');
-$idEmpresaPost = isset($_POST['id_empresa']) ? (int)$_POST['id_empresa'] : 0;
+$urlMenuSubida = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true) ? app_path('/html/subir_registro.html.php') : app_path('/html/index_cliente.php');
+$idEmpresaPost = (int)($_POST['id_empresa'] ?? 0);
 
 // Soporte para regenerar Word sin subir archivo: acción POST 'accion=regenerar_word'
 if (isset($_POST['accion']) && $_POST['accion'] === 'regenerar_word') {
@@ -452,6 +450,16 @@ if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
 
 if (!isset($_FILES['excel']) || empty($_POST['tipo'])) {
     redirigirMenuSubida($urlMenuSubida, 'No se envió archivo o tipo.', null, $idEmpresaPost);
+}
+
+// Validar errores en los archivos subidos
+if (isset($_FILES['excel']['error'])) {
+    $errs = is_array($_FILES['excel']['error']) ? $_FILES['excel']['error'] : [$_FILES['excel']['error']];
+    foreach ($errs as $e) {
+        if ($e !== UPLOAD_ERR_OK && $e !== UPLOAD_ERR_NO_FILE) {
+             redirigirMenuSubida($urlMenuSubida, 'Error en la subida del archivo (Cod: ' . $e . ').', null, $idEmpresaPost);
+        }
+    }
 }
 
 $tipo = strtoupper(trim((string)$_POST['tipo']));
@@ -1123,27 +1131,8 @@ foreach ($names as $i => $originalName) {
 
         $rawJornada = $v($r, 'M');
         $rawReducida = $v($r, 'N');
-        // Si es número (formato porcentaje en Excel): multiplicar por 100
-        // Si es texto (ej: "53,75%"): limpiar y usar directo
-        if ($rawJornada !== null) {
-            if (is_numeric($rawJornada) && (float)$rawJornada <= 1) {
-                $porc_jornada = (string)((float)$rawJornada * 100);
-            } else {
-                $porc_jornada = str_replace([',', '%'], ['.', ''], $rawJornada);
-            }
-        } else {
-            $porc_jornada = null;
-        }
-        
-        if ($rawReducida !== null) {
-            if (is_numeric($rawReducida) && (float)$rawReducida <= 1) {
-                $porc_reducida = (string)((float)$rawReducida * 100);
-            } else {
-                $porc_reducida = str_replace([',', '%'], ['.', ''], $rawReducida);
-            }
-        } else {
-            $porc_reducida = null;
-        }
+        $porc_jornada = $rawJornada !== null ? (float)str_replace([',', '%'], ['.', ''], $rawJornada) : null;
+        $porc_reducida = $rawReducida !== null ? (float)str_replace([',', '%'], ['.', ''], $rawReducida) : null;
 
         $motivo_reduccion = $v($r, 'O');
         $clave_contrato = $v($r, 'P') !== null ? (int)$v($r, 'P') : null;
@@ -1221,7 +1210,7 @@ foreach ($names as $i => $originalName) {
         }
 
         $okBind = $stmtEmp->bind_param(
-            "ssssiissssssssisssssssssssidsddsddisi",
+            "ssssiisssssddsisssssssssssidsddsddisi",
             $id,
             $sexo,
             $fecha_nacimiento,
@@ -1251,8 +1240,8 @@ foreach ($names as $i => $originalName) {
             $nivel,
             $salario,
             $f_fin_cal,
-            $prc_normaliz,
-            $prc_anualiz,
+            $normaliz,
+            $anualiz,
             $check_equi,
             $salario_base_eq,
             $salario_base_ef,
@@ -1295,7 +1284,14 @@ foreach ($names as $i => $originalName) {
                 );
 
                 // El Word se genera a partir del cuadro de porcentajes recién creado.
-                $rutaWordPlan = rellenarWordPlanIgualdad($rutaCuadroPorcentajes, $razon_social, $anioRegistro, $id_empresa);
+                $rutaWordPlan = rellenarWordPlanIgualdad(
+    $rutaCuadroPorcentajes,
+    $razon_social,
+    $anioRegistro,
+    $id_empresa,
+    null,              // rutaWordDestino (se genera automáticamente)
+    $rutaCompleta      // El Excel del Registro Retributivo recién subido
+);
                 registrarArchivoGeneradoEnTabla(
                     $db,
                     'GENERADO WORD',

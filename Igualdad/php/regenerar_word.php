@@ -92,41 +92,10 @@ if ($stmtAno) {
     }
 }
 
-// Buscar último archivo con asunto 'GENERADO PORCENTAJES'
-$stmt = db()->prepare(
-    'SELECT ruta_relativa
-     FROM archivos
-     WHERE id_empresa = ?
-       AND UPPER(TRIM(COALESCE(asunto, ""))) = "GENERADO PORCENTAJES"
-       AND ruta_relativa IS NOT NULL
-       AND LOWER(ruta_relativa) LIKE "uploads/%"
-       AND LOWER(ruta_relativa) REGEXP "\\.(xlsx|xls|xlsm|csv)$"
-     ORDER BY subido_en DESC, id_archivo DESC
-     LIMIT 1'
-);
-
-if (!$stmt) {
-    http_response_code(500);
-    echo json_encode(['exito' => false, 'mensaje' => 'Error preparando consulta de archivos']);
-    exit;
-}
-
-$stmt->bind_param('i', $idEmpresa);
-$stmt->execute();
-$row = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
-if (!$row || empty($row['ruta_relativa'])) {
+$rutaExcel = buscarCuadroPorcentajesParaEmpresa($idEmpresa, $razonSocial);
+if ($rutaExcel === '') {
     http_response_code(404);
     echo json_encode(['exito' => false, 'mensaje' => 'No se encontró cuadro generado de porcentajes para esta empresa']);
-    exit;
-}
-
-$rutaRel = (string)$row['ruta_relativa'];
-$rutaExcel = realpath(__DIR__ . '/../' . $rutaRel) ?: (__DIR__ . '/../' . $rutaRel);
-if (!is_file($rutaExcel)) {
-    http_response_code(404);
-    echo json_encode(['exito' => false, 'mensaje' => 'Archivo fuente no disponible en el disco']);
     exit;
 }
 
@@ -138,7 +107,7 @@ try {
         'SELECT id_archivo, ruta_relativa
          FROM archivos
          WHERE id_empresa = ?
-           AND UPPER(TRIM(tipo)) = "GENERADO WORD"
+           AND UPPER(TRIM(tipo)) = 'GENERADO WORD'
          ORDER BY subido_en DESC, id_archivo DESC
          LIMIT 1'
     );
@@ -156,7 +125,7 @@ try {
             $idArchivoAnterior = (int)$rowAnterior['id_archivo'];
             $rutaRelAnterior = (string)$rowAnterior['ruta_relativa'];
             if ($rutaRelAnterior !== '') {
-                $rutaWordDestino = __DIR__ . '/../' . $rutaRelAnterior;
+                $rutaWordDestino = resolverRutaProyectoDesdeRelativa($rutaRelAnterior);
             }
         }
     }
@@ -176,18 +145,22 @@ try {
     $tamano = (int)filesize($rutaWord);
     $mime = (string)(mime_content_type($rutaWord) ?: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     $sha256 = (string)(hash_file('sha256', $rutaWord) ?: '');
-    $rutaRelDestino = '/../uploads/' . $nombreArchivo;
+    $rutaRelDestino = obtenerRutaRelativaProyecto($rutaWord);
+    if ($rutaRelDestino === '') {
+        $rutaRelDestino = 'uploads/' . $nombreArchivo;
+    }
 
     // Si hay un archivo anterior, actualizarlo; si no, insertar uno nuevo
     if ($idArchivoAnterior !== null) {
         $stmtUpd = $db->prepare(
             'UPDATE archivos
-             SET asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, sha256 = ?, id_cliente_medida = NULL, id_empresa = ?
+               SET tipo = ?, asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, sha256 = ?, subido_en = NOW(), id_cliente_medida = NULL, id_empresa = ?
              WHERE id_archivo = ?'
         );
         if ($stmtUpd) {
+            $tipo = 'GENERADO WORD';
             $asunto = 'GENERADO WORD';
-            $stmtUpd->bind_param('ssssissii', $asunto, $nombreArchivo, $nombreArchivo, $rutaRelDestino, $tamano, $mime, $sha256, $idEmpresa, $idArchivoAnterior);
+            $stmtUpd->bind_param('sssssissii', $tipo, $asunto, $nombreArchivo, $nombreArchivo, $rutaRelDestino, $tamano, $mime, $sha256, $idEmpresa, $idArchivoAnterior);
             $stmtUpd->execute();
             $stmtUpd->close();
         }
@@ -223,5 +196,124 @@ try {
     error_log('Error regenerar_word: ' . $e->getMessage());
     echo json_encode(['exito' => false, 'mensaje' => 'Error generando Word: ' . $e->getMessage()]);
     exit;
+}
+
+/**
+ * Convierte una ruta relativa almacenada en BD a una ruta absoluta dentro del proyecto.
+ */
+function resolverRutaProyectoDesdeRelativa(string $rutaRelativa): string
+{
+    $baseProyecto = dirname(__DIR__);
+    $rutaNormalizada = str_replace('\\', '/', trim($rutaRelativa));
+    $rutaNormalizada = preg_replace('#^/+#', '', $rutaNormalizada) ?? $rutaNormalizada;
+    $rutaNormalizada = preg_replace('#^(?:\.\./)+#', '', $rutaNormalizada) ?? $rutaNormalizada;
+
+    return $baseProyecto . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rutaNormalizada);
+}
+
+/**
+ * Calcula la ruta relativa al proyecto a partir de una ruta absoluta.
+ */
+function obtenerRutaRelativaProyecto(string $rutaAbsoluta): string
+{
+    $baseProyecto = rtrim(str_replace('\\', '/', dirname(__DIR__)), '/');
+    $rutaNormalizada = str_replace('\\', '/', $rutaAbsoluta);
+
+    if (strpos($rutaNormalizada, $baseProyecto . '/') === 0) {
+        return ltrim(substr($rutaNormalizada, strlen($baseProyecto)), '/');
+    }
+
+    return '';
+}
+
+/**
+ * Busca el cuadro de porcentajes de una empresa con criterios flexibles y fallback acotado por empresa.
+ */
+function buscarCuadroPorcentajesParaEmpresa(int $idEmpresa, string $razonSocial): string
+{
+    $db = db();
+
+    $consultas = [
+        'SELECT ruta_relativa
+         FROM archivos
+         WHERE id_empresa = ?
+           AND UPPER(TRIM(COALESCE(asunto, ""))) = "GENERADO PORCENTAJES"
+           AND ruta_relativa IS NOT NULL
+           AND LOWER(ruta_relativa) LIKE "uploads/%"
+           AND LOWER(ruta_relativa) REGEXP "\\.(xlsx|xls|xlsm|csv)$"
+         ORDER BY subido_en DESC, id_archivo DESC
+         LIMIT 1',
+        'SELECT ruta_relativa
+         FROM archivos
+         WHERE id_empresa = ?
+           AND UPPER(TRIM(COALESCE(tipo, ""))) = "CUADRO PORCENTAJES"
+           AND ruta_relativa IS NOT NULL
+           AND LOWER(ruta_relativa) LIKE "uploads/%"
+           AND LOWER(ruta_relativa) REGEXP "\\.(xlsx|xls|xlsm|csv)$"
+         ORDER BY subido_en DESC, id_archivo DESC
+         LIMIT 1',
+    ];
+
+    foreach ($consultas as $sql) {
+        $stmt = $db->prepare($sql);
+        if (!$stmt) {
+            continue;
+        }
+
+        $stmt->bind_param('i', $idEmpresa);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($row && !empty($row['ruta_relativa'])) {
+            $ruta = resolverRutaProyectoDesdeRelativa((string)$row['ruta_relativa']);
+            if (is_file($ruta)) {
+                return $ruta;
+            }
+        }
+    }
+
+    $baseNombreEmpresa = normalizarNombreArchivoEmpresa($razonSocial);
+    if ($baseNombreEmpresa === '') {
+        return '';
+    }
+
+    $baseUploads = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads';
+    $patrones = [
+        $baseUploads . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.xlsx',
+        $baseUploads . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.xls',
+        $baseUploads . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.xlsm',
+        $baseUploads . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.csv',
+        $baseUploads . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.xlsx',
+        $baseUploads . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.xls',
+        $baseUploads . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.xlsm',
+        $baseUploads . DIRECTORY_SEPARATOR . '*' . DIRECTORY_SEPARATOR . $baseNombreEmpresa . '*.csv',
+    ];
+
+    $candidatos = [];
+    foreach ($patrones as $patron) {
+        foreach (glob($patron) ?: [] as $archivo) {
+            $nombre = basename($archivo);
+            $nombreUpper = strtoupper($nombre);
+            if (
+                str_contains($nombreUpper, 'PLAN_IGUALDAD') ||
+                str_starts_with($nombreUpper, 'REGISTRO_') ||
+                str_contains($nombreUpper, '_TOMA_DE_DATOS_')
+            ) {
+                continue;
+            }
+            $candidatos[$archivo] = filemtime($archivo) ?: 0;
+        }
+    }
+
+    if ($candidatos !== []) {
+        arsort($candidatos);
+        $mejorArchivo = array_key_first($candidatos);
+        if (is_string($mejorArchivo) && $mejorArchivo !== '' && is_file($mejorArchivo)) {
+            return $mejorArchivo;
+        }
+    }
+
+    return '';
 }
 

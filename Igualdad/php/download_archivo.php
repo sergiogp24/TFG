@@ -11,7 +11,7 @@ function fail(int $code, string $msg): void
   exit($msg);
 }
 
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) fail(400, 'ID inválido');
 
 // Ruta fija para la plantilla de registro retributivo (Herramienta_Registro_Redtributivo.xlsx)

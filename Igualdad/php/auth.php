@@ -38,6 +38,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
   ]);
   session_start();
 }
+
 // 9 horas f horas/min/secs
 const SESSION_TIMEOUT = 9 * 60 * 60;
 

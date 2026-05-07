@@ -2757,11 +2757,6 @@ function area_bajas(mysqli $db, int $idEmpresa, $sheet): bool
         $sheet->setCellValue('C' . $fila, $nMujeres);
         $sheet->setCellValue('G' . $fila, $nHombres);
 
-        if (($nMujeres + $nHombres) === 0) {
-            foreach (['D', 'E', 'F', 'H', 'I', 'J', 'K', 'L', 'M', 'N'] as $columna) {
-                $sheet->setCellValue($columna . $fila, 0);
-            }
-        }
     }
 
     return true;
@@ -2848,4 +2843,14 @@ function actualizarDatosCuantitativosExcel(mysqli $db, string $rutaExcel, int $i
 
     $spreadsheet->disconnectWorksheets();
     unset($spreadsheet);
+}
+
+/**
+ * Wrapper para regenerar las hojas dinámicas desde la BD al Excel.
+ * Función alias que llama a actualizarDatosCuantitativosExcel() para mayor claridad.
+ * Útil en el flujo de regeneración de Word.
+ */
+function regenerarHojasDinamicasExcelDesdeBaseDatos(mysqli $db, string $rutaExcel, int $idEmpresa): void
+{
+    actualizarDatosCuantitativosExcel($db, $rutaExcel, $idEmpresa);
 }

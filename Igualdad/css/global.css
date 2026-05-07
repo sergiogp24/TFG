@@ -1038,3 +1038,27 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-gray-500);
 }
+
+/* ===== COMPLEMENTO FORMULARIOS: EDICIÓN ===== */
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+details summary {
+  list-style: none;
+  outline: none;
+  cursor: pointer;
+}
+
+details[open] summary {
+  margin-bottom: 1rem;
+  background-color: var(--color-gray-600);
+  color: white;
+}
+
+.edit-form-container {
+  background-color: var(--color-gray-50);
+  border: 1px solid var(--color-gray-200);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+}

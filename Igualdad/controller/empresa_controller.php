@@ -103,6 +103,47 @@ function log_internal_error_empresa(string $context, Throwable $e): void
   ));
 }
 
+function asegurar_fk_archivos_cliente_medida_no_cascade(): void
+{
+  static $aplicado = false;
+  if ($aplicado) {
+    return;
+  }
+
+  $aplicado = true;
+  $db = db();
+
+  $stmt = $db->prepare(
+    "SELECT DELETE_RULE
+     FROM information_schema.REFERENTIAL_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'archivos'
+       AND CONSTRAINT_NAME = 'fk_archivo_cliente_medida'
+     LIMIT 1"
+  );
+
+  if (!$stmt) {
+    return;
+  }
+
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc();
+  $stmt->close();
+
+  $deleteRule = strtoupper(trim((string)($row['DELETE_RULE'] ?? '')));
+  if ($deleteRule === 'SET NULL') {
+    return;
+  }
+
+  @$db->query('ALTER TABLE archivos DROP FOREIGN KEY fk_archivo_cliente_medida');
+  @$db->query(
+    'ALTER TABLE archivos
+     ADD CONSTRAINT fk_archivo_cliente_medida
+     FOREIGN KEY (id_cliente_medida) REFERENCES cliente_medida(id_cliente_medida)
+     ON DELETE SET NULL'
+  );
+}
+
 function usuario_es_tecnico(int $idUsuario): bool
 {
   if ($idUsuario <= 0) {
@@ -1080,6 +1121,10 @@ if ($accion === 'edit_contratos') {
     if ($fromCtx !== '') {
       $to .= '&from=' . urlencode($fromCtx);
     }
+    $soloMedidasEmbedCtx = trim((string)($_POST['solo_medidas_embed'] ?? $_GET['solo_medidas_embed'] ?? ''));
+    if ($soloMedidasEmbedCtx === '1') {
+      $to .= '&solo_medidas_embed=1';
+    }
     header('Location: ' . $to);
     exit;
   };
@@ -1195,6 +1240,8 @@ if ($accion === 'edit_contratos') {
     $stmtU->close();
 
     if ($usaPlanYMedidas && !empty($areas)) {
+      asegurar_fk_archivos_cliente_medida_no_cascade();
+
       $stmtDelAf = $db->prepare("DELETE af FROM area_formacion af INNER JOIN cliente_medida cm ON cm.id_cliente_medida = af.id_cliente_medida INNER JOIN areas_contratadas pc ON pc.id_areas_contratadas = cm.id_areas_contratadas WHERE pc.id_empresa = ?");
       $stmtDelAf->bind_param('i', $idEmpresa);
       $stmtDelAf->execute();
@@ -1279,6 +1326,25 @@ if ($accion === 'edit_contratos') {
     $db->commit();
 
     unset($_SESSION['edit_contrato_old'], $_SESSION['edit_contrato_error']);
+    $soloMedidasEmbedCtx = trim((string)($_POST['solo_medidas_embed'] ?? $_GET['solo_medidas_embed'] ?? ''));
+    if ($soloMedidasEmbedCtx === '1') {
+      $to = app_path('/model/empresa.php?view=edit_contratos&id_contrato=') . (int)$idContrato;
+      if ($idEmpresa > 0) {
+        $to .= '&id_empresa=' . $idEmpresa;
+      }
+      $tipoContratoCtx = trim((string)($_POST['tipo_contrato_context'] ?? $_POST['tipo_contrato'] ?? $_GET['tipo_contrato'] ?? ''));
+      if ($tipoContratoCtx !== '') {
+        $to .= '&tipo_contrato=' . urlencode($tipoContratoCtx);
+      }
+      $fromCtx = trim((string)($_POST['from'] ?? $_GET['from'] ?? ''));
+      if ($fromCtx !== '') {
+        $to .= '&from=' . urlencode($fromCtx);
+      }
+      $to .= '&solo_medidas_embed=1&msg=' . urlencode('Medidas guardadas correctamente.');
+      header('Location: ' . $to);
+      exit;
+    }
+
     redirect_view_empresas('ver_contratos', 'Contrato actualizado correctamente.', $idEmpresa);
   } catch (Throwable $e) {
     @$db->rollback();
@@ -1398,6 +1464,8 @@ if ($accion === 'edit_plan') {
   $db = db();
 
   try {
+    asegurar_fk_archivos_cliente_medida_no_cascade();
+
     $stmtE = $db->prepare("SELECT id_empresa FROM empresa WHERE id_empresa = ? LIMIT 1");
     $stmtE->bind_param('i', $idEmpresa);
     $stmtE->execute();
@@ -1419,6 +1487,20 @@ if ($accion === 'edit_plan') {
     $stmtArea->close();
 
     $db->begin_transaction();
+
+    // PRESERVAR ARCHIVOS: Antes de borrar medidas, desligamos los archivos de cliente_medida 
+    // para evitar que el ON DELETE CASCADE los borre si la FK no se pudo cambiar a SET NULL.
+    $stmtPreserve = $db->prepare("
+        UPDATE archivos 
+        SET id_cliente_medida = NULL 
+        WHERE id_empresa = ? 
+          AND id_cliente_medida IS NOT NULL
+    ");
+    if ($stmtPreserve) {
+        $stmtPreserve->bind_param('i', $idEmpresa);
+        $stmtPreserve->execute();
+        $stmtPreserve->close();
+    }
 
     $stmtDelAf = $db->prepare("DELETE af FROM area_formacion af INNER JOIN cliente_medida cm ON cm.id_cliente_medida = af.id_cliente_medida INNER JOIN areas_contratadas pc ON pc.id_areas_contratadas = cm.id_areas_contratadas WHERE pc.id_empresa = ?");
     $stmtDelAf->bind_param('i', $idEmpresa);
@@ -1494,6 +1576,19 @@ if ($accion === 'delete_plan_empresa') {
   $db = db();
   try {
     $db->begin_transaction();
+
+    // PRESERVAR ARCHIVOS: Antes de borrar medidas, desligamos los archivos de cliente_medida
+    $stmtPreserve = $db->prepare("
+        UPDATE archivos 
+        SET id_cliente_medida = NULL 
+        WHERE id_empresa = ? 
+          AND id_cliente_medida IS NOT NULL
+    ");
+    if ($stmtPreserve) {
+        $stmtPreserve->bind_param('i', $idEmpresa);
+        $stmtPreserve->execute();
+        $stmtPreserve->close();
+    }
 
     $stmtDelAf = $db->prepare("DELETE af FROM area_formacion af INNER JOIN cliente_medida cm ON cm.id_cliente_medida = af.id_cliente_medida INNER JOIN areas_contratadas pc ON pc.id_areas_contratadas = cm.id_areas_contratadas WHERE pc.id_empresa = ?");
     $stmtDelAf->bind_param('i', $idEmpresa);

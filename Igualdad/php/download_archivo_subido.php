@@ -52,8 +52,8 @@ if (!in_array($rol, ['ADMINISTRADOR', 'CLIENTE', 'TECNICO'], true)) {
 }
 
 $kind = (string)($_GET['kind'] ?? '');
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$file = (string)($_GET['file'] ?? '');
+$id = (int)($_GET['id'] ?? 0);
+$file = basename((string)($_GET['file'] ?? ''));
 
 if ($kind === '') {
   fail(400, 'Parámetros inválidos');
@@ -193,9 +193,7 @@ if ($kind === 'archivos') {
   }
 
   $stem = pathinfo($file, PATHINFO_FILENAME);
-  $esTomaDeDatos = str_contains($stem, '_TOMA_DE_DATOS_');
-  $esWordGenerado = str_ends_with($stem, '_PLAN_IGUALDAD');
-  if (!$esTomaDeDatos && !$esWordGenerado) {
+  if (!str_contains($stem, '_TOMA_DE_DATOS_')) {
     fail(400, 'Archivo inválido');
   }
 
@@ -215,11 +213,7 @@ if ($kind === 'archivos') {
     }
     $stmt->close();
 
-    if ($esTomaDeDatos) {
-      [$empresaToken] = explode('_TOMA_DE_DATOS_', $stem, 2);
-    } else {
-      $empresaToken = download_quitar_sufijo_anio(substr($stem, 0, -strlen('_PLAN_IGUALDAD')));
-    }
+    [$empresaToken] = explode('_TOMA_DE_DATOS_', $stem, 2);
     $allowed = false;
     foreach ($empresas as $empresaNorm) {
       if ($empresaNorm !== '' && strcasecmp($empresaNorm, $empresaToken) === 0) {

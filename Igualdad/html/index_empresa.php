@@ -14,6 +14,8 @@ $panelCss = $isTecnico ? '../css/tecnico.css' : ($isCliente ? '../css/empresa.cs
 // Detectar de dónde viene el usuario
 $fromPanel = (string)($_GET['from'] ?? ($isTecnico ? 'tecnico' : ($isCliente ? 'cliente' : '')));
 $fromParam = $fromPanel !== '' ? '&from=' . urlencode($fromPanel) : '';
+$soloMedidasEmbed = ((string)($_GET['solo_medidas_embed'] ?? '') === '1');
+$soloMedidasEmbedMode = ($soloMedidasEmbed && $view === 'edit_contratos');
 $volverLink = '';
 $volverLinkText = '';
 
@@ -43,162 +45,168 @@ if ($fromPanel === 'tecnico') {
 </head>
 
 <body class="bg-light">
-    <div class="container-fluid py-4">
+    <div class="container-fluid<?= $soloMedidasEmbedMode ? ' py-2 px-2' : ' py-4' ?>">
         <div class="row g-3">
 
             <!-- SIDEBAR -->
-            <aside class="col-12 col-lg-3 col-xl-2">
-                <div class="card shadow-sm border-0 sidebar">
-                    <div class="card-body">
-                        <!-- Header Sidebar -->
-                        <div class="sidebar-header">
-                            <?php if ($isTecnico): ?>
-                                <div class="sidebar-avatar">👨‍💼</div>
-                                <h5 class="sidebar-title">Panel Técnico</h5>
-                            <?php else: ?>
-                                <div class="sidebar-avatar" style="background: linear-gradient(135deg, var(--color-teal), var(--color-green));">🏢</div>
-                                <h5 class="sidebar-title">Panel Empresas</h5>
-                            <?php endif; ?>
+            <?php if (!$soloMedidasEmbedMode): ?>
+                <aside class="col-12 col-lg-3 col-xl-2">
+                    <div class="card shadow-sm border-0 sidebar">
+                        <div class="card-body">
+                            <!-- Header Sidebar -->
+                            <div class="sidebar-header">
+                                <?php if ($isTecnico): ?>
+                                    <div class="sidebar-avatar">👨‍💼</div>
+                                    <h5 class="sidebar-title">Panel Técnico</h5>
+                                <?php else: ?>
+                                    <div class="sidebar-avatar" style="background: linear-gradient(135deg, var(--color-teal), var(--color-green));">🏢</div>
+                                    <h5 class="sidebar-title">Panel Empresas</h5>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- User Info -->
+                            <div class="sidebar-user-info">
+                                <div class="info-label">Usuario Actual</div>
+                                <div class="info-value"><?= $sessionUsername ?></div>
+                                <?php if ($sessionEmail !== ''): ?>
+                                    <div class="info-email">📧 <?= $sessionEmail ?></div>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- Navegación -->
+                            <nav class="sidebar-nav">
+                                <?php if ($isTecnico): ?>
+                                    <a class="nav-button" href="tecnico.php?view=menu">
+                                        <span class="nav-icon">📊</span>
+                                        <span>Mi Panel</span>
+                                    </a>
+
+                                    <button class="nav-button nav-collapse active"
+                                        type="button" data-bs-toggle="collapse" data-bs-target="#menuEmpresas"
+                                        aria-expanded="true">
+                                        <span class="nav-icon">🏢</span>
+                                        <span>Empresas</span>
+                                        <span class="collapse-icon">▾</span>
+                                    </button>
+
+                                    <div id="menuEmpresas" class="collapse nav-submenu show">
+                                        <a class="nav-subbutton" href="../model/empresa.php?view=ver_empresas&from=tecnico">
+                                            <span>📋</span>
+                                            <span>Mis Empresas</span>
+                                        </a>
+                                        <a class="nav-subbutton" href="../model/empresa.php?view=ver_planes&from=tecnico">
+                                            <span>🗂️</span>
+                                            <span>Mis Planes</span>
+                                        </a>
+                                        <a class="nav-subbutton" href="../model/empresa.php?view=ver_contratos&tipo_contrato=MANTENIMIENTO&from=tecnico">
+                                            <span>🛠️</span>
+                                            <span>Mis Mantenimientos</span>
+                                        </a>
+                                    </div>
+
+                                    <button class="nav-button nav-collapse"
+                                        type="button" data-bs-toggle="collapse" data-bs-target="#menuAreaPrivada"
+                                        aria-expanded="false">
+                                        <span class="nav-icon">🔐</span>
+                                        <span>Área Privada</span>
+                                        <span class="collapse-icon">▾</span>
+                                    </button>
+
+                                    <div id="menuAreaPrivada" class="collapse nav-submenu">
+                                        <a class="nav-subbutton" href="tecnico.php?view=perfil">
+                                            <span>👤</span>
+                                            <span>Mi Cuenta</span>
+                                        </a>
+                                        <a class="nav-subbutton" href="tecnico.php?view=reuniones">
+                                            <span>📅</span>
+                                            <span>Mis Reuniones</span>
+                                        </a>
+                                    </div>
+                                <?php else: ?>
+                                    <a class="nav-button" href="admin.php?view=menu">
+                                        <span class="nav-icon">📊</span>
+                                        <span>Panel Admin</span>
+                                    </a>
+
+                                    <!-- Usuarios -->
+                                    <a class="nav-button <?= in_array($view, ['ver_usuarios', 'add', 'edit', 'delete'], true) ? 'active' : '' ?>" href="admin.php?view=ver_usuarios">
+                                        <span class="nav-icon">👥</span>
+                                        <span>Usuarios</span>
+                                    </a>
+
+                                    <a class="nav-subbutton" href="../model/empresa.php?view=ver_empresas&from=admin">
+                                        <span class="nav-icon">🏢</span>
+                                        <span>Directorio de Empresas</span>
+                                    </a>
+
+                                    <a class="nav-button <?= ($view === 'perfil') ? 'active' : '' ?>" href="admin.php?view=perfil">
+                                        <span class="nav-icon">🔐</span>
+                                        <span>Área Privada</span>
+                                    </a>
+                                <?php endif; ?>
+
+                                <?php if (!empty($volverLink)): ?>
+                                    <!-- Volver al Panel -->
+                                    <a class="nav-button" href="<?= h($volverLink) ?>" style="border-color: var(--color-blue); color: var(--color-blue);">
+                                        <span class="nav-icon">⬅️</span>
+                                        <span><?= h($volverLinkText) ?></span>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Cerrar Sesión -->
+                                <a class="nav-button nav-logout" href="<?= h(app_path('/php/logout.php')) ?>">
+                                    <span class="nav-icon">🚪</span>
+                                    <span>Cerrar Sesión</span>
+                                </a>
+                            </nav>
                         </div>
-
-                        <!-- User Info -->
-                        <div class="sidebar-user-info">
-                            <div class="info-label">Usuario Actual</div>
-                            <div class="info-value"><?= $sessionUsername ?></div>
-                            <?php if ($sessionEmail !== ''): ?>
-                                <div class="info-email">📧 <?= $sessionEmail ?></div>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- Navegación -->
-                        <nav class="sidebar-nav">
-                            <?php if ($isTecnico): ?>
-                                <a class="nav-button" href="tecnico.php?view=menu">
-                                    <span class="nav-icon">📊</span>
-                                    <span>Mi Panel</span>
-                                </a>
-
-                                <button class="nav-button nav-collapse active"
-                                    type="button" data-bs-toggle="collapse" data-bs-target="#menuEmpresas"
-                                    aria-expanded="true">
-                                    <span class="nav-icon">🏢</span>
-                                    <span>Empresas</span>
-                                    <span class="collapse-icon">▾</span>
-                                </button>
-
-                                <div id="menuEmpresas" class="collapse nav-submenu show">
-                                    <a class="nav-subbutton" href="../model/empresa.php?view=ver_empresas&from=tecnico">
-                                        <span>📋</span>
-                                        <span>Mis Empresas</span>
-                                    </a>
-                                    <a class="nav-subbutton" href="../model/empresa.php?view=ver_planes&from=tecnico">
-                                        <span>🗂️</span>
-                                        <span>Mis Planes</span>
-                                    </a>
-                                    <a class="nav-subbutton" href="../model/empresa.php?view=ver_contratos&tipo_contrato=MANTENIMIENTO&from=tecnico">
-                                        <span>🛠️</span>
-                                        <span>Mis Mantenimientos</span>
-                                    </a>
-                                </div>
-
-                                <button class="nav-button nav-collapse"
-                                    type="button" data-bs-toggle="collapse" data-bs-target="#menuAreaPrivada"
-                                    aria-expanded="false">
-                                    <span class="nav-icon">🔐</span>
-                                    <span>Área Privada</span>
-                                    <span class="collapse-icon">▾</span>
-                                </button>
-
-                                <div id="menuAreaPrivada" class="collapse nav-submenu">
-                                    <a class="nav-subbutton" href="tecnico.php?view=perfil">
-                                        <span>👤</span>
-                                        <span>Mi Cuenta</span>
-                                    </a>
-                                    <a class="nav-subbutton" href="tecnico.php?view=reuniones">
-                                        <span>📅</span>
-                                        <span>Mis Reuniones</span>
-                                    </a>
-                                </div>
-                            <?php else: ?>
-                                <a class="nav-button" href="admin.php?view=menu">
-                                    <span class="nav-icon">📊</span>
-                                    <span>Panel Admin</span>
-                                </a>
-
-                                <!-- Usuarios -->
-                                <a class="nav-button <?= in_array($view, ['ver_usuarios', 'add', 'edit', 'delete'], true) ? 'active' : '' ?>" href="admin.php?view=ver_usuarios">
-                                    <span class="nav-icon">👥</span>
-                                    <span>Usuarios</span>
-                                </a>
-
-                                <a class="nav-subbutton" href="../model/empresa.php?view=ver_empresas&from=admin">
-                                    <span class="nav-icon">🏢</span>
-                                    <span>Directorio de Empresas</span>
-                                </a>
-
-                                <a class="nav-button <?= ($view === 'perfil') ? 'active' : '' ?>" href="admin.php?view=perfil">
-                                    <span class="nav-icon">🔐</span>
-                                    <span>Área Privada</span>
-                                </a>
-                            <?php endif; ?>
-
-                            <?php if (!empty($volverLink)): ?>
-                                <!-- Volver al Panel -->
-                                <a class="nav-button" href="<?= h($volverLink) ?>" style="border-color: var(--color-blue); color: var(--color-blue);">
-                                    <span class="nav-icon">⬅️</span>
-                                    <span><?= h($volverLinkText) ?></span>
-                                </a>
-                            <?php endif; ?>
-
-                            <!-- Cerrar Sesión -->
-                            <a class="nav-button nav-logout" href="<?= h(app_path('/php/logout.php')) ?>">
-                                <span class="nav-icon">🚪</span>
-                                <span>Cerrar Sesión</span>
-                            </a>
-                        </nav>
                     </div>
-                </div>
-            </aside>
+                </aside>
+            <?php endif; ?>
 
             <!-- CONTENT -->
-            <main class="col-12 col-lg-9 col-xl-10">
+            <main class="<?= $soloMedidasEmbedMode ? 'col-12' : 'col-12 col-lg-9 col-xl-10' ?>">
                 <div class="card panel mx-auto shadow-sm border-0 <?= in_array($view, ['ver_empresas', 'ver_empresa', 'ver_planes', 'ver_contratos'], true) ? 'panel-wide' : '' ?>">
-                    <div class="card-body p-4">
+                    <div class="card-body <?= $soloMedidasEmbedMode ? 'p-2' : 'p-4' ?>">
 
-                        <header class="d-flex align-items-center justify-content-between mb-3">
-                            <h4 class="mb-0">Gestión de Empresas</h4>
-                        </header>
-
-                        <?php if (!empty($_GET['msg'])): ?>
-                            <div class="mb-3">
-                                <div class="alert alert-info alert-dismissible fade show py-2 px-3 d-inline-flex align-items-center gap-2 mb-0 js-flash-msg" role="alert">
-                                    <span class="small fw-semibold mb-0"><?= h($_GET['msg']) ?></span>
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-                                </div>
-                            </div>
+                        <?php if (!$soloMedidasEmbedMode): ?>
+                            <header class="d-flex align-items-center justify-content-between mb-3">
+                                <h4 class="mb-0">Gestión de Empresas</h4>
+                            </header>
                         <?php endif; ?>
 
-                        <?php if (!empty($alertasAsignacion)): ?>
-                            <?php foreach ($alertasAsignacion as $alertaAsignada): ?>
-                                <div class="alert alert-warning py-2"><?= h((string)$alertaAsignada) ?></div>
-                            <?php endforeach; ?>
-                            <script>
-                                (function() {
-                                    const avisos = <?= json_encode(array_values($alertasAsignacion), JSON_UNESCAPED_UNICODE) ?>;
-                                    const avisosValidos = avisos.filter(function(texto) {
-                                        return !!texto;
-                                    });
+                        <?php if (!$soloMedidasEmbedMode): ?>
+                            <?php if (!empty($_GET['msg'])): ?>
+                                <div class="mb-3">
+                                    <div class="alert alert-info alert-dismissible fade show py-2 px-3 d-inline-flex align-items-center gap-2 mb-0 js-flash-msg" role="alert">
+                                        <span class="small fw-semibold mb-0"><?= h($_GET['msg']) ?></span>
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
 
-                                    if (avisosValidos.length === 1) {
-                                        alert(avisosValidos[0]);
-                                        return;
-                                    }
+                            <?php if (!empty($alertasAsignacion)): ?>
+                                <?php foreach ($alertasAsignacion as $alertaAsignada): ?>
+                                    <div class="alert alert-warning py-2"><?= h((string)$alertaAsignada) ?></div>
+                                <?php endforeach; ?>
+                                <script>
+                                    (function() {
+                                        const avisos = <?= json_encode(array_values($alertasAsignacion), JSON_UNESCAPED_UNICODE) ?>;
+                                        const avisosValidos = avisos.filter(function(texto) {
+                                            return !!texto;
+                                        });
 
-                                    if (avisosValidos.length > 1) {
-                                        alert('Tienes nuevas empresas asignadas:\n\n- ' + avisosValidos.join('\n- '));
-                                    }
-                                })();
-                            </script>
+                                        if (avisosValidos.length === 1) {
+                                            alert(avisosValidos[0]);
+                                            return;
+                                        }
+
+                                        if (avisosValidos.length > 1) {
+                                            alert('Tienes nuevas empresas asignadas:\n\n- ' + avisosValidos.join('\n- '));
+                                        }
+                                    })();
+                                </script>
+                            <?php endif; ?>
                         <?php endif; ?>
 
                         <?php if ($view === 'ver_empresas'): ?>
@@ -376,7 +384,7 @@ if ($fromPanel === 'tecnico') {
                                             <?php endif; ?>
                                             <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/php/ver_archivos.php?id_empresa=' . $detalleEmpresaId)) ?>">📁 Archivos subidos</a>
                                             <?php if (!$isAdmin): ?>
-                                                <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/html/index_staff.php?id_empresa=' . $detalleEmpresaId)) ?>">📊 Subir registro retributivo</a>
+                                                <a class="btn btn-primary btn-sm ge-company-action-btn" href="<?= h(app_path('/html/subir_registro.html.php?id_empresa=' . $detalleEmpresaId)) ?>">📊 Subir registro retributivo</a>
                                             <?php endif; ?>
                                             <a class="btn btn-secondary btn-sm ge-company-action-btn" href="../model/empresa.php?view=edit_empresas&id_empresa=<?= $detalleEmpresaId ?><?= $fromParam ?>">✏️ Editar empresa</a>
                                             <a class="btn btn-secondary btn-sm ge-company-action-btn" href="../model/empresa.php?view=ver_medidas&id_empresa=<?= $detalleEmpresaId ?><?= $fromParam ?>">📌 Ver áreas y medidas</a>
@@ -1446,7 +1454,13 @@ if ($fromPanel === 'tecnico') {
 
                 <?php elseif ($view === 'edit_contratos'): ?>
 
-                    <h6 class="mb-3">Editar Servicios</h6>
+                    <?php if (!$soloMedidasEmbedMode): ?>
+                        <h6 class="mb-3">Editar Servicios</h6>
+                    <?php endif; ?>
+
+                    <?php if ($soloMedidasEmbedMode && !empty($_GET['msg'])): ?>
+                        <div class="alert alert-success py-2 mb-3"><?= h((string)$_GET['msg']) ?></div>
+                    <?php endif; ?>
 
                     <?php if (!empty($editContratoError)): ?>
                         <div class="alert alert-danger py-2 mb-3"><?= h($editContratoError) ?></div>
@@ -1468,54 +1482,78 @@ if ($fromPanel === 'tecnico') {
                                 <input type="hidden" name="from" value="<?= h((string)$fromPanel) ?>">
                             <?php endif; ?>
 
-                            <div>
-                                <label class="form-label">Empresa</label>
-                                <input class="form-control" type="text" value="<?= h((string)($selectedContrato['empresa_nombre'] ?? '')) ?>" readonly>
-                            </div>
+                            <?php if ($soloMedidasEmbedMode): ?>
+                                <input type="hidden" name="id_usuario" value="<?= (int)($selectedContrato['id_usuario'] ?? ($_SESSION['user']['id_usuario'] ?? 0)) ?>">
+                                <input type="hidden" name="tipo_contrato" value="<?= h((string)($selectedContrato['tipo_contrato'] ?? 'PLAN IGUALDAD')) ?>">
+                                <input type="hidden" name="inicio_plan" value="<?= h((string)($selectedContrato['inicio_plan'] ?? '')) ?>">
+                                <input type="hidden" name="fin_plan" value="<?= h((string)($selectedContrato['fin_plan'] ?? '')) ?>">
+                                <input type="hidden" name="inicio_contratacion" value="<?= h((string)($selectedContrato['inicio_contratacion'] ?? '')) ?>">
+                                <input type="hidden" name="fin_contratacion" value="<?= h((string)($selectedContrato['fin_contratacion'] ?? '')) ?>">
+                                <input type="hidden" name="solo_medidas_embed" value="1">
+                            <?php endif; ?>
 
-                            <div>
-                                <label class="form-label">Técnico asignado al servicio</label>
-                                <?php if ($isTecnico): ?>
-                                    <input type="hidden" name="id_usuario" value="<?= (int)($_SESSION['user']['id_usuario'] ?? 0) ?>">
-                                    <input class="form-control" type="text" value="<?= h((string)($_SESSION['user']['nombre_usuario'] ?? 'Técnico')) ?>" readonly>
-                                <?php else: ?>
-                                    <select class="form-select" name="id_usuario" required>
-                                        <option value="">-- seleccionar Técnico --</option>
-                                        <?php foreach (($tecnicosDisponibles ?? []) as $tecnicoContrato): ?>
-                                            <?php $idTecnicoContrato = (int)($tecnicoContrato['id_usuario'] ?? 0); ?>
-                                            <option value="<?= $idTecnicoContrato ?>" <?= ((int)($selectedContrato['id_usuario'] ?? 0) === $idTecnicoContrato) ? 'selected' : '' ?>>
-                                                <?= h((string)($tecnicoContrato['nombre_usuario'] ?? '')) ?><?= !empty($tecnicoContrato['email']) ? ' (' . h((string)$tecnicoContrato['email']) . ')' : '' ?>
+                            <?php if (!$soloMedidasEmbedMode): ?>
+
+                                <div>
+                                    <label class="form-label">Empresa</label>
+                                    <input class="form-control" type="text" value="<?= h((string)($selectedContrato['empresa_nombre'] ?? '')) ?>" readonly>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Técnico asignado al servicio</label>
+                                    <?php if ($isTecnico): ?>
+                                        <input type="hidden" name="id_usuario" value="<?= (int)($_SESSION['user']['id_usuario'] ?? 0) ?>">
+                                        <input class="form-control" type="text" value="<?= h((string)($_SESSION['user']['nombre_usuario'] ?? 'Técnico')) ?>" readonly>
+                                    <?php else: ?>
+                                        <select class="form-select" name="id_usuario" required>
+                                            <option value="">-- seleccionar Técnico --</option>
+                                            <?php foreach (($tecnicosDisponibles ?? []) as $tecnicoContrato): ?>
+                                                <?php $idTecnicoContrato = (int)($tecnicoContrato['id_usuario'] ?? 0); ?>
+                                                <option value="<?= $idTecnicoContrato ?>" <?= ((int)($selectedContrato['id_usuario'] ?? 0) === $idTecnicoContrato) ? 'selected' : '' ?>>
+                                                    <?= h((string)($tecnicoContrato['nombre_usuario'] ?? '')) ?><?= !empty($tecnicoContrato['email']) ? ' (' . h((string)$tecnicoContrato['email']) . ')' : '' ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Tipo de Servicio</label>
+                                    <select class="form-select js-tipo-contrato" name="tipo_contrato" required>
+                                        <?php foreach (($tiposContrato ?? []) as $tipo): ?>
+                                            <option value="<?= h($tipo) ?>" <?= (($selectedContrato['tipo_contrato'] ?? 'PLAN IGUALDAD') === $tipo) ? 'selected' : '' ?>>
+                                                <?= h($tipo) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Inicio contratación</label>
+                                    <input class="form-control" type="date" name="inicio_contratacion" required value="<?= h($selectedContrato['inicio_contratacion'] ?? '') ?>">
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Fin contratación</label>
+                                    <input class="form-control" type="date" name="fin_contratacion" required value="<?= h($selectedContrato['fin_contratacion'] ?? '') ?>">
+                                </div>
+
+                                <?php $tipoContratoActualEdit = strtoupper(trim((string)($selectedContrato['tipo_contrato'] ?? 'PLAN IGUALDAD'))); ?>
+                                <div class="maintenance-fields border rounded p-3 bg-light" style="display: <?= ($tipoContratoActualEdit === 'MANTENIMIENTO') ? 'block' : 'none' ?>;">
+                                    <div class="small text-muted mb-2">Estos datos solo son obligatorios cuando el servicio es de Mantenimiento.</div>
+                                    <div>
+                                        <label class="form-label">Fecha inicio vigencia</label>
+                                        <input class="form-control js-contrato-plan-date" type="date" name="inicio_plan" value="<?= h($selectedContrato['inicio_plan'] ?? '') ?>">
+                                    </div>
+
+                                    <div>
+                                        <label class="form-label">Fecha fin vigencia</label>
+                                        <input class="form-control js-contrato-plan-date" type="date" name="fin_plan" value="<?= h($selectedContrato['fin_plan'] ?? '') ?>">
+                                    </div>
+
                                 <?php endif; ?>
-                            </div>
 
-                            <div>
-                                <label class="form-label">Tipo de Servicio</label>
-                                <select class="form-select js-tipo-contrato" name="tipo_contrato" required>
-                                    <?php foreach (($tiposContrato ?? []) as $tipo): ?>
-                                        <option value="<?= h($tipo) ?>" <?= (($selectedContrato['tipo_contrato'] ?? 'PLAN IGUALDAD') === $tipo) ? 'selected' : '' ?>>
-                                            <?= h($tipo) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <?php $tipoContratoActualEdit = strtoupper(trim((string)($selectedContrato['tipo_contrato'] ?? 'PLAN IGUALDAD'))); ?>
-                            <div class="maintenance-fields border rounded p-3 bg-light" style="display: <?= ($tipoContratoActualEdit === 'MANTENIMIENTO') ? 'block' : 'none' ?>;">
-                                <div class="small text-muted mb-2">Estos datos solo son obligatorios cuando el servicio es de Mantenimiento.</div>
-                                <div>
-                                    <label class="form-label">Fecha inicio vigencia</label>
-                                    <input class="form-control js-contrato-plan-date" type="date" name="inicio_plan" value="<?= h($selectedContrato['inicio_plan'] ?? '') ?>">
-                                </div>
-
-                                <div>
-                                    <label class="form-label">Fecha fin vigencia</label>
-                                    <input class="form-control js-contrato-plan-date" type="date" name="fin_plan" value="<?= h($selectedContrato['fin_plan'] ?? '') ?>">
-                                </div>
-
-                                <div class="border rounded p-3 bg-light mt-3">
+                                <div class="border rounded p-3 bg-light<?= $soloMedidasEmbedMode ? '' : ' mt-3' ?>">
                                     <label class="form-label fw-semibold">Áreas del Plan y sus medidas</label>
                                     <div class="small text-muted mb-2">Marca un Área para desplegar y elegir sus medidas.</div>
 
@@ -1576,22 +1614,21 @@ if ($fromPanel === 'tecnico') {
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                            </div>
 
-                            <div>
-                                <label class="form-label">Inicio contratación</label>
-                                <input class="form-control" type="date" name="inicio_contratacion" required value="<?= h($selectedContrato['inicio_contratacion'] ?? '') ?>">
-                            </div>
+                                <?php if (!$soloMedidasEmbedMode): ?>
+                                </div>
+                            <?php endif; ?>
 
-                            <div>
-                                <label class="form-label">Fin contratación</label>
-                                <input class="form-control" type="date" name="fin_contratacion" required value="<?= h($selectedContrato['fin_contratacion'] ?? '') ?>">
-                            </div>
-
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-primary w-100" type="submit">Guardar cambios</button>
-                                <a class="btn btn-outline-secondary w-100" href="../model/empresa.php?view=ver_contratos<?= ($idEmpresaContexto > 0) ? '&id_empresa=' . (int)$idEmpresaContexto : '' ?><?= (($tipoContratoFiltro ?? '') !== '') ? '&tipo_contrato=' . urlencode((string)$tipoContratoFiltro) : '' ?><?= $fromParam ?>">Volver</a>
-                            </div>
+                            <?php if (!$soloMedidasEmbedMode): ?>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-primary w-100" type="submit">Guardar cambios</button>
+                                    <a class="btn btn-outline-secondary w-100" href="../model/empresa.php?view=ver_contratos<?= ($idEmpresaContexto > 0) ? '&id_empresa=' . (int)$idEmpresaContexto : '' ?><?= (($tipoContratoFiltro ?? '') !== '') ? '&tipo_contrato=' . urlencode((string)$tipoContratoFiltro) : '' ?><?= $fromParam ?>">Volver</a>
+                                </div>
+                            <?php else: ?>
+                                <div class="d-flex justify-content-end">
+                                    <button class="btn btn-primary px-4" type="submit">Guardar medidas</button>
+                                </div>
+                            <?php endif; ?>
                         </form>
                     <?php endif; ?>
 
@@ -1655,6 +1692,16 @@ if ($fromPanel === 'tecnico') {
                                     <?php endforeach; ?>
                                 </select>
                             <?php endif; ?>
+                        </div>
+
+                        <div>
+                            <label class="form-label">Inicio contratación</label>
+                            <input class="form-control" type="date" name="inicio_contratacion" required value="<?= h($selectedContrato['inicio_contratacion'] ?? '') ?>">
+                        </div>
+
+                        <div>
+                            <label class="form-label">Fin contratación</label>
+                            <input class="form-control" type="date" name="fin_contratacion" required value="<?= h($selectedContrato['fin_contratacion'] ?? '') ?>">
                         </div>
 
                         <?php $tipoContratoActualAdd = strtoupper(trim((string)((($tipoContratoForzadoAdd ?? '') !== '') ? $tipoContratoForzadoAdd : ($addContratoOld['tipo_contrato'] ?? 'PLAN IGUALDAD')))); ?>
@@ -1732,16 +1779,6 @@ if ($fromPanel === 'tecnico') {
                                     </div>
                                 <?php endforeach; ?>
                             </div>
-                        </div>
-
-                        <div>
-                            <label class="form-label">Inicio contratación</label>
-                            <input class="form-control" type="date" name="inicio_contratacion" required value="<?= h($addContratoOld['inicio_contratacion'] ?? '') ?>">
-                        </div>
-
-                        <div>
-                            <label class="form-label">Fin contratación</label>
-                            <input class="form-control" type="date" name="fin_contratacion" required value="<?= h($addContratoOld['fin_contratacion'] ?? '') ?>">
                         </div>
 
                         <div class="d-flex gap-2">
@@ -1863,9 +1900,9 @@ if ($fromPanel === 'tecnico') {
             // Update hint text dynamically
             var infoText = fields.querySelector('.js-maintenance-info');
             if (infoText) {
-                infoText.innerHTML = esMantenimiento
-                    ? 'Estos datos solo son obligatorios cuando el servicio es de Mantenimiento.'
-                    : 'Estos datos son <strong>opcionales</strong> para el Plan de Igualdad. Puedes seleccionar áreas y medidas si lo deseas.';
+                infoText.innerHTML = esMantenimiento ?
+                    'Estos datos solo son obligatorios cuando el servicio es de Mantenimiento.' :
+                    'Estos datos son <strong>opcionales</strong> para el Plan de Igualdad. Puedes seleccionar áreas y medidas si lo deseas.';
             }
 
             fields.querySelectorAll('.js-contrato-plan-date').forEach(function(input) {
