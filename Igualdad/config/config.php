@@ -8,7 +8,7 @@ const DB_HOST = '127.0.0.1';
 const DB_USER = 'nombre_usuario';
 const DB_PASS = 'contraseña'; 
 const DB_NAME = 'nombre_base_de_datos';
-
+const GEMINI_API_KEY = 'key_api';
 function db(): mysqli {
   static $conn = null;
   if ($conn instanceof mysqli) return $conn;
