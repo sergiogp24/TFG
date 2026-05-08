@@ -286,7 +286,7 @@ function obtenerConteosPorModalidadContratoEnPeriodo(mysqli $db, int $idEmpresa,
         SELECT
             de.sexo,
             de.clave_contrato,
-            de.inicio_contratacion,
+            de.fecha_antiguedad,
             ad.fecha_inicio,
             ad.fecha_fin,
             de.salario_base_eq,
@@ -297,7 +297,7 @@ function obtenerConteosPorModalidadContratoEnPeriodo(mysqli $db, int $idEmpresa,
         WHERE ce.id_empresa = ?
           AND de.id_ano_datos = ?
           AND de.clave_contrato IS NOT NULL
-          AND de.inicio_contratacion IS NOT NULL
+          AND de.fecha_antiguedad IS NOT NULL
           AND ad.fecha_inicio IS NOT NULL
           AND ad.fecha_fin IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
@@ -318,14 +318,14 @@ function obtenerConteosPorModalidadContratoEnPeriodo(mysqli $db, int $idEmpresa,
     $hombres = array_fill(0, 5, 0);
 
     while ($row = $result->fetch_assoc()) {
-        $inicioContratacion = \DateTime::createFromFormat('Y-m-d', (string)($row['inicio_contratacion'] ?? ''));
+        $fechaAntiguedad = \DateTime::createFromFormat('Y-m-d', (string)($row['fecha_antiguedad'] ?? ''));
         $fechaInicio = \DateTime::createFromFormat('Y-m-d', (string)($row['fecha_inicio'] ?? ''));
         $fechaFin = \DateTime::createFromFormat('Y-m-d', (string)($row['fecha_fin'] ?? ''));
-        if ($inicioContratacion === false || $fechaInicio === false || $fechaFin === false) {
+        if ($fechaAntiguedad === false || $fechaInicio === false || $fechaFin === false) {
             continue;
         }
 
-        if ($inicioContratacion < $fechaInicio || $inicioContratacion > $fechaFin) {
+        if ($fechaAntiguedad < $fechaInicio || $fechaAntiguedad > $fechaFin) {
             continue;
         }
 
@@ -510,7 +510,7 @@ function obtenerConteosPorPorcentajeJornadaEnPeriodo(mysqli $db, int $idEmpresa,
         SELECT
             de.sexo,
             de.porc_jornada,
-            de.inicio_contratacion,
+            de.fecha_antiguedad,
             ad.fecha_inicio,
             ad.fecha_fin,
             de.salario_base_eq,
@@ -521,10 +521,10 @@ function obtenerConteosPorPorcentajeJornadaEnPeriodo(mysqli $db, int $idEmpresa,
         WHERE ce.id_empresa = ?
           AND de.id_ano_datos = ?
           AND de.porc_jornada IS NOT NULL
-          AND de.inicio_contratacion IS NOT NULL
+          AND de.fecha_antiguedad IS NOT NULL
           AND ad.fecha_inicio IS NOT NULL
           AND ad.fecha_fin IS NOT NULL
-          AND de.inicio_contratacion BETWEEN ad.fecha_inicio AND ad.fecha_fin
+          AND de.fecha_antiguedad BETWEEN ad.fecha_inicio AND ad.fecha_fin
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
@@ -688,10 +688,10 @@ function obtenerConteosPorPuestoProfesionalEnPeriodo(mysqli $db, int $idEmpresa,
           AND de.id_ano_datos = ?
           AND de.puesto_empresa IS NOT NULL
           AND TRIM(de.puesto_empresa) <> ''
-          AND de.inicio_contratacion IS NOT NULL
+          AND de.fecha_antiguedad IS NOT NULL
           AND ad.fecha_inicio IS NOT NULL
           AND ad.fecha_fin IS NOT NULL
-          AND de.inicio_contratacion BETWEEN ad.fecha_inicio AND ad.fecha_fin
+          AND de.fecha_antiguedad BETWEEN ad.fecha_inicio AND ad.fecha_fin
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
@@ -1004,10 +1004,10 @@ function obtenerConteosPorAreaFuncionalEnPeriodo(mysqli $db, int $idEmpresa, int
           AND de.id_ano_datos = ?
           AND de.dpto_empresa IS NOT NULL
           AND TRIM(de.dpto_empresa) <> ''
-          AND de.inicio_contratacion IS NOT NULL
+          AND de.fecha_antiguedad IS NOT NULL
           AND ad.fecha_inicio IS NOT NULL
           AND ad.fecha_fin IS NOT NULL
-          AND de.inicio_contratacion BETWEEN ad.fecha_inicio AND ad.fecha_fin
+          AND de.fecha_antiguedad BETWEEN ad.fecha_inicio AND ad.fecha_fin
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
@@ -1267,7 +1267,7 @@ function obtenerConteosEdadContratacionPeriodo(mysqli $db, int $idEmpresa, int $
         SELECT
             de.sexo,
             de.fecha_nacimiento,
-            de.inicio_contratacion,
+            de.fecha_antiguedad,
             ad.fecha_inicio,
             ad.fecha_fin,
             de.salario_base_eq,
@@ -1278,7 +1278,7 @@ function obtenerConteosEdadContratacionPeriodo(mysqli $db, int $idEmpresa, int $
         WHERE ce.id_empresa = ?
           AND de.id_ano_datos = ?
           AND de.fecha_nacimiento IS NOT NULL
-          AND de.inicio_contratacion IS NOT NULL
+          AND de.fecha_antiguedad IS NOT NULL
           AND ad.fecha_inicio IS NOT NULL
           AND ad.fecha_fin IS NOT NULL
           AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
@@ -1307,16 +1307,16 @@ function obtenerConteosEdadContratacionPeriodo(mysqli $db, int $idEmpresa, int $
         }
 
         $fechaNacimiento = \DateTime::createFromFormat('Y-m-d', (string)$row['fecha_nacimiento']);
-        $inicioContratacion = \DateTime::createFromFormat('Y-m-d', (string)$row['inicio_contratacion']);
+        $fechaAntiguedad = \DateTime::createFromFormat('Y-m-d', (string)$row['fecha_antiguedad']);
         $fechaInicio = \DateTime::createFromFormat('Y-m-d', (string)$row['fecha_inicio']);
         $fechaFin = \DateTime::createFromFormat('Y-m-d', (string)$row['fecha_fin']);
 
-        if ($fechaNacimiento === false || $inicioContratacion === false || $fechaInicio === false || $fechaFin === false) {
+        if ($fechaNacimiento === false || $fechaAntiguedad === false || $fechaInicio === false || $fechaFin === false) {
             continue;
         }
 
         // Solo contrataciones dentro del periodo del ano_datos.
-        if ($inicioContratacion < $fechaInicio || $inicioContratacion > $fechaFin) {
+        if ($fechaAntiguedad < $fechaInicio || $fechaAntiguedad > $fechaFin) {
             continue;
         }
 

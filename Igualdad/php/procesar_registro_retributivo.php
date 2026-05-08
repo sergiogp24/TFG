@@ -129,7 +129,7 @@ function registrarArchivoGeneradoEnTabla(
         $idArchivo = (int)$rowDup['id_archivo'];
         $stmtUpd = $db->prepare(
             'UPDATE archivos
-             SET asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, sha256 = ?, id_cliente_medida = ?, id_empresa = ?
+             SET asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, sha256 = ?, id_cliente_medida = ?, id_empresa = ?, subido_en = CURRENT_TIMESTAMP
              WHERE id_archivo = ?'
         );
 
@@ -906,13 +906,13 @@ foreach ($names as $i => $originalName) {
     $mime = mime_content_type($rutaCompleta);
     $rutaRelativa = 'uploads/' . $nombreGuardado;
 
-    // Verificar si el archivo ya existe para actualizarlo
+    // Verificar si el archivo ya existe para actualizarlo (basándonos en tipo y ruta_relativa)
     $stmtDup = $db->prepare(
-        "SELECT id_archivo FROM archivos WHERE tipo = ? AND sha256 = ? LIMIT 1"
+        "SELECT id_archivo FROM archivos WHERE tipo = ? AND ruta_relativa = ? LIMIT 1"
     );
     $idArchivoExistente = null;
     if ($stmtDup) {
-        $stmtDup->bind_param('ss', $tipo, $sha256);
+        $stmtDup->bind_param('ss', $tipo, $rutaRelativa);
         $stmtDup->execute();
         $resultDup = $stmtDup->get_result()->fetch_assoc();
         $stmtDup->close();
@@ -930,7 +930,7 @@ foreach ($names as $i => $originalName) {
         if ($idClienteMedidaUsado !== null) {
             $stmtUpdate = $db->prepare(" 
                 UPDATE archivos 
-                SET nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_cliente_medida = ?, id_empresa = ?
+                SET nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_cliente_medida = ?, id_empresa = ?, subido_en = CURRENT_TIMESTAMP
                 WHERE id_archivo = ?
             ");
             if ($stmtUpdate) {
@@ -941,7 +941,7 @@ foreach ($names as $i => $originalName) {
         } else {
             $stmtUpdate = $db->prepare("
                 UPDATE archivos 
-                SET nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_empresa = ?
+                SET nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_empresa = ?, subido_en = CURRENT_TIMESTAMP
                 WHERE id_archivo = ?
             ");
             if ($stmtUpdate) {
@@ -994,28 +994,69 @@ foreach ($names as $i => $originalName) {
     }
 
     // ================== Año Datos ==================
-    $stmtAno = $db->prepare("
-        INSERT INTO ano_datos (fecha_inicio, fecha_fin, id_contrato_empresa)
-        VALUES (?,?,?)
+    $id_ano_datos = null;
+    $anioRR = (int)date('Y', strtotime($fecha_inicio));
+    
+    // Buscamos si ya existe algún registro de año de datos para esta empresa y este mismo año natural
+    $stmtCheckAno = $db->prepare("
+        SELECT id_ano_datos 
+        FROM ano_datos 
+        WHERE (YEAR(fecha_inicio) = ? OR YEAR(fecha_fin) = ?) 
+          AND id_contrato_empresa = ? 
+        ORDER BY id_ano_datos ASC
     ");
 
-    if (!$stmtAno) {
-        $totalErroresGlobal++;
-        $erroresMensajes[] = "Error prepare ano_datos: " . $db->error;
-        continue;
+    if ($stmtCheckAno) {
+        $stmtCheckAno->bind_param("iii", $anioRR, $anioRR, $id_contrato_empresa);
+        $stmtCheckAno->execute();
+        $resCheckAno = $stmtCheckAno->get_result();
+        while ($rowAnoExistente = $resCheckAno->fetch_assoc()) {
+            if ($id_ano_datos === null) {
+                // Reutilizamos el primer registro encontrado
+                $id_ano_datos = (int)$rowAnoExistente['id_ano_datos'];
+                // Actualizamos las fechas exactas por si han cambiado en el Excel
+                $stmtUpdAno = $db->prepare("UPDATE ano_datos SET fecha_inicio = ?, fecha_fin = ? WHERE id_ano_datos = ?");
+                if ($stmtUpdAno) {
+                    $stmtUpdAno->bind_param("ssi", $fecha_inicio, $fecha_fin, $id_ano_datos);
+                    $stmtUpdAno->execute();
+                    $stmtUpdAno->close();
+                }
+                // Borramos los empleados antiguos asociados a este año (para sobrescribir con los nuevos)
+                $db->query("DELETE FROM datos_empleados WHERE id_ano_datos = $id_ano_datos");
+            } else {
+                // Si hubiera duplicados accidentales para el mismo año, los limpiamos
+                $idExtra = (int)$rowAnoExistente['id_ano_datos'];
+                $db->query("DELETE FROM ano_datos WHERE id_ano_datos = $idExtra");
+            }
+        }
+        $stmtCheckAno->close();
     }
 
-    $stmtAno->bind_param("ssi", $fecha_inicio, $fecha_fin, $id_contrato_empresa);
+    if ($id_ano_datos === null) {
+        // Si no existe, creamos uno nuevo
+        $stmtAno = $db->prepare("
+            INSERT INTO ano_datos (fecha_inicio, fecha_fin, id_contrato_empresa)
+            VALUES (?,?,?)
+        ");
 
-    if (!$stmtAno->execute()) {
-        $totalErroresGlobal++;
-        $erroresMensajes[] = "Error insert ano_datos: " . $stmtAno->error;
+        if (!$stmtAno) {
+            $totalErroresGlobal++;
+            $erroresMensajes[] = "Error prepare ano_datos: " . $db->error;
+            continue;
+        }
+
+        $stmtAno->bind_param("ssi", $fecha_inicio, $fecha_fin, $id_contrato_empresa);
+
+        if (!$stmtAno->execute()) {
+            $totalErroresGlobal++;
+            $erroresMensajes[] = "Error insert ano_datos: " . $stmtAno->error;
+            $stmtAno->close();
+            continue;
+        }
+
+        $id_ano_datos = $stmtAno->insert_id;
         $stmtAno->close();
-        continue;
     }
-
-    $id_ano_datos = $stmtAno->insert_id;
-    $stmtAno->close();
 
     // ================== Hoja 3 (pestaña "Datos"): Empleados ==================
     $sheetEmpleados = $spreadsheet->getSheetByName('Datos');
