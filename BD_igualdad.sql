@@ -4,7 +4,7 @@ CREATE DATABASE IF NOT EXISTS igualdadconsulting;
 USE igualdadconsulting;
 -- --------------------------------------------------------
 --
--- Estructura para la tabla ROL
+-- Esctrutura para la tabla ROL
 --
 
 CREATE TABLE `rol`(
@@ -190,8 +190,6 @@ INDEX idx_contrato_empresa_empresa (id_empresa),
   CONSTRAINT fk_contrato_empresa_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
 INDEX idx_contrato_empresa_usuario (id_usuario)
 )ENGINE=InnoDB;
-
-
 -- --------------------------------------------------------
 --
 -- Estructura para la tabla año_datos
@@ -559,13 +557,13 @@ CONSTRAINT fk_definitivas_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas
 -- --------------------------------------------------------
 
 --
--- Estructura para la tabla EXCEDENCIAS
+-- Estructura para la tabla EXCENDENCIAS
 --
 
 CREATE TABLE `area_excedencias`(
 `id_excedencias`INT AUTO_INCREMENT PRIMARY KEY,
 `motivo`VARCHAR(100) DEFAULT NULL,
-`tipo`ENUM('Excedencias Voluntarias','Excedencias Cuidado Menores','Excedencias Cuidado de Personas Mayores') NOT NULL,
+`tipo`ENUM('Excedencias Voluntarias','Excedencias Cuidado Menores','Excedencias Cuidado de Personas Mayores','Otros') NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
 `id_ano_datos`INT NOT NULL,
@@ -600,7 +598,7 @@ CREATE TABLE `area_formaciones`(
 CREATE TABLE `area_Permisos_retribuidos`(
 `id_permisos_retribuidos`INT AUTO_INCREMENT PRIMARY KEY,
 `motivo`VARCHAR(100) DEFAULT NULL,
-`tipo` ENUM('Lactancia','Nacimiento') NOT NULL,
+`tipo` ENUM('Lactancia','Nacimiento','Matrimonio','Hospitalizacion de familiares','Otros') NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
 `id_ano_datos`INT  NOT NULL,
@@ -639,7 +637,6 @@ CREATE TABLE `area_adaptaciones_jornada`(
    INDEX idx_adaptaciones_empresa (id_ano_datos))ENGINE=InnoDB;
 
 -- --------------------------------------------------------
-
 --
 -- Estructura Cuestionario Cualitativo
 --
@@ -837,7 +834,7 @@ CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL','GENERADO WORD','REGISTRO_MALFORMATEADO') NOT NULL,
+  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL','GENERADO WORD', 'REGISTRO_MALFORMATEADO') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -868,6 +865,7 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- --------------------------------------------------------
+
 --
 --
 -- Insertar roles
@@ -970,7 +968,6 @@ INSERT INTO empresa (
  'Educación', 'Convenio Enseñanza', 28, 12, 40, 1,
  'Reuniones y actas', '2025-2027', NULL);
  
-
  -- INSERTS PARA LA BASE DE DATOS IGUALDAD AREAS
 
 -- ========================================================
