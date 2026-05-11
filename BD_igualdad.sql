@@ -4,7 +4,7 @@ CREATE DATABASE IF NOT EXISTS igualdadconsulting;
 USE igualdadconsulting;
 -- --------------------------------------------------------
 --
--- Esctrutura para la tabla ROL
+-- Estructura para la tabla ROL
 --
 
 CREATE TABLE `rol`(
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
   KEY `idx_token` (`token`),
   KEY `idx_expires_at` (`expires_at`)
 ) ENGINE=InnoDB;
-SELECT * FROM password_reset_token;
+
 -- --------------------------------------------------------
 
 --
@@ -106,7 +106,7 @@ CREATE TABLE `empresa`(
   INDEX `idx_cliente_nif` (`nif`),
   INDEX `idx_empresa_razon_social` (`razon_social`)
 ) ENGINE=InnoDB;
-SELECT * FROM empresa;
+
 
 CREATE TABLE `cnae` (
   `id` INT  PRIMARY KEY AUTO_INCREMENT,
@@ -114,7 +114,7 @@ CREATE TABLE `cnae` (
   `id_empresa` INT NOT NULL,
    CONSTRAINT `fk_empresa_cnae` FOREIGN KEY (`id_empresa`) REFERENCES `empresa`(`id_empresa`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-SELECT * FROM cnae;
+
 -- --------------------------------------------------------
 --
 -- Estructura para la tabla RELACIONAL USUARIOS Y CLIENTES
@@ -206,7 +206,7 @@ CREATE TABLE `ano_datos`(
  CONSTRAINT fk_ano_datos_contrato_empresa FOREIGN KEY (id_contrato_empresa) REFERENCES contrato_empresa(id_contrato_empresa) ON DELETE CASCADE,
  INDEX idx__ano_datos_contrato_empresa (id_contrato_empresa)
  )ENGINE= InnoDB;
- SELECT * FROM ano_datos;
+
 -- --------------------------------------------------------
 
 --
@@ -255,7 +255,7 @@ CREATE TABLE `datos_empleados`(
   CONSTRAINT fk_ano_datos_datos_empleados FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
 INDEX idx_ano_datos_datos_empleados(id_ano_datos)
 )ENGINE=InnoDB;
-SELECT * FROM datos_empleados;
+
 
 -- --------------------------------------------------------
 
@@ -534,7 +534,7 @@ CREATE TABLE `baja_temporales`(
   CONSTRAINT fk_bajastemporales_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
 `id_bajas`INT NOT NULL,
 CONSTRAINT fk_temporales_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)ON DELETE CASCADE)ENGINE=InnoDB;
-SELECT * FROM baja_temporales;
+
 -- --------------------------------------------------------
 
 --
@@ -559,7 +559,7 @@ CONSTRAINT fk_definitivas_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas
 -- --------------------------------------------------------
 
 --
--- Estructura para la tabla EXCENDENCIAS
+-- Estructura para la tabla EXCEDENCIAS
 --
 
 CREATE TABLE `area_excedencias`(
@@ -667,7 +667,7 @@ CREATE TABLE `cuestionario_seleccion_personal`(
   CONSTRAINT fk_cuestionario_seleccion_personal_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   CONSTRAINT fk_seleccion_personal_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_seleccion_personal_empresa (id_ano_datos))ENGINE=InnoDB;
-SELECT * FROM cuestionario_seleccion_personal;
+
 -- --------------------------------------------------------
 
 --
@@ -837,7 +837,7 @@ CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL','GENERADO WORD') NOT NULL,
+  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL','GENERADO WORD','REGISTRO_MALFORMATEADO') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -854,7 +854,7 @@ CREATE TABLE `archivos`(
   INDEX idx_archivos_tipo (tipo),
   INDEX idx_archivos_cliente_medida_fecha (id_cliente_medida, subido_en)
 ) ENGINE=InnoDB;
-Select * from archivos;
+
 
 CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   id_descarga INT AUTO_INCREMENT PRIMARY KEY,
@@ -868,7 +868,6 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 -- --------------------------------------------------------
-select * from archivo_descarga_log;
 --
 --
 -- Insertar roles
