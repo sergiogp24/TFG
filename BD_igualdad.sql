@@ -24,6 +24,7 @@ CREATE TABLE `usuario`(
  `apellidos`VARCHAR(255) DEFAULT NULL,
  `email`VARCHAR(255) UNIQUE NOT NULL,
  `telefono`VARCHAR(20)  DEFAULT NULL,
+ `firmacorreo`VARCHAR(255) DEFAULT NULL,
  `direccion`VARCHAR(255) DEFAULT NULL,
  `localidad`VARCHAR(20) DEFAULT NULL,
  `password`VARCHAR(255) NOT NULL,
@@ -841,7 +842,8 @@ CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','PLAN_IGUALDAD_DEFINITIVO','GENERADO WORD', 'REGISTRO_MALFORMATEADO','DOCUMENTACION') NOT NULL,
+  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES',
+  'PLAN_IGUALDAD_DEFINITIVO','GENERADO WORD','REGISTRO_PROPIO_CLIENTE','DOCUMENTACION','FIRMACORREO') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -2221,4 +2223,3 @@ SELECT ap.id_plan, 'Implementación de las medidas y protocolo según lo dispues
 FROM area_plan ap
 WHERE ap.nombre = 'Colectivo LGTBI'
 AND NOT EXISTS (SELECT 1 FROM medida m WHERE m.id_plan = ap.id_plan AND m.descripcion = 'Implementación de las medidas y protocolo según lo dispuesto en la normativa vigente');
-
