@@ -1,0 +1,49 @@
+# Dependencies
+vendor/
+composer.lock
+
+# Environment & Secrets (NEVER COMMIT!)
+.env
+.env.local
+.env.*.local
+.env.backup
+.env.production
+.env.production.local
+config/mail.php
+
+# Uploads & temporary files
+uploads/*
+!uploads/.gitkeep
+*.xlsx
+*.xls
+*.docx
+*.doc
+uploads/procesar_registro_retributivo_error.log
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Session files
+session/
+sessions/
+tmp/
+
+# Log files
+*.log
+logs/
+
+# Build & distribution
+build/
+dist/
+node_modules/
