@@ -30,7 +30,7 @@ $tipo = strtoupper(trim((string)($_POST['tipo'] ?? '')));
 $maxTamanoBytes = 100 * 1024 * 1024; // 100MB
 $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
-$tiposPermitidos = ['IGUALDAD', 'SELECCION', 'SALUD', 'COMUNICACION', 'LGTBI', 'TOMA DE DATOS'];
+$tiposPermitidos = ['IGUALDAD', 'SELECCION', 'SALUD', 'COMUNICACION', 'LGTBI', 'TOMA DE DATOS', 'DOCUMENTACION'];
 
 if (!in_array($tipo, $tiposPermitidos, true)) {
     redirect_documentos('Tipo de archivo no valido.');
@@ -82,10 +82,26 @@ if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
 $db = db();
 
 $empresaNombre = '';
-$idEmpresaContexto = 0;
-if ($usuarioId > 0) {
+$idEmpresaContexto = (int)($_POST['id_empresa'] ?? 0);
+
+if ($idEmpresaContexto > 0) {
+    // Verificar si la empresa existe
+    $stmtCheck = $db->prepare('SELECT razon_social FROM empresa WHERE id_empresa = ? LIMIT 1');
+    if ($stmtCheck) {
+        $stmtCheck->bind_param('i', $idEmpresaContexto);
+        $stmtCheck->execute();
+        $rowCheck = $stmtCheck->get_result()->fetch_assoc();
+        $stmtCheck->close();
+        if ($rowCheck) {
+            $empresaNombre = trim((string)($rowCheck['razon_social'] ?? ''));
+        }
+    }
+}
+
+// Fallback logic if id_empresa not provided (legacy or client view)
+if ($idEmpresaContexto <= 0 && $usuarioId > 0) {
     $stmtEmpresa = $db->prepare(
-        'SELECT e.razon_social
+        'SELECT e.id_empresa, e.razon_social
          FROM usuario_empresa ue
          INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
          WHERE ue.id_usuario = ?
@@ -97,23 +113,10 @@ if ($usuarioId > 0) {
         $stmtEmpresa->execute();
         $rowEmpresa = $stmtEmpresa->get_result()->fetch_assoc();
         $stmtEmpresa->close();
-        $empresaNombre = trim((string)($rowEmpresa['razon_social'] ?? ''));
-    }
-
-    $stmtEmpresaId = $db->prepare(
-        'SELECT e.id_empresa
-         FROM usuario_empresa ue
-         INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
-         WHERE ue.id_usuario = ?
-         ORDER BY e.razon_social ASC
-         LIMIT 1'
-    );
-    if ($stmtEmpresaId) {
-        $stmtEmpresaId->bind_param('i', $usuarioId);
-        $stmtEmpresaId->execute();
-        $rowEmpresaId = $stmtEmpresaId->get_result()->fetch_assoc();
-        $stmtEmpresaId->close();
-        $idEmpresaContexto = (int)($rowEmpresaId['id_empresa'] ?? 0);
+        if ($rowEmpresa) {
+            $idEmpresaContexto = (int)($rowEmpresa['id_empresa'] ?? 0);
+            $empresaNombre = trim((string)($rowEmpresa['razon_social'] ?? ''));
+        }
     }
 }
 
@@ -145,12 +148,30 @@ $nombreGuardadoBase = $empresaToken . '_' . $tipoToken . '_' . $uniqueSuffix;
 $nombreGuardado = $nombreGuardadoBase . '.' . $ext;
 $rutaDestino = $uploadDir . '/' . $nombreGuardado;
 
+$finfo = finfo_open(FILEINFO_MIME_TYPE);
+$mimeReal = finfo_file($finfo, $tmpName);
+finfo_close($finfo);
+
+$allowedMimes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-office',
+    'application/octet-stream'
+];
+
+if (!in_array($mimeReal, $allowedMimes, true)) {
+    redirect_documentos('El contenido del archivo no es válido o no está permitido.');
+}
+
 if (!move_uploaded_file($tmpName, $rutaDestino)) {
     redirect_documentos('No se pudo guardar el archivo.');
 }
 
 $rutaRelativa = 'uploads/' . $nombreGuardado;
-$mime = mime_content_type($rutaDestino) ?: null;
+$mime = $mimeReal;
 $sha256 = hash_file('sha256', $rutaDestino) ?: null;
 
 $nombreOriginalMostrar = $empresaToken . '_' . $tipoToken;

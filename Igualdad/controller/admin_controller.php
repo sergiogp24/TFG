@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-session_start();
 
 require __DIR__ . '/../php/auth.php';
+
+require_once __DIR__ . '/../php/helpers.php';
 require_role('ADMINISTRADOR');
 
 require __DIR__ . '/../config/config.php';
@@ -44,6 +45,120 @@ function normalize_role_name(string $roleName): string
 {
   $upper = strtoupper(trim($roleName));
   return str_replace(['Á', 'É', 'Í', 'Ó', 'Ú'], ['A', 'E', 'I', 'O', 'U'], $upper);
+}
+
+function is_tecnico_role(mysqli $db, int $rolId): bool
+{
+  if ($rolId <= 0) {
+    return false;
+  }
+
+  $stmt = $db->prepare('SELECT nombre FROM rol WHERE id = ? LIMIT 1');
+  if (!$stmt) {
+    return false;
+  }
+
+  $stmt->bind_param('i', $rolId);
+  $stmt->execute();
+  $row = $stmt->get_result()->fetch_assoc() ?: null;
+  $stmt->close();
+
+  $rolNormalizado = normalize_role_name((string)($row['nombre'] ?? ''));
+  return str_contains($rolNormalizado, 'TECNICO');
+}
+
+function remove_firmacorreo_file(?string $relativePath): void
+{
+  $relativePath = trim((string)$relativePath);
+  if ($relativePath === '') {
+    return;
+  }
+
+  $basePath = realpath(__DIR__ . '/..');
+  if ($basePath === false) {
+    return;
+  }
+
+  $normalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, ltrim($relativePath, '/\\'));
+  if (!str_starts_with(str_replace('\\', '/', $normalized), 'uploads/')) {
+    return;
+  }
+
+  $baseName = basename($normalized);
+  if (!str_starts_with($baseName, 'firma_')) {
+    return;
+  }
+
+  $fullPath = realpath($basePath . DIRECTORY_SEPARATOR . $normalized);
+  if ($fullPath === false || !is_file($fullPath)) {
+    return;
+  }
+
+  $uploadsDir = realpath($basePath . DIRECTORY_SEPARATOR . 'uploads');
+  if ($uploadsDir === false) {
+    return;
+  }
+
+  if (strpos($fullPath, $uploadsDir) === 0) {
+    @unlink($fullPath);
+  }
+}
+
+function save_firmacorreo_upload(array $file, ?string $existingRelativePath = null): string
+{
+  $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+  if ($error === UPLOAD_ERR_NO_FILE) {
+    throw new RuntimeException('No se seleccionó ninguna imagen.');
+  }
+  if ($error !== UPLOAD_ERR_OK) {
+    throw new RuntimeException('Error al subir la imagen de firma.');
+  }
+
+  $tmpPath = (string)($file['tmp_name'] ?? '');
+  $size = (int)($file['size'] ?? 0);
+  if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+    throw new RuntimeException('No se pudo validar el archivo subido.');
+  }
+  if ($size <= 0 || $size > 2 * 1024 * 1024) {
+    throw new RuntimeException('La firma debe ser una imagen de máximo 2 MB.');
+  }
+
+  $finfo = finfo_open(FILEINFO_MIME_TYPE);
+  $mime = $finfo ? (string)finfo_file($finfo, $tmpPath) : '';
+  if ($finfo) {
+    finfo_close($finfo);
+  }
+
+  $allowed = [
+    'image/png' => 'png',
+    'image/jpeg' => 'jpg',
+    'image/webp' => 'webp',
+    'image/gif' => 'gif',
+  ];
+
+  if (!isset($allowed[$mime])) {
+    throw new RuntimeException('Formato no permitido. Usa PNG, JPG, WEBP o GIF.');
+  }
+
+  $basePath = realpath(__DIR__ . '/..');
+  if ($basePath === false) {
+    throw new RuntimeException('No se pudo resolver la ruta base del proyecto.');
+  }
+
+  $relativeDir = 'uploads';
+  $targetDir = $basePath . DIRECTORY_SEPARATOR . 'uploads';
+  if (!is_dir($targetDir)) {
+    throw new RuntimeException('La carpeta uploads no existe o no es accesible.');
+  }
+
+  $fileName = 'firma_' . bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
+  $targetPath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
+  if (!move_uploaded_file($tmpPath, $targetPath)) {
+    throw new RuntimeException('No se pudo guardar la imagen en el servidor.');
+  }
+
+  remove_firmacorreo_file($existingRelativePath);
+  return $relativeDir . '/' . $fileName;
 }
 
 // VALIDACIÓN DE MÉTODO HTTP
@@ -204,11 +319,32 @@ if ($accion === 'crear') {
   }
 
   $esRolCliente = ($rolNombreNormalizado === 'CLIENTE');
-  $esRolTecnico = str_starts_with($rolNombreNormalizado, 'TECNICO');
+  $esRolTecnico = str_contains($rolNombreNormalizado, 'TECNICO');
 
   if ($esRolCliente && empty($empresaIds)) {
     $_SESSION['add_user_error'] = 'Para rol Cliente es obligatorio asignar al menos una empresa.';
     redirect_view('add');
+  }
+
+  if (!$esRolTecnico && isset($_FILES['firmacorreo']) && is_array($_FILES['firmacorreo'])) {
+    $firmaError = (int)($_FILES['firmacorreo']['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($firmaError !== UPLOAD_ERR_NO_FILE) {
+      $_SESSION['add_user_error'] = 'La firma de correo solo se permite para usuarios técnicos.';
+      redirect_view('add');
+    }
+  }
+
+  $firmacorreo = null;
+  if ($esRolTecnico && isset($_FILES['firmacorreo']) && is_array($_FILES['firmacorreo'])) {
+    $firmaError = (int)($_FILES['firmacorreo']['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($firmaError !== UPLOAD_ERR_NO_FILE) {
+      try {
+        $firmacorreo = save_firmacorreo_upload($_FILES['firmacorreo']);
+      } catch (Throwable $e) {
+        $_SESSION['add_user_error'] = $e->getMessage();
+        redirect_view('add');
+      }
+    }
   }
 
   // Crear usuario con contraseña temporal hasheada.
@@ -217,8 +353,8 @@ if ($accion === 'crear') {
   $temporaryPasswordHash = password_hash($temporaryPassword, PASSWORD_DEFAULT);
 
   try {
-    $stmt = db()->prepare("INSERT INTO usuario (nombre_usuario, apellidos, email, telefono, direccion, localidad, password, rol_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param('sssssssi', $username, $apellidos, $email, $telefono, $direccion, $localidad, $temporaryPasswordHash, $rol_id);
+    $stmt = db()->prepare("INSERT INTO usuario (nombre_usuario, apellidos, email, telefono, firmacorreo, direccion, localidad, password, rol_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('ssssssssi', $username, $apellidos, $email, $telefono, $firmacorreo, $direccion, $localidad, $temporaryPasswordHash, $rol_id);
     $stmt->execute();
   } catch (mysqli_sql_exception $e) {
     log_internal_error('admin.crear_usuario', $e);
@@ -288,8 +424,10 @@ if ($accion === 'crear') {
     if (!empty($empresasObjetivo)) {
       $objetivoReunionFinal .= ' - ' . implode(', ', $empresasObjetivo);
     }
-    $stmtReunion = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion) VALUES (?, ?, ?)");
-    $stmtReunion->bind_param('sss', $objetivoReunionFinal, $horaReunion, $fechaReunion);
+    // Marcar esta reunión como FechaLimite (deadline) para que el cliente la vea como fecha límite
+    $tipoReunion = 'FechaLimite';
+    $stmtReunion = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion, tipo) VALUES (?, ?, ?, ?)");
+    $stmtReunion->bind_param('ssss', $objetivoReunionFinal, $horaReunion, $fechaReunion, $tipoReunion);
     $stmtReunion->execute();
     $idReunion = (int)$stmtReunion->insert_id;
     $stmtReunion->close();
@@ -318,13 +456,14 @@ if ($accion === 'crear') {
 
   $assignedCompanies = [];
   if ($newUserId > 0) {
-    $stmtEmpresasAsignadas = $db->prepare("\n      SELECT\n        e.razon_social,\n        COALESCE((\n          SELECT ce.tipo_contrato\n          FROM contrato_empresa ce\n          WHERE ce.id_empresa = e.id_empresa\n          ORDER BY ce.id_contrato_empresa DESC\n          LIMIT 1\n        ), 'SIN CONTRATO') AS tipo_contrato\n      FROM usuario_empresa ue\n      INNER JOIN empresa e ON e.id_empresa = ue.id_empresa\n      WHERE ue.id_usuario = ?\n      ORDER BY e.razon_social ASC\n    ");
+    $stmtEmpresasAsignadas = $db->prepare("\n      SELECT\n        e.id_empresa,\n        e.razon_social,\n        COALESCE((\n          SELECT ce.tipo_contrato\n          FROM contrato_empresa ce\n          WHERE ce.id_empresa = e.id_empresa\n          ORDER BY ce.id_contrato_empresa DESC\n          LIMIT 1\n        ), 'SIN CONTRATO') AS tipo_contrato\n      FROM usuario_empresa ue\n      INNER JOIN empresa e ON e.id_empresa = ue.id_empresa\n      WHERE ue.id_usuario = ?\n      ORDER BY e.razon_social ASC\n    ");
     if ($stmtEmpresasAsignadas) {
       $stmtEmpresasAsignadas->bind_param('i', $newUserId);
       $stmtEmpresasAsignadas->execute();
       $resEmpresasAsignadas = $stmtEmpresasAsignadas->get_result();
       while ($rowEmpresaAsignada = $resEmpresasAsignadas->fetch_assoc()) {
         $assignedCompanies[] = [
+          'id_empresa' => (int)($rowEmpresaAsignada['id_empresa'] ?? 0),
           'razon_social' => trim((string)($rowEmpresaAsignada['razon_social'] ?? '')),
           'tipo_contrato' => trim((string)($rowEmpresaAsignada['tipo_contrato'] ?? 'SIN CONTRATO')),
         ];
@@ -346,6 +485,52 @@ if ($accion === 'crear') {
     redirect_view('add');
   }
 
+  if ($esRolCliente && !empty($assignedCompanies)) {
+    $tecnicosNotificados = [];
+
+    foreach ($assignedCompanies as $companyData) {
+      $idEmpresaAsignada = (int)($companyData['id_empresa'] ?? 0);
+      if ($idEmpresaAsignada <= 0) {
+        continue;
+      }
+
+      $tecnicosEmpresa = correo_obtener_tecnicos_empresa($db, $idEmpresaAsignada);
+      foreach ($tecnicosEmpresa as $tecnicoEmpresa) {
+        $emailTecnico = trim((string)($tecnicoEmpresa['email'] ?? ''));
+        if ($emailTecnico === '') {
+          continue;
+        }
+
+        $claveTecnico = strtolower($emailTecnico);
+        if (!isset($tecnicosNotificados[$claveTecnico])) {
+          $tecnicosNotificados[$claveTecnico] = [
+            'email' => $emailTecnico,
+            'nombre' => trim((string)($tecnicoEmpresa['nombre_usuario'] ?? 'Técnico')),
+            'empresas' => [],
+          ];
+        }
+
+        $tecnicosNotificados[$claveTecnico]['empresas'][] = [
+          'razon_social' => trim((string)($companyData['razon_social'] ?? '')),
+          'tipo_contrato' => trim((string)($companyData['tipo_contrato'] ?? 'SIN CONTRATO')),
+        ];
+      }
+    }
+
+    foreach ($tecnicosNotificados as $tecnicoNotificado) {
+      try {
+        correo_enviar_notificacion_tecnico_nuevo_cliente(
+          (string)($tecnicoNotificado['email'] ?? ''),
+          (string)($tecnicoNotificado['nombre'] ?? 'Técnico'),
+          $username,
+          (array)($tecnicoNotificado['empresas'] ?? [])
+        );
+      } catch (Throwable $e) {
+        log_internal_error('admin.enviar_correo_nuevo_cliente_tecnico', $e);
+      }
+    }
+  }
+
   if ($esRolTecnico && !empty($empresaIds)) {
     foreach ($empresaIds as $idEmpresaAsignada) {
       $idEmpresaAsignada = (int)$idEmpresaAsignada;
@@ -360,7 +545,7 @@ if ($accion === 'crear') {
 
       $empresaNombre = (string)($empresaServicio['empresa'] ?? '');
       $servicioNombre = (string)($empresaServicio['servicio'] ?? 'Pendiente de asignar');
-      $urlEmpresa = app_path('/model/empresa.php?view=ver_empresa&id_empresa=' . $idEmpresaAsignada . '&from=tecnico');
+      $urlEmpresa = app_path('/model/empresa.php?view=ver_empresa&id_empresa=' . $idEmpresaAsignada . '&from=PERSONAL TECNICO');
 
       try {
         correo_enviar_nueva_empresa_asignada(
@@ -397,19 +582,19 @@ if ($accion === 'editar') {
     redirect_view('edit', 'Faltan datos');
   }
   if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-    redirect_view('edit', 'Email inválido. Debe tener formato ejemplo@dominio.com');
+    redirect_view('edit&id_usuario=' . $id, 'Email inválido. Debe tener formato ejemplo@dominio.com');
   }
   if ($password !== '' && strlen($password) < 6) {
-    redirect_view('edit', 'La contraseña debe tener al menos 6 caracteres');
+    redirect_view('edit&id_usuario=' . $id, 'La contraseña debe tener al menos 6 caracteres');
   }
   if ($apellidos !== '' && !preg_match('/^[\p{L}\s\-\'\.]{2,60}$/u', $apellidos)) {
-    redirect_view('edit', 'Apellidos inválidos: solo letras y espacios (sin números).');
+    redirect_view('edit&id_usuario=' . $id, 'Apellidos inválidos: solo letras y espacios (sin números).');
   }
   if ($localidad !== '' && !preg_match('/^[\p{L}\s\-\'\.]{2,60}$/u', $localidad)) {
-    redirect_view('add', 'Localidad inválida: solo letras y espacios (sin números).');
+    redirect_view('edit&id_usuario=' . $id, 'Localidad inválida: solo letras y espacios (sin números).');
   }
   if ($telefono !== '' && !preg_match('/^\d{6,15}$/', $telefono)) {
-    redirect_view('add', 'Teléfono inválido: solo números (6 a 15 dígitos).');
+    redirect_view('edit&id_usuario=' . $id, 'Teléfono inválido: solo números (6 a 15 dígitos).');
   }
 
   // Convertir vacíos a NULL (campos opcionales)
@@ -420,24 +605,60 @@ if ($accion === 'editar') {
 
 
   $db = db();
+  $firmacorreo = null;
+
+  $stmtFirmaActual = $db->prepare('SELECT firmacorreo FROM usuario WHERE id_usuario = ? LIMIT 1');
+  if ($stmtFirmaActual) {
+    $stmtFirmaActual->bind_param('i', $id);
+    $stmtFirmaActual->execute();
+    $firmaRow = $stmtFirmaActual->get_result()->fetch_assoc() ?: null;
+    $stmtFirmaActual->close();
+    $firmacorreo = (string)($firmaRow['firmacorreo'] ?? '');
+    if ($firmacorreo === '') {
+      $firmacorreo = null;
+    }
+  }
+
+  $esRolTecnico = is_tecnico_role($db, $rol_id);
+  if ($esRolTecnico && isset($_FILES['firmacorreo']) && is_array($_FILES['firmacorreo'])) {
+    $firmaError = (int)($_FILES['firmacorreo']['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($firmaError !== UPLOAD_ERR_NO_FILE) {
+      try {
+        $firmacorreo = save_firmacorreo_upload($_FILES['firmacorreo'], $firmacorreo);
+      } catch (Throwable $e) {
+        redirect_view('edit&id_usuario=' . $id, $e->getMessage());
+      }
+    }
+  } else {
+    if ($firmacorreo !== null && $firmacorreo !== '') {
+      remove_firmacorreo_file($firmacorreo);
+    }
+    $firmacorreo = null;
+  }
 
   try {
     if ($password !== '') {
       $hash = password_hash($password, PASSWORD_DEFAULT);
-      $stmt = $db->prepare("UPDATE usuario SET nombre_usuario = ?, apellidos= ?, email = ?, telefono = ?, direccion = ?, localidad = ?,  password = ?, rol_id = ? WHERE id_usuario = ?");
-      $stmt->bind_param('sssssssii', $username, $apellidos, $email, $telefono, $direccion, $localidad, $hash, $rol_id, $id);
+      $stmt = $db->prepare("UPDATE usuario SET nombre_usuario = ?, apellidos= ?, email = ?, telefono = ?, firmacorreo = ?, direccion = ?, localidad = ?, password = ?, rol_id = ? WHERE id_usuario = ?");
+      $stmt->bind_param('ssssssssii', $username, $apellidos, $email, $telefono, $firmacorreo, $direccion, $localidad, $hash, $rol_id, $id);
     } else {
-      $stmt = $db->prepare("UPDATE usuario SET nombre_usuario = ?, apellidos = ?, email= ?, telefono = ?, direccion = ?, localidad= ?, rol_id= ? WHERE id_usuario = ?");
-      $stmt->bind_param('ssssssii', $username, $apellidos, $email, $telefono, $direccion, $localidad, $rol_id, $id);
+      $stmt = $db->prepare("UPDATE usuario SET nombre_usuario = ?, apellidos = ?, email= ?, telefono = ?, firmacorreo = ?, direccion = ?, localidad= ?, rol_id= ? WHERE id_usuario = ?");
+      $stmt->bind_param('sssssssii', $username, $apellidos, $email, $telefono, $firmacorreo, $direccion, $localidad, $rol_id, $id);
     }
 
     $stmt->execute();
     $stmt->close();
 
     redirect_menu('Usuario actualizado');
+  } catch (mysqli_sql_exception $e) {
+    log_internal_error('admin.editar_usuario', $e);
+    if ((int)$e->getCode() === 1062) {
+      redirect_view('edit&id_usuario=' . $id, 'No se pudo actualizar: el nombre de usuario o email ya existe.');
+    }
+    redirect_view('edit&id_usuario=' . $id, 'Error al actualizar usuario. Revisa los datos e intentalo de nuevo.');
   } catch (Throwable $e) {
     log_internal_error('admin.editar_usuario', $e);
-    redirect_view('edit', 'No se pudo actualizar el usuario. Intentalo de nuevo.');
+    redirect_view('edit&id_usuario=' . $id, 'No se pudo actualizar el usuario. Intentalo de nuevo.');
   }
 }
 
@@ -449,12 +670,23 @@ if ($accion === 'eliminar') {
   $currentId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   if ($currentId === $id) redirect_view('delete', 'No puedes eliminar tu propio usuario');
 
+  $firmaEliminar = null;
+  $stmtFirma = db()->prepare('SELECT firmacorreo FROM usuario WHERE id_usuario = ? LIMIT 1');
+  if ($stmtFirma) {
+    $stmtFirma->bind_param('i', $id);
+    $stmtFirma->execute();
+    $rowFirma = $stmtFirma->get_result()->fetch_assoc() ?: null;
+    $stmtFirma->close();
+    $firmaEliminar = (string)($rowFirma['firmacorreo'] ?? '');
+  }
+
   $stmt = db()->prepare("DELETE FROM usuario WHERE id_usuario = ?");
   $stmt->bind_param('i', $id);
 
   try {
     $stmt->execute();
     $stmt->close();
+    remove_firmacorreo_file($firmaEliminar);
     redirect_menu('Usuario eliminado');
   } catch (Throwable $e) {
     log_internal_error('admin.eliminar_usuario', $e);
@@ -506,8 +738,9 @@ if ($accion === 'crear_reunion') {
     $db->begin_transaction();
 
     $objetivoDb = ($objetivo === '') ? null : $objetivo;
-    $stmt = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion) VALUES (?, ?, ?)");
-    $stmt->bind_param('sss', $objetivoDb, $hora, $fecha);
+    $tipoReunion = 'CreadaUsu';
+    $stmt = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion, tipo) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param('ssss', $objetivoDb, $hora, $fecha, $tipoReunion);
     $stmt->execute();
     $idReunion = (int)$stmt->insert_id;
     $stmt->close();

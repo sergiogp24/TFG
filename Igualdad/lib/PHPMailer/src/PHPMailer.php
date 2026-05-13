@@ -913,8 +913,8 @@ class PHPMailer
         if ($this->SMTPDebug <= 0) {
             return;
         }
-        //Is this a PSR-3 logger?
-        if ($this->Debugoutput instanceof \Psr\Log\LoggerInterface) {
+        //Is this a PSR-3-style logger?
+        if (is_object($this->Debugoutput) && method_exists($this->Debugoutput, 'debug')) {
             $this->Debugoutput->debug(rtrim($str, "\r\n"));
 
             return;

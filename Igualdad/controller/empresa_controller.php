@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-session_start();
 
 require __DIR__ . '/../php/auth.php';
+
+require_once __DIR__ . '/../php/helpers.php';
 
 require_login();
 
@@ -406,13 +407,45 @@ function guardar_archivos_empresa(int $idEmpresa, $filesInput): array
     }
 
     $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-    if (!in_array($ext, $allowedExtensions, true)) {
-      $result['errores'][] = $filename . ': extensión no permitida.';
+    
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $tmpFile);
+    finfo_close($finfo);
+
+    $allowedMimes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+
+    if (!in_array($ext, $allowedExtensions, true) || !in_array($mimeType, $allowedMimes, true)) {
+      $result['errores'][] = $filename . ': extensión o contenido no permitido.';
       continue;
     }
 
     if ($fileSize > 52428800) {
       $result['errores'][] = $filename . ': supera el límite de 50MB.';
+      continue;
+    }
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = finfo_file($finfo, $tmpFile);
+    finfo_close($finfo);
+
+    $allowedMimes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-office',
+      'application/octet-stream' // A veces detectado para archivos de office antiguos
+    ];
+
+    if (!in_array($mime, $allowedMimes, true)) {
+      $result['errores'][] = $filename . ': el contenido del archivo no es válido o no está permitido.';
       continue;
     }
 
@@ -423,15 +456,6 @@ function guardar_archivos_empresa(int $idEmpresa, $filesInput): array
       $result['errores'][] = $filename . ': no se pudo guardar en disco.';
       continue;
     }
-
-    $mime = match ($ext) {
-      'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'doc' => 'application/msword',
-      'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'xls' => 'application/vnd.ms-excel',
-      'pdf' => 'application/pdf',
-      default => 'application/octet-stream',
-    };
 
     $sha = hash_file('sha256', $newPath) ?: '';
     $rutaRelativa = 'uploads/' . $newName;
@@ -507,25 +531,26 @@ if ($accion === 'enviar_correo_empresa') {
   }
 
   try {
-    $asuntoHtml = htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8');
-    $cuerpoHtml = nl2br(htmlspecialchars($cuerpo, ENT_QUOTES, 'UTF-8'));
+    $tecnicoNombre = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Tecnico'));
+    $tecnicoEmail = trim((string)($_SESSION['user']['email'] ?? ''));
 
-    $html = '
-      <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
-          <div style="max-width: 680px; margin: 0 auto; padding: 16px;">
-            <p><strong>' . $asuntoHtml . '</strong></p>
-            <div>' . $cuerpoHtml . '</div>
-          </div>
-        </body>
-      </html>
-    ';
+    if ($tecnicoEmail === '' && $currentUserId > 0) {
+      $stmtT = db()->prepare('SELECT email FROM usuario WHERE id_usuario = ? LIMIT 1');
+      if ($stmtT) {
+        $stmtT->bind_param('i', $currentUserId);
+        $stmtT->execute();
+        $rowT = $stmtT->get_result()->fetch_assoc();
+        $tecnicoEmail = trim((string)($rowT['email'] ?? ''));
+        $stmtT->close();
+      }
+    }
 
-    correo_enviar_html(
+    correo_enviar_contacto_tecnico_empresa(
       $emailDestino,
       $nombreEmpresa,
+      $tecnicoNombre,
+      $tecnicoEmail,
       $asunto,
-      $html,
       $cuerpo
     );
 
@@ -648,7 +673,7 @@ if ($accion === 'add_empresas') {
       $mensajeFinal .= '. Errores de archivos: ' . implode('; ', $resultadoSubida['errores']);
     }
 
-    $to = 'http://localhost/Igualdad/model/empresa.php?view=add_contratos&id_empresa=' . $idEmpresaNueva;
+    $to = app_path('/model/empresa.php?view=add_contratos&id_empresa=') . $idEmpresaNueva;
     header('Location: ' . $to);
     exit;
   } catch (Throwable $e) {

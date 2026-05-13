@@ -161,12 +161,8 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
         return false;
     }
 
-    $sql = '
-        SELECT 1
-        FROM archivos a
-        INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
-        INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
-        WHERE UPPER(TRIM(a.tipo)) = "REGISTRO_RETRIBUTIVO" AND ac.id_empresa = ?
+    $sql = ' SELECT 1 FROM archivos a INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
+        INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND ac.id_empresa = ?
         LIMIT 1';
 
     $stmt = db()->prepare($sql);
@@ -183,10 +179,7 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
         return true;
     }
 
-    $sqlDirecto = '
-        SELECT 1
-        FROM archivos a
-        WHERE UPPER(TRIM(a.tipo)) = "REGISTRO_RETRIBUTIVO" AND a.id_empresa = ?
+    $sqlDirecto = 'SELECT 1 FROM archivos a WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND a.id_empresa = ?
         LIMIT 1';
 
     $stmtDirecto = db()->prepare($sqlDirecto);
@@ -208,11 +201,7 @@ function complemento_contrato_id_para_medidas(int $idEmpresa): int
         return 0;
     }
 
-    $sql = '
-        SELECT id_contrato_empresa
-        FROM contrato_empresa
-        WHERE id_empresa = ?
-        ORDER BY
+    $sql = 'SELECT id_contrato_empresa FROM contrato_empresa WHERE id_empresa = ? ORDER BY
             CASE
                 WHEN UPPER(TRIM(tipo_contrato)) LIKE "PLAN IGUALDAD%" THEN 0
                 WHEN UPPER(TRIM(tipo_contrato)) LIKE "MANTENIMIENTO%" THEN 1
@@ -242,127 +231,127 @@ $idEmpresaSeleccionada = (int)($_GET['id_empresa'] ?? 0);
 
 $cuestionarioTabs = [
     'cuestionario_seleccion_personal' => [
-        'label' => 'Cuest. seleccion personal',
+        'label' => 'Cuestionario seleccion personal',
         'table' => 'cuestionario_seleccion_personal',
         'title' => 'Cuestionario seleccion personal',
         'fields' => [
-            ['name' => 'factores_determinantes', 'label' => 'Factores determinantes'],
-            ['name' => 'incorporacion_nuevo_personal', 'label' => 'Incorporacion nuevo personal'],
-            ['name' => 'publicacion_interna', 'label' => 'Publicacion interna'],
-            ['name' => 'personas_responsables', 'label' => 'Personas responsables'],
-            ['name' => 'caracteristicas_candidaturas', 'label' => 'Caracteristicas candidaturas'],
-            ['name' => 'entrevista_salida', 'label' => 'Entrevista salida'],
-            ['name' => 'sistema_reclutamiento', 'label' => 'Sistema reclutamiento'],
-            ['name' => 'definicion_perfiles', 'label' => 'Definicion perfiles'],
-            ['name' => 'metodos_seleccion', 'label' => 'Metodos seleccion'],
+            ['name' => 'factores_determinantes', 'label' => 'Factores determinantes del inicio de la seleccion'],
+            ['name' => 'sistema_reclutamiento', 'label' => 'Sistemas de reclutamiento'],
+            ['name' => 'incorporacion_nuevo_personal', 'label' => 'Incorporacion de nuevo personal'],
+            ['name' => 'definicion_perfiles', 'label' => 'Definicion de perfiles'],
+            ['name' => 'publicacion_interna', 'label' => 'Publicacion interna de vacantes'],
+            ['name' => 'metodos_seleccion', 'label' => 'Metodos de seleccion'],
+            ['name' => 'personas_responsables', 'label' => 'Personas responsables de la seleccion'],
             ['name' => 'ultima_decision', 'label' => 'Ultima decision'],
-            ['name' => 'barreras_internas_externas', 'label' => 'Barreras internas/externas'],
+            ['name' => 'caracteristicas_candidaturas', 'label' => 'Caracteristicas generales de las candidaturas'],
+            ['name' => 'barreras_internas_externas', 'label' => 'Barreras internas o externas para la incorporacion de mujeres'],
+            ['name' => 'entrevista_salida', 'label' => 'Entrevista de salida'],
         ],
     ],
     'cuestionario_promocion_profesional' => [
-        'label' => 'Cuest. promocion profesional',
+        'label' => 'Cuestionario promocion profesional',
         'table' => 'cuestionario_promocion_profesional',
         'title' => 'Cuestionario promocion profesional',
         'fields' => [
             ['name' => 'metodologia', 'label' => 'Metodologia'],
-            ['name' => 'metodologia_evaluacion', 'label' => 'Metodologia evaluacion'],
-            ['name' => 'personas_intervienen', 'label' => 'Personas intervienen'],
-            ['name' => 'formacion_ligada', 'label' => 'Formacion ligada'],
-            ['name' => 'acciones_fomentar', 'label' => 'Acciones fomentar'],
+            ['name' => 'metodologia_evaluacion', 'label' => 'Metodologia estandar de evaluacion del personal'],
+            ['name' => 'personas_intervienen', 'label' => 'Personas que intervienen en la decision de promocion'],
+            ['name' => 'formacion_ligada', 'label' => 'Formacion ligada a la promocion'],
+            ['name' => 'acciones_fomentar', 'label' => 'Acciones para fomentar la promocion de las mujeres'],
             ['name' => 'requisitos', 'label' => 'Requisitos'],
-            ['name' => 'planes_carrera', 'label' => 'Planes carrera'],
-            ['name' => 'comunicacion_vacantes', 'label' => 'Comunicacion vacantes'],
-            ['name' => 'dificultades_promocion', 'label' => 'Dificultades promocion'],
+            ['name' => 'planes_carrera', 'label' => 'Planes de carrera'],
+            ['name' => 'comunicacion_vacantes', 'label' => 'Comunicacion interna de vacantes'],
+            ['name' => 'dificultades_promocion', 'label' => 'Dificultades en la promocion de mujeres'],
         ],
     ],
     'cuestionario_formacion' => [
-        'label' => 'Cuest. formacion',
+        'label' => 'Cuestionario formacion',
         'table' => 'cuestionario_formacion',
         'title' => 'Cuestionario formacion',
         'fields' => [
-            ['name' => 'deteccion_formativas', 'label' => 'Deteccion formativas'],
+            ['name' => 'deteccion_formativas', 'label' => 'Deteccion de las necesidades formativas'],
             ['name' => 'difusion_ofertas', 'label' => 'Difusion ofertas'],
-            ['name' => 'puede_solicitar', 'label' => 'Puede solicitar'],
-            ['name' => 'compensacion_fuera', 'label' => 'Compensacion fuera'],
-            ['name' => 'posibilidad_formacion', 'label' => 'Posibilidad formacion'],
-            ['name' => 'formacion_mujeres', 'label' => 'Formacion mujeres'],
-            ['name' => 'existencia_plan', 'label' => 'Existencia plan'],
-            ['name' => 'asisten_igualmente', 'label' => 'Asisten igualmente'],
-            ['name' => 'criterios_seleccion', 'label' => 'Criterios seleccion'],
-            ['name' => 'impartacion_fuera', 'label' => 'Impartacion fuera'],
-            ['name' => 'ayudas_formacion', 'label' => 'Ayudas formacion'],
-            ['name' => 'formacion_igualdad', 'label' => 'Formacion igualdad'],
-            ['name' => 'coste_medio', 'label' => 'Coste medio'],
-            ['name' => 'formacion_reciclaje', 'label' => 'Formacion reciclaje'],
+            ['name' => 'puede_solicitar', 'label' => '¿Puede solicitar el personal un curso del Plan de Formacion?'],
+            ['name' => 'compensacion_fuera', 'label' => 'Compensacion por formacion fuera de horario laboral'],
+            ['name' => 'posibilidad_formacion', 'label' => 'Posibilidad de realizar una formacion no relacionada con el puesto'],
+            ['name' => 'formacion_mujeres', 'label' => 'Formacion especifica para mujeres'],
+            ['name' => 'existencia_plan', 'label' => 'Existencia o no del plan de formacion'],
+            ['name' => 'asisten_igualmente', 'label' => '¿Asisten igualmente a formaciones hombres y mujeres?'],
+            ['name' => 'criterios_seleccion', 'label' => 'Criterios de seleccion'],
+            ['name' => 'impartacion_fuera', 'label' => 'Imparticion de formacion fuera de horario laboral'],
+            ['name' => 'ayudas_formacion', 'label' => 'Ayudas para la formacion externa'],
+            ['name' => 'formacion_igualdad', 'label' => 'Formacion en igualdad'],
+            ['name' => 'coste_medio', 'label' => 'Coste medio de la formacion'],
+            ['name' => 'formacion_reciclaje', 'label' => 'Formacion de reciclaje'],
         ],
     ],
     'cuestionario_conciliacion_corresponsabilidad' => [
-        'label' => 'Cuest. conciliacion',
+        'label' => 'Cuestionario conciliacion corresponsabilidad',
         'table' => 'cuestionario_conciliacion_corresponsabilidad',
         'title' => 'Cuestionario conciliacion corresponsabilidad',
         'fields' => [
-            ['name' => 'ordenacion_tiempo', 'label' => 'Ordenacion tiempo'],
-            ['name' => 'quienes_utilizan', 'label' => 'Quienes utilizan'],
-            ['name' => 'reduccion_jornada', 'label' => 'Reduccion jornada'],
+            ['name' => 'ordenacion_tiempo', 'label' => 'Ordenacion del tiempo de trabajo y conciliacion de la vida laboral y familiar'],
+            ['name' => 'quienes_utilizan', 'label' => '¿Quienes utilizan mas estas medidas? Razones.'],
+            ['name' => 'reduccion_jornada', 'label' => 'La reduccion de jornada, ¿afecta a la situacion profesional?'],
             ['name' => 'mecanismos_disponibles', 'label' => 'Mecanismos disponibles'],
-            ['name' => 'cuantas_personas', 'label' => 'Cuantas personas'],
-            ['name' => 'canales_informacion', 'label' => 'Canales informacion'],
+            ['name' => 'cuantas_personas', 'label' => '¿Cuantas personas fueron madres/padres?'],
+            ['name' => 'canales_informacion', 'label' => 'Canales de informacion y difusion'],
         ],
     ],
     'cuestionario_infrarrepresentacion_femenina' => [
-        'label' => 'Cuest. infrarrepresentacion',
+        'label' => 'Cuestionario infrarrepresentacion femenina',
         'table' => 'cuestionario_infrarrepresentacion_femenina',
         'title' => 'Cuestionario infrarrepresentacion femenina',
         'fields' => [
-            ['name' => 'barreras_internas', 'label' => 'Barreras internas'],
-            ['name' => 'hay_mujeres', 'label' => 'Hay mujeres'],
+            ['name' => 'barreras_internas', 'label' => 'Barreras internas, externas y/o sectoriales para la incorporacion de mujeres'],
+            ['name' => 'hay_mujeres', 'label' => '¿Hay mujeres con cargos de responsabilidad?'],
         ],
     ],
     'cuestionario_salud_laboral' => [
-        'label' => 'Cuest. salud laboral',
+        'label' => 'Cuestionario salud laboral',
         'table' => 'cuestionario_salud_laboral',
         'title' => 'Cuestionario salud laboral',
         'fields' => [
-            ['name' => 'seguridad_salud', 'label' => 'Seguridad salud'],
-            ['name' => 'medidas_linea', 'label' => 'Medidas en linea'],
-            ['name' => 'incluido_perspectiva', 'label' => 'Incluido perspectiva'],
-            ['name' => 'permite_desconexion', 'label' => 'Permite desconexion'],
+            ['name' => 'seguridad_salud', 'label' => 'Seguridad, salud laboral y equipamientos'],
+            ['name' => 'medidas_linea', 'label' => 'Medidas en esta linea'],
+            ['name' => 'incluido_perspectiva', 'label' => '¿Se ha incluido la perspectiva de genero en el plan de prevencion de riesgos laborales?'],
+            ['name' => 'permite_desconexion', 'label' => '¿Se permite la desconexion digital?'],
         ],
     ],
     'cuestionario_prevencion_acoso_sexual' => [
-        'label' => 'Cuest. prevencion acoso',
+        'label' => 'Cuestionario prevencion acoso sexual',
         'table' => 'cuestionario_prevencion_acoso_sexual',
         'title' => 'Cuestionario prevencion acoso sexual',
         'fields' => [
-            ['name' => 'conocen_acoso', 'label' => 'Conocen acoso'],
-            ['name' => 'protocolo_prevencion', 'label' => 'Protocolo prevencion'],
-            ['name' => 'medidas_sensibilizacion', 'label' => 'Medidas sensibilizacion'],
+            ['name' => 'conocen_acoso', 'label' => 'Se conocen casos de acosos sexual y/o por razon de sexo en el ultimo año'],
+            ['name' => 'protocolo_prevencion', 'label' => 'Protocolo de Prevencion y Actuacion contra el acoso sexual y por razon de sexo'],
+            ['name' => 'medidas_sensibilizacion', 'label' => 'Medidas de sensibilizacion, prevencion, deteccion contra el acoso sexual y por razon de genero.'],
         ],
     ],
     'cuestionario_violencia_genero' => [
-        'label' => 'Cuest. violencia genero',
+        'label' => 'Cuestionario violencia genero',
         'table' => 'cuestionario_violencia_genero',
         'title' => 'Cuestionario violencia genero',
         'fields' => [
-            ['name' => 'conocimiento_contratada', 'label' => 'Conocimiento contratada'],
-            ['name' => 'prevision_progama', 'label' => 'Prevision programa'],
+            ['name' => 'conocimiento_contratada', 'label' => '¿Conocimiento de tener contratada alguna mujer del colectivo?'],
+            ['name' => 'prevision_progama', 'label' => '¿Prevision de algun programa para mujeres en esta circunstancia?'],
         ],
     ],
     'cuestionario_comunicacion_identidad_corporativa' => [
-        'label' => 'Cuest. comunicacion identidad',
+        'label' => 'Cuestionario comunicacion identidad corporativa',
         'table' => 'cuestionario_comunicacion_identidad_corporativa',
         'title' => 'Cuestionario comunicacion identidad corporativa',
         'fields' => [
-            ['name' => 'canales_comunicacion', 'label' => 'Canales comunicacion'],
-            ['name' => 'campanas_comunicacion', 'label' => 'Campanas comunicacion'],
-            ['name' => 'imagen_empresa', 'label' => 'Imagen empresa'],
-            ['name' => 'existencia_comunicacion', 'label' => 'Existencia comunicacion'],
-            ['name' => 'frecuencia', 'label' => 'Frecuencia'],
-            ['name' => 'lenguaje_imagen', 'label' => 'Lenguaje imagen'],
-            ['name' => 'objetivos', 'label' => 'Objetivos'],
-            ['name' => 'filosofia', 'label' => 'Filosofia'],
-            ['name' => 'procesos_calidad', 'label' => 'Procesos calidad'],
-            ['name' => 'responsabilidad_social', 'label' => 'Responsabilidad social'],
+            ['name' => 'canales_comunicacion', 'label' => 'Canales de comunicacion interna'],
+            ['name' => 'campanas_comunicacion', 'label' => 'Campañas de comunicacion y sensibilizacion'],
+            ['name' => 'imagen_empresa', 'label' => '¿La imagen de la empresa transmite valores de igualdad? Razones'],
+            ['name' => 'existencia_comunicacion', 'label' => 'Existencia de canales de comunicacion con la empresa'],
+            ['name' => 'frecuencia', 'label' => 'Frecuencia de uso de los canales'],
+            ['name' => 'lenguaje_imagen', 'label' => 'Lenguaje e imagen web'],
+            ['name' => 'objetivos', 'label' => 'Objetivos empresariales'],
+            ['name' => 'filosofia', 'label' => 'Filosofia de la empresa'],
+            ['name' => 'procesos_calidad', 'label' => 'Procesos de calidad'],
+            ['name' => 'responsabilidad_social', 'label' => 'Responsabilidad Social Corporativa'],
         ],
     ],
 ];
@@ -482,7 +471,7 @@ if ($idEmpresaSeleccionada > 0) {
             $erroresListado[] = (string)$resBajas['error'];
         }
 
-        $resFormacion = complemento_fetch_simple_rows('area_formaciones', $idEmpresaSeleccionada, ['tipo', 'n_mujeres', 'n_hombres']);
+        $resFormacion = complemento_fetch_simple_rows('area_formaciones', $idEmpresaSeleccionada, ['tipo', 'n_mujeres', 'n_hombres', 'n_horas', 'modalidad', 'perfil_puesto', 'horario', 'caracter']);
         $formacionRows = $resFormacion['rows'] ?? [];
         if (($resFormacion['error'] ?? '') !== '') {
             $erroresListado[] = 'Formacion: ' . $resFormacion['error'];
@@ -610,17 +599,44 @@ if ($idEmpresaSeleccionada > 0) {
                         </div>
                     <?php endif; ?>
 
-                    <div class="mb-4 d-flex align-items-center gap-3">
-                        <label class="form-label mb-0 fw-bold">Empresa:</label>
-                        <?php if ($embed): ?>
-                            <input type="text" class="form-control w-auto" value="<?= h($empresaFijadaNombre) ?>" readonly>
-                        <?php else: ?>
-                            <select class="form-select w-auto" onchange="window.location.href='complemento_formularios.php?tab=<?= h($tab) ?><?= $embed ? '&embed=1' : '' ?>&id_empresa=' + this.value;">
-                                <option value="">-- Seleccionar --</option>
-                                <?php foreach (($empresasDisponibles ?? []) as $empresa): ?>
-                                    <option value="<?= (int)$empresa['id_empresa'] ?>" <?= ((int)$empresa['id_empresa'] === $idEmpresaSeleccionada) ? 'selected' : '' ?>><?= h($empresa['razon_social']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                    <div class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <label class="form-label mb-0 fw-bold">Empresa:</label>
+                            <?php if ($embed): ?>
+                                <input type="text" class="form-control w-auto" value="<?= h($empresaFijadaNombre) ?>" readonly>
+                            <?php else: ?>
+                                <select class="form-select w-auto" onchange="window.location.href='complemento_formularios.php?tab=<?= h($tab) ?><?= $embed ? '&embed=1' : '' ?>&id_empresa=' + this.value;">
+                                    <option value="">-- Seleccionar --</option>
+                                    <?php foreach (($empresasDisponibles ?? []) as $empresa): ?>
+                                        <option value="<?= (int)$empresa['id_empresa'] ?>" <?= ((int)$empresa['id_empresa'] === $idEmpresaSeleccionada) ? 'selected' : '' ?>><?= h($empresa['razon_social']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Apartado de subir documentación rápida -->
+                        <?php if ($idEmpresaSeleccionada > 0 && !$complementosBloqueados): ?>
+                            <div class="card bg-light border-0 shadow-sm" style="max-width: 500px;">
+                                <div class="card-body p-2">
+                                    <form action="../controller/complemento_formulario_controler.php" method="POST" enctype="multipart/form-data" class="row g-2 align-items-center">
+                                        <?= csrf_input() ?>
+                                        <input type="hidden" name="accion" value="subir_documentacion_rapida">
+                                        <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
+                                        <input type="hidden" name="embed" value="<?= $embed ? '1' : '0' ?>">
+                                        <input type="hidden" name="tab" value="<?= h($tab) ?>">
+                                         <label class="form-label mb-0 fw-bold">Subir Documentación si la tienes en archivo:</label>
+                                        <div class="col-auto">
+                                        <label class="form-label mb-0 fw-bold">¿Que hay en tu archivo?:</label>    <input type="text" name="asunto" class="form-control form-control-sm" placeholder="Asunto del documento..." required>
+                                        </div>
+                                        <div class="col-auto">
+                                            <input type="file" name="archivo" class="form-control form-control-sm" required>
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-primary btn-sm">Subir</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         <?php endif; ?>
                     </div>
 
@@ -628,7 +644,7 @@ if ($idEmpresaSeleccionada > 0) {
                         <div class="alert alert-warning mb-4">
                             <?= $soloMedidas
                                 ? 'Selecciona una empresa para continuar con las medidas.'
-                                : 'Debes subir primero el Registro Retributivo en esta empresa para desbloquear los complementos de formularios.' ?>
+                                : 'Debes subir primero el Registro Retributivo o un Registro Propio en esta empresa para desbloquear los complementos de formularios.' ?>
                         </div>
                     <?php endif; ?>
 
@@ -657,7 +673,7 @@ if ($idEmpresaSeleccionada > 0) {
                         <div class="alert alert-secondary mb-0">
                             <?= $soloMedidas
                                 ? 'Selecciona una empresa para ver y usar sus medidas.'
-                                : 'Selecciona una empresa que ya haya subido su Registro Retributivo para ver y usar sus complementos.' ?>
+                                : 'Selecciona una empresa que ya haya subido su Registro Retributivo o un Registro Propio para ver y usar sus complementos.' ?>
                         </div>
                     <?php else: ?>
 
@@ -693,10 +709,7 @@ if ($idEmpresaSeleccionada > 0) {
                                     </select>
                                 </div>
 
-                                <div>
-                                    <label class="form-label" for="bajas_motivo">Motivo</label>
-                                    <input id="bajas_motivo" type="text" name="motivo" class="form-control" maxlength="255">
-                                </div>
+
 
                                 <div id="bloque_temporales">
                                     <label class="form-label" for="tipo_temporal">Tipo temporal</label>
@@ -753,7 +766,6 @@ if ($idEmpresaSeleccionada > 0) {
                                                 <th>ID</th>
                                                 <th>Tipo</th>
                                                 <th>Detalle</th>
-                                                <th>Motivo</th>
                                                 <th>Mujeres</th>
                                                 <th>Hombres</th>
                                                 <th>Acciones</th>
@@ -772,7 +784,6 @@ if ($idEmpresaSeleccionada > 0) {
                                                     <td><?= (int)($row['id_bajas'] ?? 0) ?></td>
                                                     <td><?= h($tipoBaja) ?></td>
                                                     <td><?= h($esTemporal ? $tipoTemporal : $tipoDefinitiva) ?></td>
-                                                    <td><?= h((string)($row['motivo'] ?? '')) ?></td>
                                                     <td><?= (int)($row['num_mujeres'] ?? 0) ?></td>
                                                     <td><?= (int)($row['num_hombres'] ?? 0) ?></td>
                                                     <td>
@@ -782,7 +793,6 @@ if ($idEmpresaSeleccionada > 0) {
                                                                 class="btn btn-outline-primary btn-sm btn-edit-baja"
                                                                 data-id="<?= (int)($row['id_bajas'] ?? 0) ?>"
                                                                 data-tipo-baja="<?= h($tipoBaja) ?>"
-                                                                data-motivo="<?= h((string)($row['motivo'] ?? '')) ?>"
                                                                 data-tipo-temporal="<?= h($tipoTemporal) ?>"
                                                                 data-tipo-definitiva="<?= h($tipoDefinitivaDb) ?>"
                                                                 data-num-mujeres="<?= (int)($row['num_mujeres'] ?? 0) ?>"
@@ -822,13 +832,52 @@ if ($idEmpresaSeleccionada > 0) {
                                 </div>
 
                                 <div class="row g-3">
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label" for="formacion_n_mujeres">Numero de mujeres</label>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="formacion_n_horas">Horas totales</label>
+                                        <input id="formacion_n_horas" type="number" min="0" name="n_horas" class="form-control" value="0">
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="formacion_n_mujeres">Mujeres</label>
                                         <input id="formacion_n_mujeres" type="number" min="0" name="n_mujeres" class="form-control" value="0" required>
                                     </div>
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label" for="formacion_n_hombres">Numero de hombres</label>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="formacion_n_hombres">Hombres</label>
                                         <input id="formacion_n_hombres" type="number" min="0" name="n_hombres" class="form-control" value="0" required>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="formacion_modalidad">Modalidad</label>
+                                        <select id="formacion_modalidad" name="modalidad" class="form-select">
+                                            <option value="">Selecciona...</option>
+                                            <option value="Presencial">Presencial</option>
+                                            <option value="Online">Online</option>
+                                            <option value="Mixta">Mixta</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="formacion_horario">Horario</label>
+                                        <select id="formacion_horario" name="horario" class="form-select">
+                                            <option value="">Selecciona...</option>
+                                            <option value="Dentro del horario">Dentro del horario</option>
+                                            <option value="Fuera del horario">Fuera del horario</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="formacion_perfil_puesto">Perfil (Puesto)</label>
+                                        <input id="formacion_perfil_puesto" type="text" name="perfil_puesto" class="form-control" placeholder="Ej: Operarios">
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="formacion_caracter">Carácter</label>
+                                        <select id="formacion_caracter" name="caracter" class="form-select">
+                                            <option value="">Selecciona...</option>
+                                            <option value="Obligatoria">Obligatoria</option>
+                                            <option value="Voluntaria">Voluntaria</option>
+                                        </select>
                                     </div>
                                 </div>
 
@@ -849,9 +898,14 @@ if ($idEmpresaSeleccionada > 0) {
                                         <thead>
                                             <tr>
                                                 <th>ID</th>
-                                                <th>Tipo</th>
+                                                <th>Formación</th>
+                                                <th>Horas</th>
                                                 <th>Mujeres</th>
                                                 <th>Hombres</th>
+                                                <th>Modalidad</th>
+                                                <th>Perfil (Puesto)</th>
+                                                <th>Horario</th>
+                                                <th>Carácter</th>
                                                 <th>Acciones</th>
                                             </tr>
                                         </thead>
@@ -860,8 +914,13 @@ if ($idEmpresaSeleccionada > 0) {
                                                 <tr>
                                                     <td><?= (int)($row['id_registro'] ?? 0) ?></td>
                                                     <td><?= h((string)($row['tipo'] ?? '')) ?></td>
+                                                    <td><?= h((string)($row['n_horas'] ?? 0)) ?></td>
                                                     <td><?= (int)($row['n_mujeres'] ?? 0) ?></td>
                                                     <td><?= (int)($row['n_hombres'] ?? 0) ?></td>
+                                                    <td><?= h((string)($row['modalidad'] ?? '-')) ?></td>
+                                                    <td><?= h((string)($row['perfil_puesto'] ?? '-')) ?></td>
+                                                    <td><?= h((string)($row['horario'] ?? '-')) ?></td>
+                                                    <td><?= h((string)($row['caracter'] ?? '-')) ?></td>
                                                     <td>
                                                         <?php if ($puedeEditarTablas): ?>
                                                             <button 
@@ -870,7 +929,12 @@ if ($idEmpresaSeleccionada > 0) {
                                                                 data-id="<?= (int)($row['id_registro'] ?? 0) ?>"
                                                                 data-tipo="<?= h((string)($row['tipo'] ?? '')) ?>"
                                                                 data-n-mujeres="<?= (int)($row['n_mujeres'] ?? 0) ?>"
-                                                                data-n-hombres="<?= (int)($row['n_hombres'] ?? 0) ?>">
+                                                                data-n-hombres="<?= (int)($row['n_hombres'] ?? 0) ?>"
+                                                                data-n-horas="<?= (int)($row['n_horas'] ?? 0) ?>"
+                                                                data-modalidad="<?= h((string)($row['modalidad'] ?? '')) ?>"
+                                                                data-perfil-puesto="<?= h((string)($row['perfil_puesto'] ?? '')) ?>"
+                                                                data-horario="<?= h((string)($row['horario'] ?? '')) ?>"
+                                                                data-caracter="<?= h((string)($row['caracter'] ?? '')) ?>">
                                                                 Editar
                                                             </button>
                                                         <?php endif; ?>
@@ -899,7 +963,7 @@ if ($idEmpresaSeleccionada > 0) {
 
                                 <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
-                                <div>
+                                <div id="excedencias_motivo_container" class="d-none">
                                     <label class="form-label" for="excedencias_motivo">Motivo</label>
                                     <input id="excedencias_motivo" type="text" name="motivo" class="form-control" maxlength="100">
                                 </div>
@@ -911,6 +975,7 @@ if ($idEmpresaSeleccionada > 0) {
                                         <option value="Excedencias Voluntarias">Excedencias Voluntarias</option>
                                         <option value="Excedencias Cuidado Menores">Excedencias Cuidado Menores</option>
                                         <option value="Excedencias Cuidado de Personas Mayores">Excedencias Cuidado de Personas Mayores</option>
+                                        <option value="Otros">Otros</option>
                                     </select>
                                 </div>
 
@@ -995,7 +1060,7 @@ if ($idEmpresaSeleccionada > 0) {
 
                                 <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaSeleccionada ?>">
 
-                                <div>
+                                <div id="permisos_motivo_container" class="d-none">
                                     <label class="form-label" for="permisos_motivo">Motivo</label>
                                     <input id="permisos_motivo" type="text" name="motivo" class="form-control" maxlength="100">
                                 </div>
@@ -1006,6 +1071,9 @@ if ($idEmpresaSeleccionada > 0) {
                                         <option value="">-- Selecciona tipo de permiso --</option>
                                         <option value="Lactancia">Lactancia</option>
                                         <option value="Nacimiento">Nacimiento</option>
+                                        <option value="Matrimonio">Matrimonio</option>
+                                        <option value="Hospitalizacion de familiares">Hospitalizacion de familiares</option>
+                                        <option value="Otros">Otros</option>
                                     </select>
                                 </div>
 
@@ -1210,6 +1278,42 @@ if ($idEmpresaSeleccionada > 0) {
             const inputAccion = document.getElementById('edit_accion');
             const inputIdRegistro = document.getElementById('edit_id_registro');
             const inputIdBaja = document.getElementById('edit_id_baja');
+            const selectTipoBaja = document.getElementById('tipo_baja');
+            const bloqueTemporales = document.getElementById('bloque_temporales');
+            const bloqueDefinitivas = document.getElementById('bloque_definitivas');
+
+            const actualizarBloquesBajas = () => {
+                if (!selectTipoBaja || !bloqueTemporales || !bloqueDefinitivas) {
+                    return;
+                }
+
+                const esTemporal = selectTipoBaja.value === 'TEMPORALES';
+                const esDefinitiva = selectTipoBaja.value === 'DEFINITIVAS';
+
+                bloqueTemporales.classList.toggle('d-none', esDefinitiva);
+                bloqueDefinitivas.classList.toggle('d-none', !esDefinitiva);
+            };
+
+            if (selectTipoBaja) {
+                selectTipoBaja.addEventListener('change', actualizarBloquesBajas);
+                actualizarBloquesBajas();
+            }
+
+            const selectExcedenciasTipo = document.getElementById('excedencias_tipo');
+            const containerExcedenciasMotivo = document.getElementById('excedencias_motivo_container');
+            const selectPermisosTipo = document.getElementById('permisos_tipo');
+            const containerPermisosMotivo = document.getElementById('permisos_motivo_container');
+
+            if (selectExcedenciasTipo && containerExcedenciasMotivo) {
+                selectExcedenciasTipo.addEventListener('change', function() {
+                    containerExcedenciasMotivo.classList.toggle('d-none', this.value !== 'Otros');
+                });
+            }
+            if (selectPermisosTipo && containerPermisosMotivo) {
+                selectPermisosTipo.addEventListener('change', function() {
+                    containerPermisosMotivo.classList.toggle('d-none', this.value !== 'Otros');
+                });
+            }
 
             // Bajas
             document.querySelectorAll('.btn-edit-baja').forEach(btn => {
@@ -1222,10 +1326,6 @@ if ($idEmpresaSeleccionada > 0) {
                                     <option value="TEMPORALES" ${this.dataset.tipoBaja === 'TEMPORALES' ? 'selected' : ''}>Temporales</option>
                                     <option value="DEFINITIVAS" ${this.dataset.tipoBaja === 'DEFINITIVAS' ? 'selected' : ''}>Definitivas</option>
                                 </select>
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="form-label fw-bold">Motivo</label>
-                                <input type="text" name="motivo" class="form-control" value="${this.dataset.motivo}">
                             </div>
                         </div>
                         <div class="row g-3 mt-1">
@@ -1275,17 +1375,54 @@ if ($idEmpresaSeleccionada > 0) {
                 btn.addEventListener('click', function() {
                     container.innerHTML = `
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Tipo de formación</label>
+                            <label class="form-label fw-bold">Nombre de la formación</label>
                             <input type="text" name="tipo" class="form-control" value="${this.dataset.tipo}" required>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-4">
+                                <label class="form-label fw-bold">Horas</label>
+                                <input type="number" name="n_horas" class="form-control" value="${this.dataset.nHoras || 0}">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label fw-bold">Mujeres</label>
+                                <input type="number" name="n_mujeres" class="form-control" value="${this.dataset.nMujeres}" required>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label fw-bold">Hombres</label>
+                                <input type="number" name="n_hombres" class="form-control" value="${this.dataset.nHombres}" required>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Modalidad</label>
+                                <select name="modalidad" class="form-select">
+                                    <option value="" ${!this.dataset.modalidad ? 'selected' : ''}>Selecciona...</option>
+                                    <option value="Presencial" ${this.dataset.modalidad === 'Presencial' ? 'selected' : ''}>Presencial</option>
+                                    <option value="Online" ${this.dataset.modalidad === 'Online' ? 'selected' : ''}>Online</option>
+                                    <option value="Mixta" ${this.dataset.modalidad === 'Mixta' ? 'selected' : ''}>Mixta</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Horario</label>
+                                <select name="horario" class="form-select">
+                                    <option value="" ${!this.dataset.horario ? 'selected' : ''}>Selecciona...</option>
+                                    <option value="Dentro del horario" ${this.dataset.horario === 'Dentro del horario' ? 'selected' : ''}>Dentro del horario</option>
+                                    <option value="Fuera del horario" ${this.dataset.horario === 'Fuera del horario' ? 'selected' : ''}>Fuera del horario</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="row g-3">
                             <div class="col-6">
-                                <label class="form-label fw-bold">Nº Mujeres</label>
-                                <input type="number" name="n_mujeres" class="form-control" value="${this.dataset.nMujeres}" required>
+                                <label class="form-label fw-bold">Perfil (Puesto)</label>
+                                <input type="text" name="perfil_puesto" class="form-control" value="${this.dataset.perfilPuesto || ''}">
                             </div>
                             <div class="col-6">
-                                <label class="form-label fw-bold">Nº Hombres</label>
-                                <input type="number" name="n_hombres" class="form-control" value="${this.dataset.nHombres}" required>
+                                <label class="form-label fw-bold">Carácter</label>
+                                <select name="caracter" class="form-select">
+                                    <option value="" ${!this.dataset.caracter ? 'selected' : ''}>Selecciona...</option>
+                                    <option value="Obligatoria" ${this.dataset.caracter === 'Obligatoria' ? 'selected' : ''}>Obligatoria</option>
+                                    <option value="Voluntaria" ${this.dataset.caracter === 'Voluntaria' ? 'selected' : ''}>Voluntaria</option>
+                                </select>
                             </div>
                         </div>
                     `;
@@ -1300,16 +1437,17 @@ if ($idEmpresaSeleccionada > 0) {
             document.querySelectorAll('.btn-edit-excedencia').forEach(btn => {
                 btn.addEventListener('click', function() {
                     container.innerHTML = `
-                        <div class="mb-3">
+                        <div class="mb-3 ${this.dataset.tipo === 'Otros' ? '' : 'd-none'}" id="edit_excedencias_motivo_container">
                             <label class="form-label fw-bold">Motivo</label>
                             <input type="text" name="motivo" class="form-control" value="${this.dataset.motivo}">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Tipo de excedencia</label>
-                            <select name="tipo" class="form-select" required>
+                            <select name="tipo" class="form-select" required onchange="document.getElementById('edit_excedencias_motivo_container').classList.toggle('d-none', this.value !== 'Otros')">
                                 <option value="Excedencias Voluntarias" ${this.dataset.tipo === 'Excedencias Voluntarias' ? 'selected' : ''}>Excedencias Voluntarias</option>
                                 <option value="Excedencias Cuidado Menores" ${this.dataset.tipo === 'Excedencias Cuidado Menores' ? 'selected' : ''}>Excedencias Cuidado Menores</option>
                                 <option value="Excedencias Cuidado de Personas Mayores" ${this.dataset.tipo === 'Excedencias Cuidado de Personas Mayores' ? 'selected' : ''}>Excedencias Cuidado de Personas Mayores</option>
+                                <option value="Otros" ${this.dataset.tipo === 'Otros' ? 'selected' : ''}>Otros</option>
                             </select>
                         </div>
                         <div class="row g-3">
@@ -1334,15 +1472,18 @@ if ($idEmpresaSeleccionada > 0) {
             document.querySelectorAll('.btn-edit-permiso').forEach(btn => {
                 btn.addEventListener('click', function() {
                     container.innerHTML = `
-                        <div class="mb-3">
+                        <div class="mb-3 ${this.dataset.tipo === 'Otros' ? '' : 'd-none'}" id="edit_permisos_motivo_container">
                             <label class="form-label fw-bold">Motivo</label>
                             <input type="text" name="motivo" class="form-control" value="${this.dataset.motivo}">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Tipo de permiso</label>
-                            <select name="tipo" class="form-select" required>
+                            <select name="tipo" class="form-select" required onchange="document.getElementById('edit_permisos_motivo_container').classList.toggle('d-none', this.value !== 'Otros')">
                                 <option value="Lactancia" ${this.dataset.tipo === 'Lactancia' ? 'selected' : ''}>Lactancia</option>
                                 <option value="Nacimiento" ${this.dataset.tipo === 'Nacimiento' ? 'selected' : ''}>Nacimiento</option>
+                                <option value="Matrimonio" ${this.dataset.tipo === 'Matrimonio' ? 'selected' : ''}>Matrimonio</option>
+                                <option value="Hospitalizacion de familiares" ${this.dataset.tipo === 'Hospitalizacion de familiares' ? 'selected' : ''}>Hospitalizacion de familiares</option>
+                                <option value="Otros" ${this.dataset.tipo === 'Otros' ? 'selected' : ''}>Otros</option>
                             </select>
                         </div>
                         <div class="row g-3">
@@ -1391,7 +1532,6 @@ if ($idEmpresaSeleccionada > 0) {
             });
         });
 
-        // Copia de la lógica de visibilidad de bajas para el Modal si fuera necesario (aunque ya está precargado)
     </script>
 </body>
 </html>

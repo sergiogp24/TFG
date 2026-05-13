@@ -37,7 +37,7 @@ $_SESSION['user']['email']    = $clienteEmail;
 
 // SISTEMA DE VISTAS
 
-$view = $_GET['view'] ?? 'menu';
+$view = (string)($_GET['view'] ?? 'menu');
 $allowed = ['menu', 'perfil', 'upload', 'archivos'];
 if (!in_array($view, $allowed, true)) $view = 'menu';
 
@@ -63,4 +63,4 @@ if ($view === 'archivos') {
 
 // ENVIAR A OTRA VISTA
 
-require __DIR__ . '/../html/cliente.html.php';
+require __DIR__ . '/../html/index_cliente.php';

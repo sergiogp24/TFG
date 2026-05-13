@@ -11,7 +11,7 @@ require __DIR__ . '/../config/config.php';
 
 function ensure_reuniones_empresa_column(mysqli $db): void
 {
-    $check = $db->query("\n        SELECT 1\n        FROM information_schema.COLUMNS\n        WHERE TABLE_SCHEMA = DATABASE()\n          AND TABLE_NAME = 'reuniones'\n          AND COLUMN_NAME = 'id_empresa'\n        LIMIT 1\n    ");
+    $check = $db->query("SELECT 1\n        FROM information_schema.COLUMNS\n        WHERE TABLE_SCHEMA = DATABASE()\n          AND TABLE_NAME = 'reuniones'\n          AND COLUMN_NAME = 'id_empresa'\n        LIMIT 1\n    ");
     $exists = ($check instanceof mysqli_result) && ($check->num_rows > 0);
     if ($check instanceof mysqli_result) {
         $check->close();
@@ -56,12 +56,10 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
         return false;
     }
 
-    $sql = '
-        SELECT 1
-        FROM archivos a
+    $sql = 'SELECT 1 FROM archivos a
         INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
         INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
-        WHERE UPPER(TRIM(a.tipo)) = "REGISTRO_RETRIBUTIVO" AND ac.id_empresa = ?
+        WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND ac.id_empresa = ?
         LIMIT 1';
 
     $stmt = db()->prepare($sql);
@@ -78,11 +76,7 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
         return true;
     }
 
-    $sqlDirecto = '
-        SELECT 1
-        FROM archivos a
-        WHERE UPPER(TRIM(a.tipo)) = "REGISTRO_RETRIBUTIVO" AND a.id_empresa = ?
-        LIMIT 1';
+    $sqlDirecto = 'SELECT 1 FROM archivos a WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND a.id_empresa = ? LIMIT 1';
 
     $stmtDirecto = db()->prepare($sqlDirecto);
     if (!$stmtDirecto) {
@@ -97,35 +91,51 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
     return $ok;
 }
 
-function obtener_word_final_empresa(int $idEmpresa): ?array
+function empresa_tiene_datos_cuantitativos(int $idEmpresa): bool
 {
-    if ($idEmpresa <= 0) {
-        return null;
-    }
-
-    $sql = '
-        SELECT id_archivo, nombre_original, subido_en
-        FROM archivos
-        WHERE UPPER(TRIM(tipo)) IN ("WORD_GENERADO", "WORD_FINAL") AND id_empresa = ?
-        ORDER BY subido_en DESC, id_archivo DESC
-        LIMIT 1';
-
-    $stmt = db()->prepare($sql);
-    if (!$stmt) {
-        return null;
-    }
-
-    $stmt->bind_param('i', $idEmpresa);
+    if ($idEmpresa <= 0) return false;
+    $db = db();
+    $sql = "SELECT 1 FROM bajas WHERE id_empresa = ? UNION SELECT 1 FROM area_formaciones WHERE id_empresa = ? UNION SELECT 1 FROM area_excedencias WHERE id_empresa = ? UNION SELECT 1 FROM area_Permisos_retribuidos WHERE id_empresa = ? LIMIT 1";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) return false;
+    $stmt->bind_param('iiii', $idEmpresa, $idEmpresa, $idEmpresa, $idEmpresa);
     $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc() ?: null;
+    $ok = (bool)$stmt->get_result()->fetch_assoc();
     $stmt->close();
-
-    return $row;
+    return $ok;
 }
 
-$view = (string)($_GET['view'] ?? 'mi_espacio');
-if (!in_array($view, ['menu', 'mi_espacio', 'privada', 'perfil', 'reuniones'], true)) {
-    $view = 'mi_espacio';
+function empresa_tiene_cuestionario_cualitativo(int $idEmpresa): bool
+{
+    if ($idEmpresa <= 0) return false;
+    $db = db();
+    $sql = "SELECT 1 FROM cuestionario_seleccion_personal WHERE id_empresa = ? UNION SELECT 1 FROM cuestionario_promocion_profesional WHERE id_empresa = ? UNION SELECT 1 FROM cuestionario_formacion WHERE id_empresa = ? LIMIT 1";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) return false;
+    $stmt->bind_param('iii', $idEmpresa, $idEmpresa, $idEmpresa);
+    $stmt->execute();
+    $ok = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $ok;
+}
+
+function empresa_tiene_documentacion(int $idEmpresa): bool
+{
+    if ($idEmpresa <= 0) return false;
+    $db = db();
+    $sql = "SELECT 1 FROM archivos WHERE id_empresa = ? AND UPPER(TRIM(tipo)) = 'DOCUMENTACION' LIMIT 1";
+    $stmt = $db->prepare($sql);
+    if (!$stmt) return false;
+    $stmt->bind_param('i', $idEmpresa);
+    $stmt->execute();
+    $ok = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $ok;
+}
+
+$view = (string)($_GET['view'] ?? 'empresas');
+if (!in_array($view, ['menu', 'mi_espacio', 'privada', 'perfil', 'reuniones', 'empresas'], true)) {
+    $view = 'empresas';
 }
 
 $msg = (string)($_GET['msg'] ?? '');
@@ -144,7 +154,7 @@ $clienteTecnicosEmpresa = [];
 if ($usuarioId > 0) {
     ensure_reuniones_empresa_column(db());
     $stmtEmpresas = db()->prepare(
-        'SELECT t.id_empresa, t.razon_social
+        'SELECT t.id_empresa, t.razon_social, GROUP_CONCAT(DISTINCT ce.tipo_contrato SEPARATOR ", ") AS tipo_contrato
          FROM (
              SELECT e.id_empresa, e.razon_social
              FROM usuario_empresa ue
@@ -157,6 +167,9 @@ if ($usuarioId > 0) {
              FROM empresa e
              WHERE e.id_usuario = ?
          ) t
+         LEFT JOIN contrato_empresa ce ON ce.id_empresa = t.id_empresa 
+            AND STR_TO_DATE(CONCAT(ce.fin_contratacion, " 23:59:59"), "%Y-%m-%d %H:%i:%s") >= NOW()
+         GROUP BY t.id_empresa, t.razon_social
          ORDER BY t.razon_social ASC'
     );
 
@@ -168,6 +181,7 @@ if ($usuarioId > 0) {
             $empresasDisponibles[] = [
                 'id_empresa' => (int)($rowEmpresa['id_empresa'] ?? 0),
                 'razon_social' => trim((string)($rowEmpresa['razon_social'] ?? '')),
+                'tipo_contrato' => trim((string)($rowEmpresa['tipo_contrato'] ?? '')),
             ];
         }
         $stmtEmpresas->close();
@@ -186,26 +200,27 @@ if ($usuarioId > 0) {
         $stmtPerfil->close();
     }
 
-    if (in_array($view, ['privada', 'reuniones'], true)) {
-        correo_enviar_recordatorio_rr_reuniones_vencidas(db());
-        db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
-        $stmtReuniones = db()->prepare(
-            'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion, r.id_empresa, er.razon_social AS empresa_reunion
-             FROM reuniones r
-             LEFT JOIN empresa er ON er.id_empresa = r.id_empresa
-             INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
-             WHERE ur.id_usuario = ?
-             ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC'
-        );
-        if ($stmtReuniones) {
-            $stmtReuniones->bind_param('i', $usuarioId);
-            $stmtReuniones->execute();
-            $resReuniones = $stmtReuniones->get_result();
-            while ($rowReunion = $resReuniones->fetch_assoc()) {
-                $clienteReuniones[] = $rowReunion;
-            }
-            $stmtReuniones->close();
+    correo_enviar_recordatorio_rr_reuniones_vencidas(db());
+    db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
+    $stmtReuniones = db()->prepare(
+        'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion, r.id_empresa, er.razon_social AS empresa_reunion
+         FROM reuniones r
+         LEFT JOIN empresa er ON er.id_empresa = r.id_empresa
+         INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
+         WHERE ur.id_usuario = ?
+         ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC'
+    );
+    if ($stmtReuniones) {
+        $stmtReuniones->bind_param('i', $usuarioId);
+        $stmtReuniones->execute();
+        $resReuniones = $stmtReuniones->get_result();
+        while ($rowReunion = $resReuniones->fetch_assoc()) {
+            $clienteReuniones[] = $rowReunion;
         }
+        $stmtReuniones->close();
+    }
+
+    if (in_array($view, ['privada', 'reuniones'], true)) {
 
         $tecnicosEmpresaMap = [];
 
@@ -215,7 +230,7 @@ if ($usuarioId > 0) {
              INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
              INNER JOIN usuario u ON u.id_usuario = ue.id_usuario
              INNER JOIN rol r ON r.id = u.rol_id
-             WHERE UPPER(TRIM(r.nombre)) LIKE "TECNICO%"
+             WHERE UPPER(TRIM(r.nombre)) LIKE "PERSONAL TECNICO%"
                AND ue.id_empresa IN (
                    SELECT t.id_empresa
                    FROM (
@@ -254,7 +269,7 @@ if ($usuarioId > 0) {
              FROM empresa e
              INNER JOIN usuario u ON u.id_usuario = e.id_usuario
              INNER JOIN rol r ON r.id = u.rol_id
-             WHERE UPPER(TRIM(r.nombre)) LIKE "TECNICO%"
+             WHERE UPPER(TRIM(r.nombre)) LIKE "PERSONAL TECNICO%"
                AND e.id_empresa IN (
                    SELECT t.id_empresa
                    FROM (
@@ -291,15 +306,16 @@ if ($usuarioId > 0) {
         $clienteTecnicosEmpresa = array_values($tecnicosEmpresaMap);
     }
 
-    $stmtProximaReunion = db()->prepare(
-        'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion
-         FROM reuniones r
-         INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
-         WHERE ur.id_usuario = ?
-           AND STR_TO_DATE(CONCAT(r.fecha_reunion, " ", r.hora_reunion), "%Y-%m-%d %H:%i") >= NOW()
-         ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC
-         LIMIT 1'
-    );
+        $stmtProximaReunion = db()->prepare(
+                'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion
+                         FROM reuniones r
+                         INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
+                         WHERE ur.id_usuario = ?
+                             AND r.tipo = "FechaLimite"
+                             AND STR_TO_DATE(CONCAT(r.fecha_reunion, " ", r.hora_reunion), "%Y-%m-%d %H:%i") >= NOW()
+                         ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC
+                         LIMIT 1'
+        );
     if ($stmtProximaReunion) {
         $stmtProximaReunion->bind_param('i', $usuarioId);
         $stmtProximaReunion->execute();
@@ -335,43 +351,22 @@ if (!empty($empresasDisponibles)) {
 
 $sinEmpresaAsignada = ($empresaAsignada === null);
 $idEmpresaAsignada = (int)($empresaAsignada['id_empresa'] ?? 0);
+
 $registroSubido = (!$sinEmpresaAsignada && empresa_tiene_registro_retributivo($idEmpresaAsignada));
+$datosCuantitativosSubidos = (!$sinEmpresaAsignada && empresa_tiene_datos_cuantitativos($idEmpresaAsignada));
+$datosCualitativosSubidos = (!$sinEmpresaAsignada && empresa_tiene_cuestionario_cualitativo($idEmpresaAsignada));
+$documentacionSubida = (!$sinEmpresaAsignada && empresa_tiene_documentacion($idEmpresaAsignada));
 
+// Lógica de desbloqueo secuencial (Gamificación)
+$paso1Completado = $registroSubido;
 
-$idEmpresaWordFinalSeleccionada = (int)($_GET['id_empresa_word_final'] ?? 0);
-$wordFinalPorEmpresa = [];
+// Paso 2 (Datos) se desbloquea al completar el Paso 1
+// Paso 3 (Documentación) se desbloquea si el Paso 2 está completado (cuantitativo, cualitativo o documentación rápida)
+$paso2Desbloqueado = $paso1Completado;
+$paso2Completado = ($datosCuantitativosSubidos || $datosCualitativosSubidos || $documentacionSubida);
 
-if (!empty($empresasDisponibles)) {
-    foreach (($empresasDisponibles ?? []) as $empresaDisponible) {
-        $idEmpresaDisponible = (int)($empresaDisponible['id_empresa'] ?? 0);
-        if ($idEmpresaDisponible <= 0) {
-            continue;
-        }
-
-        $wordFinal = obtener_word_final_empresa($idEmpresaDisponible);
-        if ($wordFinal !== null) {
-            $wordFinalPorEmpresa[$idEmpresaDisponible] = $wordFinal;
-        }
-    }
-
-    if ($idEmpresaWordFinalSeleccionada <= 0) {
-        $idEmpresaWordFinalSeleccionada = $idEmpresaAsignada;
-    }
-
-    $empresaWordFinalValida = false;
-    foreach (($empresasDisponibles ?? []) as $empresaDisponible) {
-        if ((int)($empresaDisponible['id_empresa'] ?? 0) === $idEmpresaWordFinalSeleccionada) {
-            $empresaWordFinalValida = true;
-            break;
-        }
-    }
-
-    if (!$empresaWordFinalValida) {
-        $idEmpresaWordFinalSeleccionada = (int)($empresasDisponibles[0]['id_empresa'] ?? 0);
-    }
-}
-
-$wordFinalSeleccionado = $wordFinalPorEmpresa[$idEmpresaWordFinalSeleccionada] ?? null;
+$paso3Desbloqueado = $paso2Completado;
+$paso3Completado = false; // Ver documentación es informativo/enlace, no tiene "completado" per se, pero podemos marcarlo si ha visitado? No, dejemoslo como enlace.
 
 $pendientesEspacio = 0;
 $empresasPendientesLista = [];
@@ -397,7 +392,6 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 
     <link rel="stylesheet" href="../css/global.css?v=<?= (int)$globalCssVersion ?>">
     <link rel="stylesheet" href="../css/admin.css?v=<?= (int)$adminCssVersion ?>">
@@ -407,84 +401,69 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
 <body class="bg-light cliente-page">
     <?php $view = $view ?? 'mi_espacio'; ?>
     <div class="container-fluid py-4">
-        <div class="row g-3">
+        <div class="row g-3 align-items-start">
 
             <!-- SIDEBAR -->
-            <aside class="col-12 col-lg-3 col-xl-2">
-                <div class="card shadow-sm border-0 sidebar">
-                    <div class="card-body">
-                        <!-- Header Sidebar -->
-                        <div class="sidebar-header">
-                            <div class="sidebar-avatar" style="background: linear-gradient(135deg, var(--color-blue), var(--color-teal));">💼</div>
-                            <h5 class="sidebar-title">Panel Cliente</h5>
-                        </div>
+            <!-- SIDEBAR -->
+            <?php include __DIR__ . '/../php/fragments/sidebar.php'; ?>
 
-                        <!-- User Info -->
-                        <div class="sidebar-user-info">
-                            <div class="info-label">Usuario Actual</div>
-                            <div class="info-value"><?= h($sessionUsername) ?></div>
-                            <?php if ($sessionEmail !== ''): ?>
-                                <div class="info-email">📧 <?= h($sessionEmail) ?></div>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- Navegación -->
-                        <nav class="sidebar-nav">
-                            <!-- Mi Espacio -->
-                            <a class="nav-button <?= ($view === 'mi_espacio') ? 'active' : '' ?>" href="index_cliente.php?view=mi_espacio">
-                                <span class="nav-icon">📊</span>
-                                <span>Mi Espacio</span>
-                            </a>
-
-                            <!-- Área Privada Collapse -->
-                            <?php $isPrivateView = in_array($view, ['privada', 'perfil', 'reuniones'], true); ?>
-                            <button class="nav-button nav-collapse <?= $isPrivateView ? 'active' : '' ?>"
-                                type="button" data-bs-toggle="collapse" data-bs-target="#menuAreaPrivada"
-                                aria-expanded="<?= $isPrivateView ? 'true' : 'false' ?>">
-                                <span class="nav-icon">🔐</span>
-                                <span>Área Privada</span>
-                                <span class="collapse-icon">▾</span>
-                            </button>
-
-                            <div id="menuAreaPrivada" class="collapse nav-submenu <?= $isPrivateView ? 'show' : '' ?>">
-                                <a class="nav-subbutton <?= ($view === 'perfil') ? 'active' : '' ?>" href="index_cliente.php?view=perfil">
-                                    <span>👤</span>
-                                    <span>Mi Cuenta</span>
-                                </a>
-                                <a class="nav-subbutton <?= ($view === 'reuniones') ? 'active' : '' ?>" href="index_cliente.php?view=reuniones">
-                                    <span>📅</span>
-                                    <span>Mis Reuniones</span>
-                                </a>
-                            </div>
-
-                            <!-- Cerrar Sesión -->
-                            <a class="nav-button nav-logout" href="<?= h(app_path('/php/logout.php')) ?>">
-                                <span class="nav-icon">🚪</span>
-                                <span>Cerrar Sesión</span>
-                            </a>
-                        </nav>
-                    </div>
-                </div>
-            </aside>
-
-            <main class="col-12 col-lg-9 col-xl-10">
-                <div class="card panel <?= in_array($view, ['menu', 'mi_espacio', 'reuniones'], true) ? 'panel-wide' : '' ?> mx-auto shadow-sm border-0">
+            <main class="col-12 col-md-9 col-xl-10">
+                <div class="card panel <?= in_array($view, ['menu', 'mi_espacio', 'reuniones'], true) ? 'panel-wide' : '' ?> shadow-sm border-0">
                     <div class="card-body p-4">
-                        <header class="d-flex align-items-center justify-content-between mb-3">
+                        <!-- HEADER DENTRO DE LA TARJETA -->
+                        <div class="mb-4">
                             <?php if (in_array($view, ['privada', 'perfil', 'reuniones'], true)): ?>
-                                <h4 class="mb-0">Panel de Cliente</h4>
+                                <h2 class="fw-bold mb-1">Panel de Cliente</h2>
+                                <p class="text-muted small mb-0">Gestión de área privada y reuniones</p>
                             <?php elseif ($view === 'mi_espacio'): ?>
-                                <h4 class="mb-0">Mi espacio</h4>
+                                <h2 class="fw-bold mb-1">Mi Espacio</h2>
+                                <p class="text-muted small mb-0">Resumen de actividad y estado de tareas</p>
                             <?php else: ?>
-                                <h4 class="mb-0">Subir Documento del Registro Retributivo</h4>
+                                <h2 class="fw-bold mb-1">Registro Retributivo</h2>
+                                <p class="text-muted small mb-0">Subida y gestión de documentos del registro</p>
                             <?php endif; ?>
-                        </header>
+                            <hr class="mt-3 mb-0 opacity-10">
+                        </div>
 
                         <?php if ($msg !== ''): ?>
                             <div class="alert alert-info py-2"><?= h($msg) ?></div>
                         <?php endif; ?>
 
-                        <?php if ($view === 'privada'): ?>
+                        <?php if ($view === 'empresas'): ?>
+                            <div class="text-center mb-5">
+                                <h3 class="fw-bold">Mis Empresas</h3>
+                                <p class="text-muted">Selecciona una empresa para gestionar su registro y documentación</p>
+                            </div>
+                            <div class="row g-4 justify-content-center">
+                                <?php if (empty($empresasDisponibles)): ?>
+                                    <div class="col-12 text-center">
+                                        <div class="alert alert-warning">No tienes empresas asignadas aún.</div>
+                                    </div>
+                                <?php else: ?>
+                                    <?php foreach ($empresasDisponibles as $emp): ?>
+                                        <div class="col-12 col-md-6 col-lg-4">
+                                            <a href="index_cliente.php?view=mi_espacio&id_empresa=<?= (int)$emp['id_empresa'] ?>" class="text-decoration-none">
+                                                <div class="card h-100 border-0 shadow-sm company-card" style="transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border-radius: 12px;">
+                                                    <div class="card-body p-4 text-center">
+                                                        <div class="mb-3" style="font-size: 3rem;">🏢</div>
+                                                        <h5 class="fw-bold text-dark mb-2"><?= h($emp['razon_social']) ?></h5>
+                                                        <?php if (!empty($emp['tipo_contrato'])): ?>
+                                                            <p class="text-muted small mb-0">📋 <?= h($emp['tipo_contrato']) ?></p>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                            <style>
+                                .company-card:hover {
+                                    transform: translateY(-5px);
+                                    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+                                }
+                            </style>
+                        <?php elseif ($view === 'privada'): ?>
                             <div class="alert alert-light border mb-0">
                                 Selecciona una opcion de Area Privada: <strong>Mi cuenta</strong> o <strong>Mis reuniones</strong>.
                             </div>
@@ -539,7 +518,8 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 $idReunion = (int)($reunion['id_reunion'] ?? 0);
                                 $objetivoReunion = trim((string)($reunion['objetivo'] ?? ''));
                                 $fechaReunion = (string)($reunion['fecha_reunion'] ?? '');
-                                $horaReunion = (string)($reunion['hora_reunion'] ?? '');
+                                $horaReunionRaw = (string)($reunion['hora_reunion'] ?? '');
+                                $horaReunion = date('H:i', strtotime($horaReunionRaw));
                                 $titulo = ($objetivoReunion !== '' ? $objetivoReunion : 'Reunion');
                                 $clienteCalendarEvents[] = [
                                     'id' => (string)$idReunion,
@@ -577,9 +557,9 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                             </select>
                                         </div>
                                         <div class="col-12 col-md-3">
-                                            <label class="form-label">👤 Técnico</label>
+                                            <label class="form-label">👤 Personal Técnico</label>
                                             <select class="form-select" id="clienteSelectTecnicoReunion" name="id_tecnico_reunion" disabled>
-                                                <option value="0">Sin asignar a técnico</option>
+                                                <option value="0">Sin asignar personal técnico</option>
                                             </select>
                                         </div>
                                         <div class="col-12 col-md-2">
@@ -682,18 +662,16 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                             </div>
                         <?php elseif ($view === 'mi_espacio'): ?>
                             <div class="space-shell mb-8">
-                                <div class="d-flex align-items-end justify-content-between flex-wrap gap-6 mb-6">
-                                    <div>
-                                        <div class="space-kicker">Mi espacio</div>
-                                        <h3 class="mb-1">Resumen rápido de trabajo</h3>
-                                        <div class="text-muted">Acceso directo a lo importante de tu día a día.</div>
-                                    </div>
+                                <div class="text-center mb-5">
+                                    <div class="space-kicker">MI ESPACIO</div>
+                                    <h3 class="mb-1 fw-bold">Resumen rápido de trabajo</h3>
+                                    <div class="text-muted">Acceso directo a lo importante de tu día a día.</div>
                                 </div>
 
-                                <div class="row g-3 mb-4">
-                                    <div class="col-12 col-md-4">
+                                <div class="row g-3 mb-5 justify-content-center">
+                                    <div class="col-12 col-md-5 col-lg-4">
                                         <div class="space-stat-card h-100">
-                                            <div class="space-stat-label">Próxima reunión</div>
+                                            <div class="space-stat-label">Fecha Límite Subida Registro Retributivo</div>
                                             <div class="space-stat-value">
                                                 <?php if (!empty($proximaReunion)): ?>
                                                     <?php
@@ -702,15 +680,15 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                     echo h(trim($fechaResumen . ' · ' . $horaResumen, " ·"));
                                                     ?>
                                                 <?php else: ?>
-                                                    Sin reuniones
+                                                    Ya has subido el registro retributivo
                                                 <?php endif; ?>
                                             </div>
                                             <div class="space-stat-icon">◔</div>
                                         </div>
                                     </div>
-                                    <div class="col-12 col-md-4">
+                                    <div class="col-12 col-md-5 col-lg-4">
                                         <div class="space-stat-card h-100">
-                                            <div class="space-stat-label">Clientes con Registro retributivo pendiente</div>
+                                            <div class="space-stat-label">Tus Empresas con Registro retributivo pendiente</div>
                                             <div class="space-stat-value"><?= (int)$pendientesEspacio ?></div>
                                             <div class="space-stat-icon" <?= $pendientesEspacio > 0 ? 'style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes" title="Ver empresas pendientes"' : '' ?>>▣</div>
                                             <?php if ($pendientesEspacio > 0): ?>
@@ -723,110 +701,66 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 </div>
 
                                 <div class="row g-4 mb-4">
-                                    <div class="col-12 col-xl-5">
+                                    <div class="col-12 col-lg-10 col-xl-8 mx-auto">
                                         <div class="space-panel h-100">
                                             <h4 class="mb-1">Qué tengo que hacer ahora</h4>
-                                            <div class="text-muted small mb-3">Vista guiada para el cliente.</div>
+                                            <div class="text-muted small mb-3">Guía paso a paso para ir completando la info que necesitamos para tu Plan de Igualdad.</div>
 
                                             <div class="space-task-list d-grid gap-3">
-                                                <div class="space-task-item">Subir registro retributivo si ya disponen de él</div>
-                                                <div class="space-task-item">Si no lo tienen, descargar la plantilla y completarla</div>
-                                                <div class="space-task-item">Completar los datos cuantitativos del formulario</div>
-                                                <div class="space-task-item">Completar cuestionario cualitativo</div>
-                                                <div class="space-task-item">Revisar próximas reuniones</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-12 col-xl-7">
-                                        <div class="space-panel h-100">
-                                            <h4 class="mb-1">Accesos rápidos</h4>
-                                            <div class="text-muted small mb-3">Entradas directas a tus áreas visibles.</div>
-
-                                            <div class="row g-3">
-                                                <div class="col-12 col-md-4">
-                                                    <a class="space-quick-card h-100" href="index_cliente.php?view=menu">
-                                                        <div class="space-quick-icon">⛨</div>
-                                                        <div class="space-quick-title">Plan de igualdad</div>
-                                                        <div class="space-quick-text">Registro retributivo, datos cuantitativos y cuestionario cualitativo.</div>
-                                                    </a>
-                                                </div>
-                                                <div class="col-12 col-md-4">
-                                                    <?php
-                                                    $idEmpresaMantenimiento = (int)($empresasDisponibles[0]['id_empresa'] ?? 0);
-                                                    $mantenimientoHref = ($idEmpresaMantenimiento > 0) 
-                                                        ? "../model/mantenimiento.php?id_empresa=" . $idEmpresaMantenimiento 
-                                                        : "javascript:alert('No tienes empresas asignadas para el mantenimiento');";
-                                                    ?>
-                                                    <a class="space-quick-card h-100" href="<?= $mantenimientoHref ?>">
-                                                        <div class="space-quick-icon">🔧</div>
-                                                        <div class="space-quick-title">Mantenimiento</div>
-                                                        <div class="space-quick-text">Áreas, medidas y formularios del mantenimiento.</div>
-                                                    </a>
-                                                </div>
-                                                <div class="col-12 col-md-4">
-                                                    <div class="space-quick-card h-100">
-                                                        <div class="space-quick-icon">📄</div>
-                                                        <div class="space-quick-title">Word final</div>
-                                                        <div class="space-quick-text mb-2">Selecciona empresa y descarga el documento final.</div>
-
-                                                        <?php if ($sinEmpresaAsignada || empty($empresasDisponibles)): ?>
-                                                            <div class="alert alert-warning py-2 mb-0">
-                                                                No tienes empresas asignadas para descargar el Word final.
-                                                            </div>
-                                                        <?php else: ?>
-                                                            <div class="row g-2 align-items-end">
-                                                                <div class="col-12">
-                                                                    <label for="id_empresa_word_final" class="form-label small mb-1">Selecciona empresa</label>
-                                                                    <select id="id_empresa_word_final" name="id_empresa_word_final" class="form-select form-select-sm">
-                                                                        <?php foreach (($empresasDisponibles ?? []) as $empresaDisponible): ?>
-                                                                            <?php $idEmpresaOpcionWord = (int)($empresaDisponible['id_empresa'] ?? 0); ?>
-                                                                            <option value="<?= $idEmpresaOpcionWord ?>" <?= ($idEmpresaOpcionWord === $idEmpresaWordFinalSeleccionada) ? 'selected' : '' ?>>
-                                                                                <?= h((string)($empresaDisponible['razon_social'] ?? '')) ?>
-                                                                            </option>
-                                                                        <?php endforeach; ?>
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-
-                                                            <div class="mt-2">
-                                                                <a
-                                                                    id="btnDescargarWordFinal"
-                                                                    class="btn btn-outline-success px-4"
-                                                                    href="<?= h(($wordFinalSeleccionado !== null) ? app_path('/php/download_archivo_subido.php?kind=archivos&id=' . (int)($wordFinalSeleccionado['id_archivo'] ?? 0)) : '#') ?>"
-                                                                    <?= ($wordFinalSeleccionado === null) ? 'aria-disabled="true" tabindex="-1"' : '' ?>>
-                                                                    Descargar Word final
-                                                                </a>
-                                                            </div>
-
-                                                            <?php $fechaWordFinal = (string)($wordFinalSeleccionado['subido_en'] ?? ''); ?>
-                                                            <div id="wordFinalEstado" class="small <?= ($wordFinalSeleccionado !== null) ? 'text-muted' : 'text-info' ?> mt-2">
-                                                                <?php if ($wordFinalSeleccionado !== null && $fechaWordFinal !== ''): ?>
-                                                                    Ultima subida: <?= h($fechaWordFinal) ?>
-                                                                <?php else: ?>
-                                                                    Todavia no hay Word final subido para la empresa seleccionada.
-                                                                <?php endif; ?>
-                                                            </div>
-
-                                                            <div id="wordFinalData" class="d-none">
-                                                                <?php foreach (($empresasDisponibles ?? []) as $empresaDisponible): ?>
-                                                                    <?php $idEmpresaOpcionWord = (int)($empresaDisponible['id_empresa'] ?? 0); ?>
-                                                                    <?php $wordFinalEmpresa = $wordFinalPorEmpresa[$idEmpresaOpcionWord] ?? null; ?>
-                                                                    <?php $downloadWordUrl = ''; ?>
-                                                                    <?php if ($wordFinalEmpresa !== null): ?>
-                                                                        <?php $downloadWordUrl = app_path('/php/download_archivo_subido.php?kind=archivos&id=' . (int)($wordFinalEmpresa['id_archivo'] ?? 0)); ?>
-                                                                    <?php endif; ?>
-                                                                    <?php $subidoEnWord = ($wordFinalEmpresa !== null) ? (string)($wordFinalEmpresa['subido_en'] ?? '') : ''; ?>
-                                                                    <span
-                                                                        class="word-final-item"
-                                                                        data-id-empresa="<?= $idEmpresaOpcionWord ?>"
-                                                                        data-download-url="<?= h($downloadWordUrl) ?>"
-                                                                        data-subido-en="<?= h($subidoEnWord) ?>"></span>
-                                                                <?php endforeach; ?>
-                                                            </div>
-                                                        <?php endif; ?>
+                                                <p>Lo primero que tenemos que hacer es subir el registro retributivo si ya disponen de él, en caso contrario descargar la plantilla y completarla, sigue los pasos indicados.</p>
+                                                <!-- Paso 1: Registro Retributivo -->
+                                                <a href="index_cliente.php?view=menu&id_empresa=<?= (int)$idEmpresaAsignada ?>" class="space-task-item text-decoration-none text-dark d-block border <?= $paso1Completado ? 'border-success bg-light' : 'border-primary' ?> p-3 rounded" style="cursor: pointer; transition: background-color 0.2s;">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <strong>Paso 1:</strong> Subir registro retributivo o descargar plantilla.
+                                                        </div>
+                                                        <span class="fs-4"><?= $paso1Completado ? '✅' : '❌' ?></span>
                                                     </div>
-                                                </div>
+                                                </a>
+
+                                                <!-- Paso 2: Datos Cuantitativos -->
+                                                <?php if ($paso2Desbloqueado): ?>
+                                                    <button type="button" class="btn-open-paso2 space-task-item text-decoration-none text-dark d-block border <?= $paso2Completado ? 'border-success bg-light' : 'border-primary' ?> p-3 rounded" style="cursor: pointer; transition: background-color 0.2s; background: none; border: inherit; padding: inherit; width: 100%; text-align: left;">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <strong>Paso 2:</strong> Completar datos cuantitativos y cuestionarios cualitativos del formulario.
+                                                            </div>
+                                                            <span class="fs-4"><?= $paso2Completado ? '✅' : '❌' ?></span>
+                                                        </div>
+                                                    </button>
+                                                <?php else: ?>
+                                                    <div class="space-task-item text-decoration-none text-muted d-block border border-secondary p-3 rounded bg-light" style="cursor: not-allowed; opacity: 0.7;">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <strong>Paso 2:</strong> Completar datos cuantitativos y cuestionarios cualitativos del formulario.
+                                                                <div class="small mt-1">Bloqueado. Completa el Paso 1.</div>
+                                                            </div>
+                                                            <span class="fs-4">🔒</span>
+                                                        </div>
+                                                    </div>
+                                                <?php endif; ?>
+
+                                                <!-- Paso 3: Ver Documentación -->
+                                                <?php if ($paso3Desbloqueado): ?>
+                                                    <a href="<?= h(app_path('/php/ver_archivos.php?id_empresa=' . $idEmpresaAsignada)) ?>" class="space-task-item text-decoration-none text-dark d-block border border-primary p-3 rounded" style="cursor: pointer; transition: background-color 0.2s;">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <strong>Paso 3:</strong> Ver Documentación.
+                                                            </div>
+                                                            <span class="fs-4">📂</span>
+                                                        </div>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <div class="space-task-item text-decoration-none text-muted d-block border border-secondary p-3 rounded bg-light" style="cursor: not-allowed; opacity: 0.7;">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <strong>Paso 3:</strong> Ver Documentación.
+                                                                <div class="small mt-1">Bloqueado. Sube al menos datos cuantitativos o cualitativos en el Paso 2.</div>
+                                                            </div>
+                                                            <span class="fs-4">🔒</span>
+                                                        </div>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -853,16 +787,15 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
 
                                                 <?php if (!$sinEmpresaAsignada): ?>
                                                     <div class="mb-3">
-                                                        <label for="nombre_empresa_cliente" class="form-label">Empresa / Referencia</label>
-                                                        <select id="nombre_empresa_cliente" name="id_empresa" class="form-select" required>
-                                                            <option value="" selected>-- seleccionar --</option>
-                                                            <?php foreach (($empresasDisponibles ?? []) as $empresaDisponible): ?>
-                                                                <?php $idEmpresaOpcion = (int)($empresaDisponible['id_empresa'] ?? 0); ?>
-                                                                <option value="<?= $idEmpresaOpcion ?>">
-                                                                    <?= h((string)($empresaDisponible['razon_social'] ?? '')) ?>
+                                                        <label for="menuEmpresaSelect" class="form-label">Empresa / Referencia</label>
+                                                        <select id="menuEmpresaSelect" class="form-select" required>
+                                                            <?php foreach (($empresasDisponibles ?? []) as $emp): ?>
+                                                                <option value="<?= (int)($emp['id_empresa'] ?? 0) ?>" <?= ((int)($emp['id_empresa'] ?? 0) === $idEmpresaAsignada) ? 'selected' : '' ?>>
+                                                                    <?= h((string)($emp['razon_social'] ?? '')) ?>
                                                                 </option>
                                                             <?php endforeach; ?>
                                                         </select>
+                                                        <input type="hidden" name="id_empresa" value="<?= (int)($idEmpresaAsignada ?? 0) ?>">
                                                     </div>
                                                 <?php else: ?>
                                                     <div class="mb-3">
@@ -881,11 +814,24 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                 <?php endif; ?>
 
                                                 <div class="mb-3">
-                                                    <label for="Asunto" class="form-label">Observaciones</label>
+                                                    <label for="Asunto" class="form-label">Observaciones (Opcional)</label>
                                                     <input type="text" id="Asunto" name="asunto" class="form-control">
                                                 </div>
 
-                                                <input type="hidden" name="tipo" value="REGISTRO_RETRIBUTIVO">
+                                                <div class="mb-3">
+                                                    <label for="modoRegistroCliente" class="form-label">Origen del registro</label>
+                                                    <select
+                                                        id="modoRegistroCliente"
+                                                        name="modo_registro"
+                                                        class="form-select"
+                                                        <?= $sinEmpresaAsignada ? 'disabled' : '' ?>
+                                                        required>
+                                                        <option value="HERRAMIENTA" selected>Herramienta de Registro Retributivo Del Ministerio</option>
+                                                        <option value="PROPIO">Tu propio registro retributivo</option>
+                                                    </select>
+                                                </div>
+
+                                                <input type="hidden" id="tipoRegistroCliente" name="tipo" value="REGISTRO_RETRIBUTIVO">
 
                                                 <div class="mb-3">
                                                     <label for="archivoRegistro" class="form-label">Archivo</label>
@@ -941,21 +887,19 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
         </div>
     </div>
 
-    <?php if ($view === 'menu'): ?>
-        <div class="modal fade" id="modalComplementoFormularios" tabindex="-1" aria-labelledby="modalComplementoFormulariosLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="modalComplementoFormulariosLabel">Complemento formularios</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                    </div>
-                    <div class="modal-body p-0" style="min-height: 70vh;">
-                        <iframe id="complementoFormulariosFrame" title="Formulario complemento" style="width:100%; height:70vh; border:0;"></iframe>
-                    </div>
+    <div class="modal fade" id="modalComplementoFormularios" tabindex="-1" aria-labelledby="modalComplementoFormulariosLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalComplementoFormulariosLabel">Complemento formularios</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-0" style="min-height: 70vh;">
+                    <iframe id="complementoFormulariosFrame" title="Formulario complemento" style="width:100%; height:70vh; border:0;"></iframe>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
     <?php if ($view === 'mi_espacio' && $pendientesEspacio > 0): ?>
         <div class="modal fade" id="modalEmpresasPendientes" tabindex="-1" aria-labelledby="modalEmpresasPendientesLabel" aria-hidden="true">
@@ -979,6 +923,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
             </div>
         </div>
     <?php endif; ?>
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
@@ -1067,7 +1012,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
 
                     const optionDefault = document.createElement('option');
                     optionDefault.value = '0';
-                    optionDefault.textContent = 'Sin asignar a técnico';
+                    optionDefault.textContent = 'Sin asignar al personal técnico';
                     selectTecnico.appendChild(optionDefault);
 
                     if (!idEmpresa || idEmpresa === '0') {
@@ -1100,108 +1045,95 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
             })();
         </script>
     <?php endif; ?>
+
     <?php if ($view === 'menu'): ?>
         <script>
             (function() {
-                const modalElement = document.getElementById('modalComplementoFormularios');
-                const iframe = document.getElementById('complementoFormulariosFrame');
-                const botones = document.querySelectorAll('.btn-open-complemento');
-                const modal = (modalElement && iframe && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(modalElement) : null;
-                const empresaSelect = document.getElementById('nombre_empresa_cliente');
-                const idEmpresaClienteInicial = <?= ($empresaAsignada !== null) ? (int)$empresaAsignada['id_empresa'] : 0 ?>;
+                const modoSelect = document.getElementById('modoRegistroCliente');
+                const tipoInput = document.getElementById('tipoRegistroCliente');
+                const empresaSelect = document.getElementById('menuEmpresaSelect');
 
-                botones.forEach((btn) => {
-                    btn.addEventListener('click', function() {
-                        if (!modal || !iframe) {
-                            return;
-                        }
-
-                        let idEmpresaCliente = idEmpresaClienteInicial;
-                        if (empresaSelect && empresaSelect.value !== '') {
-                            const parsed = Number.parseInt(empresaSelect.value, 10);
-                            if (Number.isFinite(parsed) && parsed > 0) {
-                                idEmpresaCliente = parsed;
-                            }
-                        }
-
-                        const tab = (btn.getAttribute('data-tab') || 'bajas').trim();
-                        let src = 'complemento_formularios.php?embed=1&tab=' + encodeURIComponent(tab);
-                        if (idEmpresaCliente > 0) {
-                            src += '&id_empresa=' + encodeURIComponent(String(idEmpresaCliente));
-                        }
-                        iframe.src = src;
-                        modal.show();
-                    });
-                });
-
-                if (modalElement && iframe) {
-                    modalElement.addEventListener('hidden.bs.modal', function() {
-                        iframe.src = '';
-                    });
-                }
-
-            })();
-        </script>
-    <?php endif; ?>
-    <?php if ($view === 'mi_espacio'): ?>
-        <script>
-            (function() {
-                const selectWordFinal = document.getElementById('id_empresa_word_final');
-                const btnDescargarWordFinal = document.getElementById('btnDescargarWordFinal');
-                const estadoWordFinal = document.getElementById('wordFinalEstado');
-                const itemsWordFinal = document.querySelectorAll('.word-final-item');
-
-                if (!selectWordFinal || !btnDescargarWordFinal || !estadoWordFinal || itemsWordFinal.length === 0) {
+                if (!modoSelect || !tipoInput) {
                     return;
                 }
 
-                const dataPorEmpresa = {};
-                itemsWordFinal.forEach((item) => {
-                    const idEmpresa = Number.parseInt(item.getAttribute('data-id-empresa') || '0', 10);
-                    if (!Number.isFinite(idEmpresa) || idEmpresa <= 0) {
-                        return;
-                    }
+                const syncTipoRegistro = () => {
+                    tipoInput.value = (modoSelect.value === 'PROPIO')
+                        ? 'REGISTRO_PROPIO_CLIENTE'
+                        : 'REGISTRO_RETRIBUTIVO';
+                };
 
-                    dataPorEmpresa[idEmpresa] = {
-                        downloadUrl: item.getAttribute('data-download-url') || '',
-                        subidoEn: item.getAttribute('data-subido-en') || ''
-                    };
-                });
+                syncTipoRegistro();
+                modoSelect.addEventListener('change', syncTipoRegistro);
 
-                function actualizarWordFinal() {
-                    const idEmpresa = Number.parseInt(selectWordFinal.value || '0', 10);
-                    const data = (Number.isFinite(idEmpresa) && idEmpresa > 0) ? (dataPorEmpresa[idEmpresa] || null) : null;
-                    const downloadUrl = data ? (data.downloadUrl || '') : '';
-                    const subidoEn = data ? (data.subidoEn || '') : '';
-
-                    if (downloadUrl !== '') {
-                        btnDescargarWordFinal.href = downloadUrl;
-                        btnDescargarWordFinal.classList.remove('disabled');
-                        btnDescargarWordFinal.removeAttribute('aria-disabled');
-                        btnDescargarWordFinal.removeAttribute('tabindex');
-                        estadoWordFinal.classList.remove('text-info');
-                        estadoWordFinal.classList.add('text-muted');
-                        estadoWordFinal.textContent = (subidoEn !== '') ?
-                            ('Ultima subida: ' + subidoEn) :
-                            'Word final disponible para descarga.';
-                        return;
-                    }
-
-                    btnDescargarWordFinal.href = '#';
-                    btnDescargarWordFinal.classList.add('disabled');
-                    btnDescargarWordFinal.setAttribute('aria-disabled', 'true');
-                    btnDescargarWordFinal.setAttribute('tabindex', '-1');
-                    estadoWordFinal.classList.remove('text-muted');
-                    estadoWordFinal.classList.add('text-info');
-                    estadoWordFinal.textContent = 'Todavia no hay Word final subido para la empresa seleccionada.';
+                // Manejar cambio de empresa en el selector
+                if (empresaSelect) {
+                    empresaSelect.addEventListener('change', function() {
+                        const idEmpresa = this.value;
+                        if (idEmpresa) {
+                            window.location.href = 'index_cliente.php?view=menu&id_empresa=' + encodeURIComponent(idEmpresa);
+                        }
+                    });
                 }
-
-                selectWordFinal.addEventListener('change', actualizarWordFinal);
-                actualizarWordFinal();
             })();
         </script>
     <?php endif; ?>
-    
+
+    <script>
+        (function() {
+            const modalElement = document.getElementById('modalComplementoFormularios');
+            const iframe = document.getElementById('complementoFormulariosFrame');
+            const botones = document.querySelectorAll('.btn-open-complemento');
+            const modal = (modalElement && iframe && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(modalElement) : null;
+            const empresaSelect = document.getElementById('nombre_empresa_cliente');
+            const idEmpresaClienteInicial = <?= ($empresaAsignada !== null) ? (int)$empresaAsignada['id_empresa'] : 0 ?>;
+
+            function abrirComplementoFormularios(tab) {
+                if (!modal || !iframe) {
+                    return;
+                }
+
+                let idEmpresaCliente = idEmpresaClienteInicial;
+                if (empresaSelect && empresaSelect.value !== '') {
+                    const parsed = Number.parseInt(empresaSelect.value, 10);
+                    if (Number.isFinite(parsed) && parsed > 0) {
+                        idEmpresaCliente = parsed;
+                    }
+                }
+
+                let src = 'complemento_formularios.php?embed=1&tab=' + encodeURIComponent(tab || 'bajas');
+                if (idEmpresaCliente > 0) {
+                    src += '&id_empresa=' + encodeURIComponent(String(idEmpresaCliente));
+                }
+                iframe.src = src;
+                modal.show();
+            }
+
+            // Manejar botones con clase .btn-open-complemento
+            botones.forEach((btn) => {
+                btn.addEventListener('click', function() {
+                    const tab = (btn.getAttribute('data-tab') || 'bajas').trim();
+                    abrirComplementoFormularios(tab);
+                });
+            });
+
+            // Manejar botón del Paso 2 en mi_espacio
+            const btnPaso2 = document.querySelector('.btn-open-paso2');
+            if (btnPaso2) {
+                btnPaso2.addEventListener('click', function() {
+                    abrirComplementoFormularios('bajas');
+                });
+            }
+
+            if (modalElement && iframe) {
+                modalElement.addEventListener('hidden.bs.modal', function() {
+                    iframe.src = '';
+                });
+            }
+
+        })();
+    </script>
+
 
 <?php include_once __DIR__ . '/chatbot_widget.php'; ?>
 </body>

@@ -137,7 +137,6 @@ if ($method === 'POST' && $tokenValid && $errorMsg === '') {
 
                 // Hash de la contraseña y actualización del usuario
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-
                 $stmtUpdate = db()->prepare("UPDATE usuario SET password = ? WHERE id_usuario = ?");
                 $stmtUpdate->bind_param('si', $passwordHash, $userId);
                 $stmtUpdate->execute();
@@ -145,6 +144,9 @@ if ($method === 'POST' && $tokenValid && $errorMsg === '') {
 
                 // Marcar el token como usado
                 mark_password_reset_token_as_used($token);
+                
+                // Rotar ID de sesión por seguridad al cambiar credenciales
+                session_regenerate_id(true);
 
                 $successMsg = 'Contraseña establecida correctamente. Puedes acceder a la plataforma con tu usuario y contraseña.';
                 $tokenValid = false; // Ocultar el formulario después del éxito

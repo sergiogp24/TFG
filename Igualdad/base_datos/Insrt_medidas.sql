@@ -1,5 +1,109 @@
--- Inserts Medidas --
-use igualdadconsulting;
+-- --------------------------------------------------------
+
+--
+-- Insertar roles
+-- 
+
+INSERT INTO rol (nombre) VALUES
+('ADMINISTRADOR'),
+('TECNICO'),
+('CLIENTE');
+
+-- --------------------------------------------------------
+
+--
+--
+-- Insertar usuarios de prueba
+
+INSERT INTO usuario (
+  nombre_usuario, apellidos, email, telefono, direccion, localidad, password, rol_id
+) VALUES
+(
+  'admin', NULL, 'admin@igualdad.local', NULL, NULL, NULL,
+  '$2y$10$Eh5qPCYyxVoLzuWQK9RQh.uy0Q/SPcki94SGko7DV9Ephp0jL4BAu',
+  (SELECT id FROM rol WHERE nombre='ADMINISTRADOR' LIMIT 1)
+),
+(
+  'tecnico', NULL, 'tecnico@igualdad.local', NULL, NULL, NULL,
+  '$2y$10$VLXfptHN9s8O/HewHX9Oj.0BVP02y80Qtu/SOwBPzgt.g3qElCHm.',
+  (SELECT id FROM rol WHERE nombre='TECNICO' LIMIT 1)
+),
+(
+  'cliente', NULL, 'cliente@igualdad.local', NULL, NULL, NULL,
+  '$2y$10$5Xf3bUDpX..efGXRnVryn.wRMt1bGpc1ZxXTJonYjH8Q3Y7In1EJe',
+  (SELECT id FROM rol WHERE nombre='CLIENTE' LIMIT 1)
+);
+
+
+
+-- 10 empresas de ejemplo
+-- Nota: id_usuario lo dejo en NULL para no romper la FK (fk_usuario_empresa).
+-- Si quieres asociarlas a un usuario concreto, cambia NULL por un id_usuario que exista en tu tabla usuario.
+
+INSERT INTO empresa (
+  razon_social, nif, domicilio_social, forma_juridica, ano_constitucional,
+  responsable, cargo, contacto, email, telefono,
+  sector, convenio,
+  personas_mujeres, personas_hombres, personas_total, centros_trabajo,
+  recogida_informacion, vigencia_plan, id_usuario
+) VALUES
+('Indra Sistemas S.A.', 'A28599033', 'Av. de Bruselas 35, 28108 Alcobendas (Madrid)', 'Sociedad Anónima', '1992',
+ 'Laura Martínez', 'Directora RRHH', 'rrhh@indra-ejemplo.com', 'contacto@indra-ejemplo.com', '910000001',
+ 'Tecnología', 'Convenio TIC', 220, 380, 600, 4,
+ 'Encuestas internas y HRIS', '2025-2028', NULL),
+
+('Iberdrola Energía S.A.U.', 'A95758389', 'Plaza Euskadi 5, 48009 Bilbao', 'Sociedad Anónima Unipersonal', '1901',
+ 'Carlos Gómez', 'Responsable de Personas', 'personas@iberdrola-ejemplo.com', 'info@iberdrola-ejemplo.com', '944000002',
+ 'Energía', 'Convenio Energía', 450, 650, 1100, 8,
+ 'Entrevistas y registros', '2024-2027', NULL),
+
+('Grupo Ilunion S.L.', 'B85123456', 'C/ Albacete 3, 28027 Madrid', 'Sociedad Limitada', '1988',
+ 'Marta Ruiz', 'Gerente', 'marta.ruiz@ilunion-ejemplo.com', 'contacto@ilunion-ejemplo.com', '913000003',
+ 'Servicios', 'Convenio Limpieza', 120, 80, 200, 3,
+ 'Análisis documental', '2026-2029', NULL),
+
+('Limpiezas Moratinos S.L.', 'B90234567', 'Pol. Ind. Norte, Nave 12, 41020 Sevilla', 'Sociedad Limitada', '2006',
+ 'Antonio Pérez', 'Administrador', 'antonio.perez@moratinos-ejemplo.com', 'info@moratinos-ejemplo.com', '955000004',
+ 'Limpieza', 'Convenio Limpieza', 35, 25, 60, 1,
+ 'Partes de trabajo y encuestas', '2025-2027', NULL),
+
+('Empresa Ejemplo Ficticio 3', 'B55512345', 'Pol. Ind. Norte, Nave 12, 41020 Sevilla', 'Sociedad Limitada', '2006',
+ 'Antonio Pérez', 'Administrador', 'pepito.perez@moratinos-ejemplo.com', 'info@moratinos-ejemplo.com', '955000004',
+ 'Limpieza', 'Convenio Limpieza', 35, 25, 60, 1,
+ 'Partes de trabajo y encuestas', '2025-2027', NULL),
+
+('Consulting Siglo XXI S.L.', 'B76543210', 'C/ Gran Vía 28, 28013 Madrid', 'Sociedad Limitada', '2011',
+ 'Elena Sánchez', 'CEO', 'elena.sanchez@consultingxxi-ejemplo.com', 'hola@consultingxxi-ejemplo.com', '911000005',
+ 'Consultoría', 'Convenio Oficinas', 18, 22, 40, 1,
+ 'Revisión de políticas', '2026-2028', NULL),
+
+('Transporte Atlántico S.A.', 'A12345678', 'Av. del Puerto 10, 36201 Vigo', 'Sociedad Anónima', '1999',
+ 'Javier Castro', 'Director Operaciones', 'javier.castro@transatlantico-ejemplo.com', 'operaciones@transatlantico-ejemplo.com', '986000006',
+ 'Logística', 'Convenio Transporte', 40, 110, 150, 2,
+ 'Auditoría interna', '2025-2028', NULL),
+
+('Farmacia Central Madrid S.L.', 'B33445566', 'C/ Atocha 15, 28012 Madrid', 'Sociedad Limitada', '2017',
+ 'Lucía Navarro', 'Titular', 'lucia.navarro@farmaciacentral-ejemplo.com', 'contacto@farmaciacentral-ejemplo.com', '914000007',
+ 'Sanidad', 'Convenio Comercio', 12, 6, 18, 1,
+ 'Registro horario y encuestas', '2026-2027', NULL),
+
+('Construcciones Sierra Norte S.A.', 'A55667788', 'C/ Obra Nueva 7, 47001 Valladolid', 'Sociedad Anónima', '2003',
+ 'Roberto Molina', 'Jefe de Obra', 'roberto.molina@sierranorte-ejemplo.com', 'info@sierranorte-ejemplo.com', '983000008',
+ 'Construcción', 'Convenio Construcción', 15, 65, 80, 2,
+ 'Partes de obra', '2024-2026', NULL),
+
+('Hostelería Costa Azul S.L.', 'B77889900', 'Paseo Marítimo 1, 29620 Torremolinos', 'Sociedad Limitada', '2014',
+ 'Sara León', 'Directora', 'sara.leon@costaazul-ejemplo.com', 'reservas@costaazul-ejemplo.com', '952000009',
+ 'Hostelería', 'Convenio Hostelería', 55, 35, 90, 1,
+ 'Encuestas de clima', '2026-2028', NULL),
+
+('Educación Futuro S.Coop.', 'F11223344', 'C/ Escuela 9, 50001 Zaragoza', 'Sociedad Cooperativa', '2019',
+ 'Nuria Vidal', 'Coordinadora', 'nuria.vidal@educacionfuturo-ejemplo.com', 'contacto@educacionfuturo-ejemplo.com', '976000010',
+ 'Educación', 'Convenio Enseñanza', 28, 12, 40, 1,
+ 'Reuniones y actas', '2025-2027', NULL);
+ 
+
+
 
  -- INSERTS PARA LA BASE DE DATOS IGUALDAD AREAS
 
@@ -1245,4 +1349,3 @@ SELECT ap.id_plan, 'Implementación de las medidas y protocolo según lo dispues
 FROM area_plan ap
 WHERE ap.nombre = 'Colectivo LGTBI'
 AND NOT EXISTS (SELECT 1 FROM medida m WHERE m.id_plan = ap.id_plan AND m.descripcion = 'Implementación de las medidas y protocolo según lo dispuesto en la normativa vigente');
-

@@ -93,6 +93,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         $_SESSION['user'] = [
           'id_usuario' => (int)$user['id_usuario'],
           'nombre_usuario' => (string)$user['nombre_usuario'],
+          'email' => (string)($user['email'] ?? ''),
           'rol' => (string)($user['rol'] ?? ''),
         ];
 

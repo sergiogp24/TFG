@@ -63,7 +63,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $error === '') {
           $email = (string)$user['email'];
           $username = (string)$user['nombre_usuario'];
           $token = bin2hex(random_bytes(32)); // Token seguro de 64 caracteres
-          $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Token válido por 24 horas
+          $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Token válido por 24 horas 
 
           save_password_reset_token($email, $token, $expiresAt);
 

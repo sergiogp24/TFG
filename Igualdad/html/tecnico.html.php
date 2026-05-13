@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/tecnico.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 </head>
 
 <body class="bg-light">
@@ -18,91 +17,18 @@
         <div class="row g-3">
 
             <!-- SIDEBAR -->
-            <aside class="col-12 col-lg-3 col-xl-2">
-                <div class="card shadow-sm border-0 sidebar">
-                    <div class="card-body">
-                        <!-- Header Sidebar -->
-                        <div class="sidebar-header">
-                            <div class="sidebar-avatar">👨‍💼</div>
-                            <h5 class="sidebar-title">Panel Técnico</h5>
-                        </div>
-
-                        <!-- User Info -->
-                        <div class="sidebar-user-info">
-                            <div class="info-label">Usuario Actual</div>
-                            <div class="info-value"><?= h($tecnicoUsername ?? 'técnico') ?></div>
-                            <?php if (!empty($tecnicoEmail)): ?>
-                                <div class="info-email">📧 <?= h($tecnicoEmail) ?></div>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- Navegación -->
-                        <nav class="sidebar-nav">
-                            <!-- Mi Panel -->
-                            <a class="nav-button <?= ($view === 'menu') ? 'active' : '' ?>" href="tecnico.php?view=menu">
-                                <span class="nav-icon">📊</span>
-                                <span>Mi Panel</span>
-                            </a>
-
-                            <!-- Empresas Collapse -->
-                            <button class="nav-button nav-collapse <?= !in_array($view, ['menu', 'perfil', 'privada', 'reuniones', 'contacto_empresa'], true) ? 'active' : '' ?>"
-                                type="button" data-bs-toggle="collapse" data-bs-target="#menuEmpresas"
-                                aria-expanded="<?= !in_array($view, ['menu', 'perfil', 'privada', 'reuniones', 'contacto_empresa'], true) ? 'true' : 'false' ?>">
-                                <span class="nav-icon">🏢</span>
-                                <span>Empresas</span>
-                                <span class="collapse-icon">▾</span>
-                            </button>
-
-                            <div id="menuEmpresas" class="collapse nav-submenu <?= !in_array($view, ['menu', 'perfil', 'privada', 'reuniones', 'contacto_empresa'], true) ? 'show' : '' ?>">
-                                <a class="nav-subbutton" href="../model/empresa.php?view=ver_empresas&from=tecnico">
-                                    <span>📋</span>
-                                    <span>Mis Empresas</span>
-                                </a>
-                                <a class="nav-subbutton" href="../model/empresa.php?view=ver_planes&from=tecnico">
-                                    <span>🗂️</span>
-                                    <span>Mis Planes</span>
-                                </a>
-                                <a class="nav-subbutton" href="../model/empresa.php?view=ver_contratos&tipo_contrato=MANTENIMIENTO&from=tecnico">
-                                    <span>🛠️</span>
-                                    <span>Mis Mantenimientos</span>
-                                </a>
-                            </div>
-
-                            <!-- Área Privada Collapse -->
-                            <?php $isPrivateView = in_array($view, ['privada', 'perfil', 'reuniones'], true); ?>
-                            <button class="nav-button nav-collapse <?= $isPrivateView ? 'active' : '' ?>"
-                                type="button" data-bs-toggle="collapse" data-bs-target="#menuAreaPrivada"
-                                aria-expanded="<?= $isPrivateView ? 'true' : 'false' ?>">
-                                <span class="nav-icon">🔐</span>
-                                <span>Área Privada</span>
-                                <span class="collapse-icon">▾</span>
-                            </button>
-
-                            <div id="menuAreaPrivada" class="collapse nav-submenu <?= $isPrivateView ? 'show' : '' ?>">
-                                <a class="nav-subbutton <?= ($view === 'perfil') ? 'active' : '' ?>" href="tecnico.php?view=perfil">
-                                    <span>👤</span>
-                                    <span>Mi Cuenta</span>
-                                </a>
-                                <a class="nav-subbutton <?= ($view === 'reuniones') ? 'active' : '' ?>" href="tecnico.php?view=reuniones">
-                                    <span>📅</span>
-                                    <span>Mis Reuniones</span>
-                                </a>
-                            </div>
-
-                            <!-- Cerrar Sesión -->
-                            <a class="nav-button nav-logout" href="<?= h(app_path('/php/logout.php')) ?>">
-                                <span class="nav-icon">🚪</span>
-                                <span>Cerrar Sesión</span>
-                            </a>
-                        </nav>
-                    </div>
-                </div>
-            </aside>
+            <?php include __DIR__ . '/../php/fragments/sidebar.php'; ?>
 
             <!-- MAIN CONTENT -->
-            <main class="col-12 col-lg-9 col-xl-10">
-                <div class="card panel mx-auto shadow-sm border-0">
+            <main class="col-12 col-md-9 col-xl-10">
+                <div class="card panel shadow-sm border-0">
                     <div class="card-body p-4">
+                        <!-- HEADER DENTRO DE LA TARJETA -->
+                        <div class="mb-4">
+                            <h2 class="fw-bold mb-1">Bienvenido, <?= h($tecnicoUsername ?? 'Técnico') ?></h2>
+                            <p class="text-muted small mb-0">Panel de control y gestión de empresas</p>
+                            <hr class="mt-3 mb-0 opacity-10">
+                        </div>
 
                         <?php if (!empty($_GET['msg'])): ?>
                             <div class="alert alert-info">
@@ -111,11 +37,6 @@
                         <?php endif; ?>
 
                         <?php if ($view === 'menu'): ?>
-                            <!-- HEADER CON BIENVENIDA -->
-                            <div class="content-header">
-                                <h2>Bienvenido, <?= h($tecnicoUsername ?? 'Técnico') ?></h2>
-                                <p>Panel de control y gestión de empresas</p>
-                            </div>
 
                             <!-- NOTIFICACIONES -->
                             <?php if (!empty($avisosTecnico)): ?>

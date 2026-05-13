@@ -7,7 +7,7 @@ $esAdmin = ($rol === 'ADMINISTRADOR');
 $esCliente = ($rol === 'CLIENTE');
 $esTecnico = ($rol === 'TECNICO');
 $panelCss = $esTecnico ? '../css/tecnico.css' : ($esCliente ? '../css/empresa.css' : '../css/admin.css');
-$sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? $_SESSION['user']['username'] ?? 'usuario');
+$sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
 $idEmpresaFiltro = (int)($_GET['id_empresa'] ?? 0);
 

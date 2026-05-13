@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
+
 // Extender timeout para todo el script (Excel processing toma tiempo)
-set_time_limit(300);
+set_time_limit(300); 
 
 function registrarLogProcesarRegistroRetributivo(string $mensaje): void
 {
     $archivos = [
-        __DIR__ . '/../uploads/procesar_registro_retributivo_error.log',
+        __DIR__ . '/../../logs/procesar_registro_retributivo_error.log',
         sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'procesar_registro_retributivo_error.log',
     ];
 
@@ -27,8 +31,59 @@ function registrarLogProcesarRegistroRetributivo(string $mensaje): void
     error_log($mensaje);
 }
 
-set_exception_handler(static function (Throwable $e): void {
+function responderErrorProcesarRegistroRetributivo(Throwable $e): void
+{
     registrarLogProcesarRegistroRetributivo("EXCEPTION: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+
+    $esJson = (string)($_POST['accion'] ?? '') === 'regenerar_word'
+        || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string)$_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+
+    if ($esJson) {
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+        }
+
+        echo json_encode([
+            'exito' => false,
+            'mensaje' => 'Error al procesar el archivo. Vuelve a intentarlo.'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $urlMenuFallback = app_path('/html/index_cliente.php');
+    $urlMenu = $urlMenuFallback;
+
+    global $urlMenuSubida, $idEmpresaPost;
+    if (!empty($urlMenuSubida)) {
+        $urlMenu = (string)$urlMenuSubida;
+    }
+
+    if (!headers_sent()) {
+        http_response_code(500);
+        redirigirMenuSubida($urlMenu, 'Error al procesar el archivo. Vuelve a intentarlo.', null, (int)($idEmpresaPost ?? 0));
+    }
+
+    echo 'Error al procesar el archivo. Vuelve a intentarlo.';
+    exit;
+}
+
+set_exception_handler(static function (Throwable $e): void {
+    responderErrorProcesarRegistroRetributivo($e);
+});
+
+register_shutdown_function(static function (): void {
+    $error = error_get_last();
+    if ($error === null) {
+        return;
+    }
+
+    $tiposFatales = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+    if (!in_array((int)($error['type'] ?? 0), $tiposFatales, true)) {
+        return;
+    }
+
+    responderErrorProcesarRegistroRetributivo(new Error(($error['message'] ?? 'Error fatal') . ' in ' . ($error['file'] ?? '') . ':' . (string)($error['line'] ?? 0)));
 });
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -38,11 +93,6 @@ require_once __DIR__ . '/mails.php';
 require_once __DIR__ . '/generar_cuadro_porcentajes.php';
 require_once __DIR__ . '/generar_word_desdeexcel.php';
 require_login();
-
-
-use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Shared\Date;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 function redirigirMenuSubida(string $urlMenuSubida, string $mensaje, ?int $exito = null, int $idEmpresaContexto = 0): void
 {
@@ -76,6 +126,25 @@ function limpiarRazonSocial(mixed $texto): ?string
     return mb_strtoupper((string)$texto);
 }
 
+function obtenerValorCeldaSeguro($sheet, string $coordenada): mixed
+{
+    $cell = $sheet->getCell($coordenada);
+    $valor = $cell->getValue();
+
+    if (is_string($valor) && $valor !== '' && $valor[0] === '=') {
+        try {
+            $cached = $cell->getOldCalculatedValue();
+            if ($cached !== null && $cached !== '') {
+                return $cached;
+            }
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    return $valor;
+}
+
 function ultimaFilaConDatosEnRango($sheet, string $colInicio, string $colFin, int $filaInicio = 1): int
 {
     $colIniIdx = Coordinate::columnIndexFromString($colInicio);
@@ -85,7 +154,7 @@ function ultimaFilaConDatosEnRango($sheet, string $colInicio, string $colFin, in
     for ($fila = $maxFila; $fila >= $filaInicio; $fila--) {
         for ($c = $colIniIdx; $c <= $colFinIdx; $c++) {
             $col = Coordinate::stringFromColumnIndex($c);
-            $valor = $sheet->getCell($col . $fila)->getCalculatedValue();
+            $valor = obtenerValorCeldaSeguro($sheet, $col . $fila);
             if ($valor !== null && trim((string)$valor) !== '') {
                 return $fila;
             }
@@ -380,7 +449,7 @@ if (isset($_POST['accion']) && $_POST['accion'] === 'regenerar_word') {
              FROM archivos
              WHERE id_empresa = ?
                AND UPPER(TRIM(COALESCE(asunto, ""))) = "GENERADO WORD"
-               AND UPPER(TRIM(tipo)) IN ("GENERADO WORD", "WORD_FINAL")
+               AND UPPER(TRIM(tipo)) IN ("GENERADO WORD", "PLAN_IGUALDAD_DEFINITIVO")
              ORDER BY subido_en DESC, id_archivo DESC
              LIMIT 1'
         );
@@ -463,19 +532,27 @@ if (isset($_FILES['excel']['error'])) {
 }
 
 $tipo = strtoupper(trim((string)$_POST['tipo']));
-$tiposPermitidos = ['REGISTRO_RETRIBUTIVO', 'TOMA DE DATOS'];
+$modoRegistro = strtoupper(trim((string)($_POST['modo_registro'] ?? '')));
+if ($modoRegistro === 'PROPIO') {
+    $tipo = 'REGISTRO_PROPIO_CLIENTE';
+}
+$tiposPermitidos = ['REGISTRO_RETRIBUTIVO', 'REGISTRO_PROPIO_CLIENTE', 'TOMA DE DATOS'];
 if ($rol === 'TECNICO') {
-    $tiposPermitidos[] = 'WORD_FINAL';
+    $tiposPermitidos[] = 'PLAN_IGUALDAD_DEFINITIVO';
 }
 if (!in_array($tipo, $tiposPermitidos, true)) {
     redirigirMenuSubida($urlMenuSubida, 'El tipo seleccionado no es valido para este usuario.', null, $idEmpresaPost);
 }
 
-if ($tipo === 'WORD_FINAL' && $rol !== 'TECNICO') {
-    redirigirMenuSubida($urlMenuSubida, 'Solo el tecnico puede subir WORD_FINAL.', null, $idEmpresaPost);
+if ($tipo === 'PLAN_IGUALDAD_DEFINITIVO' && $rol !== 'TECNICO') {
+    redirigirMenuSubida($urlMenuSubida, 'Solo el tecnico puede subir PLAN_IGUALDAD_DEFINITIVO.', null, $idEmpresaPost);
 }
 
 $debeGenerarDerivados = ($tipo === 'REGISTRO_RETRIBUTIVO');
+$asuntoArchivo = trim((string)($_POST['asunto'] ?? ''));
+if ($asuntoArchivo === '') {
+    $asuntoArchivo = null;
+}
 
 $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
@@ -601,6 +678,18 @@ $totalArchivosGuardados = 0;
 $totalErroresGlobal = 0;
 $totalDuplicadosGlobal = 0;
 $erroresMensajes = [];
+$avisarTecnicosPrimerArchivo = false;
+
+if ($rol === 'CLIENTE' && $idEmpresaContexto > 0) {
+    $stmtConteoArchivos = $db->prepare('SELECT COUNT(*) AS total FROM archivos WHERE id_empresa = ?');
+    if ($stmtConteoArchivos) {
+        $stmtConteoArchivos->bind_param('i', $idEmpresaContexto);
+        $stmtConteoArchivos->execute();
+        $rowConteoArchivos = $stmtConteoArchivos->get_result()->fetch_assoc() ?: null;
+        $stmtConteoArchivos->close();
+        $avisarTecnicosPrimerArchivo = ((int)($rowConteoArchivos['total'] ?? 0) === 0);
+    }
+}
 
 // ================== Normalizar arrays ==================
 $files = $_FILES['excel'];
@@ -645,13 +734,23 @@ foreach ($names as $i => $originalName) {
         if ($ext !== '') {
             $nombreGuardado .= '.' . $ext;
         }
-    } elseif ($tipo === 'WORD_FINAL') {
+    } elseif ($tipo === 'REGISTRO_PROPIO_CLIENTE') {
         if ($empresaNombreArchivo === '') {
             $empresaNombreArchivo = 'EMPRESA_' . $idEmpresaContexto;
         }
         $empresaNombreToken = preg_replace('~\s+~', '_', $empresaNombreArchivo);
         $empresaNombreToken = mb_strtoupper((string)$empresaNombreToken, 'UTF-8');
-        $nombreGuardado = $empresaNombreToken . '_WORD_FINAL_' . $uniqueSuffix;
+        $nombreGuardado = $empresaNombreToken . '_REGISTRO_PROPIO_CLIENTE_' . $uniqueSuffix;
+        if ($ext !== '') {
+            $nombreGuardado .= '.' . $ext;
+        }
+    } elseif ($tipo === 'PLAN_IGUALDAD_DEFINITIVO') {
+        if ($empresaNombreArchivo === '') {
+            $empresaNombreArchivo = 'EMPRESA_' . $idEmpresaContexto;
+        }
+        $empresaNombreToken = preg_replace('~\s+~', '_', $empresaNombreArchivo);
+        $empresaNombreToken = mb_strtoupper((string)$empresaNombreToken, 'UTF-8');
+        $nombreGuardado = $empresaNombreToken . '_PLAN_IGUALDAD_DEFINITIVO_' . $uniqueSuffix;
         if ($ext !== '') {
             $nombreGuardado .= '.' . $ext;
         }
@@ -660,6 +759,26 @@ foreach ($names as $i => $originalName) {
         $nombreGuardado = 'registro_temp_' . uniqid('', true) . '.' . $ext;
     }
     $rutaCompleta = $uploadDir . $nombreGuardado;
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeReal = finfo_file($finfo, $tmpName);
+    finfo_close($finfo);
+
+    $allowedMimes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-office',
+        'application/octet-stream'
+    ];
+
+    if (!in_array($mimeReal, $allowedMimes, true)) {
+        $totalErroresGlobal++;
+        $erroresMensajes[] = "El contenido del archivo {$originalName} no es válido.";
+        continue;
+    }
 
     if (!move_uploaded_file($tmpName, $rutaCompleta)) {
         $totalErroresGlobal++;
@@ -672,10 +791,124 @@ foreach ($names as $i => $originalName) {
         continue;
     }
 
-    if ($tipo === 'WORD_FINAL') {
+    if ($tipo === 'REGISTRO_PROPIO_CLIENTE') {
         if ($idEmpresaContexto <= 0) {
             $totalErroresGlobal++;
-            $erroresMensajes[] = 'No se pudo resolver la empresa para WORD_FINAL.';
+            $erroresMensajes[] = 'No se pudo resolver la empresa para REGISTRO_PROPIO_CLIENTE.';
+            continue;
+        }
+
+        $idEmpresaRegistro = $idEmpresaContexto;
+        $sha256 = hash_file('sha256', $rutaCompleta);
+        $size = filesize($rutaCompleta);
+        $mime = mime_content_type($rutaCompleta);
+        $rutaRelativa = 'uploads/' . $nombreGuardado;
+
+        $stmtDup = $db->prepare(
+            'SELECT id_archivo FROM archivos WHERE UPPER(TRIM(tipo)) = "REGISTRO_PROPIO_CLIENTE" AND id_empresa = ? LIMIT 1'
+        );
+        $idArchivoExistente = null;
+
+    if ($avisarTecnicosPrimerArchivo && $totalArchivosGuardados > 0 && $idEmpresaContexto > 0) {
+        $clienteNombreAviso = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
+        $empresaNombreAviso = trim((string)($empresaNombreVista ?? ''));
+        if ($empresaNombreAviso === '') {
+            $empresaNombreAviso = 'Empresa #' . $idEmpresaContexto;
+        }
+
+        foreach (correo_obtener_tecnicos_empresa($db, $idEmpresaContexto) as $tecnicoEmpresa) {
+            try {
+                correo_enviar_notificacion_tecnico_primer_archivo(
+                    (string)($tecnicoEmpresa['email'] ?? ''),
+                    (string)($tecnicoEmpresa['nombre_usuario'] ?? 'Técnico'),
+                    $clienteNombreAviso,
+                    $empresaNombreAviso,
+                    $tipo
+                );
+            } catch (Throwable $e) {
+                registrarLogProcesarRegistroRetributivo('Error enviando aviso de primer archivo a tecnico: ' . $e->getMessage());
+            }
+        }
+    }
+        if ($stmtDup) {
+            $stmtDup->bind_param('i', $idEmpresaRegistro);
+            $stmtDup->execute();
+            $resultDup = $stmtDup->get_result()->fetch_assoc();
+            $stmtDup->close();
+            if ($resultDup) {
+                $idArchivoExistente = (int)$resultDup['id_archivo'];
+            }
+        }
+
+        if ($idArchivoExistente !== null) {
+            $stmtUpdate = $db->prepare(
+                'UPDATE archivos
+                 SET asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, sha256 = ?, id_cliente_medida = ?, id_empresa = ?
+                 WHERE id_archivo = ?'
+            );
+            if ($stmtUpdate) {
+                $stmtUpdate->bind_param(
+                    'ssssissiii',
+                    $asuntoArchivo,
+                    $displayOriginalName,
+                    $nombreGuardado,
+                    $rutaRelativa,
+                    $size,
+                    $mime,
+                    $sha256,
+                    $idClienteMedidaContexto,
+                    $idEmpresaRegistro,
+                    $idArchivoExistente
+                );
+                $stmtUpdate->execute();
+                $stmtUpdate->close();
+            }
+        } else {
+            $stmtArchivo = $db->prepare(
+                'INSERT INTO archivos
+                 (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_cliente_medida, id_empresa)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+
+            if (!$stmtArchivo) {
+                $totalErroresGlobal++;
+                $erroresMensajes[] = 'Error prepare archivos REGISTRO_PROPIO_CLIENTE: ' . $db->error;
+                continue;
+            }
+
+            $tipoRegistroMalformateado = 'REGISTRO_PROPIO_CLIENTE';
+            $stmtArchivo->bind_param(
+                'sssssissii',
+                $tipoRegistroMalformateado,
+                $asuntoArchivo,
+                $displayOriginalName,
+                $nombreGuardado,
+                $rutaRelativa,
+                $size,
+                $mime,
+                $sha256,
+                $idClienteMedidaContexto,
+                $idEmpresaRegistro
+            );
+
+            if (!$stmtArchivo->execute()) {
+                $totalErroresGlobal++;
+                $erroresMensajes[] = 'Error insert REGISTRO_PROPIO_CLIENTE: ' . $stmtArchivo->error;
+                $stmtArchivo->close();
+                continue;
+            }
+
+            $stmtArchivo->close();
+        }
+
+        $totalArchivosGuardados++;
+        continue;
+    }
+
+    if ($tipo === 'PLAN_IGUALDAD_DEFINITIVO') {
+        if ($idEmpresaContexto <= 0) {
+            $totalErroresGlobal++;
+            $erroresMensajes[] = 'No se pudo resolver la empresa para PLAN_IGUALDAD_DEFINITIVO.';
             continue;
         }
 
@@ -686,7 +919,7 @@ foreach ($names as $i => $originalName) {
         $rutaRelativa = 'uploads/' . $nombreGuardado;
 
         $stmtDup = $db->prepare(
-            'SELECT id_archivo FROM archivos WHERE UPPER(TRIM(tipo)) = "WORD_FINAL" AND id_empresa = ? LIMIT 1'
+            'SELECT id_archivo FROM archivos WHERE UPPER(TRIM(tipo)) = "PLAN_IGUALDAD_DEFINITIVO" AND id_empresa = ? LIMIT 1'
         );
         $idArchivoExistente = null;
         if ($stmtDup) {
@@ -702,12 +935,13 @@ foreach ($names as $i => $originalName) {
         if ($idArchivoExistente !== null) {
             $stmtUpdate = $db->prepare(
                 'UPDATE archivos
-                 SET nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, sha256 = ?, id_cliente_medida = ?, id_empresa = ?
+                 SET asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, sha256 = ?, id_cliente_medida = ?, id_empresa = ?
                  WHERE id_archivo = ?'
             );
             if ($stmtUpdate) {
                 $stmtUpdate->bind_param(
-                    'sssissiii',
+                    'ssssissiii',
+                    $asuntoArchivo,
                     $displayOriginalName,
                     $nombreGuardado,
                     $rutaRelativa,
@@ -724,20 +958,21 @@ foreach ($names as $i => $originalName) {
         } else {
             $stmtArchivo = $db->prepare(
                 'INSERT INTO archivos
-                 (tipo, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_cliente_medida, id_empresa)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                 (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_cliente_medida, id_empresa)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
 
             if (!$stmtArchivo) {
                 $totalErroresGlobal++;
-                $erroresMensajes[] = 'Error prepare archivos WORD_FINAL: ' . $db->error;
+                $erroresMensajes[] = 'Error prepare archivos PLAN_IGUALDAD_DEFINITIVO: ' . $db->error;
                 continue;
             }
 
-            $tipoWordFinal = 'WORD_FINAL';
+            $tipoWordFinal = 'PLAN_IGUALDAD_DEFINITIVO';
             $stmtArchivo->bind_param(
-                'ssssissii',
+                'sssssissii',
                 $tipoWordFinal,
+                $asuntoArchivo,
                 $displayOriginalName,
                 $nombreGuardado,
                 $rutaRelativa,
@@ -750,7 +985,7 @@ foreach ($names as $i => $originalName) {
 
             if (!$stmtArchivo->execute()) {
                 $totalErroresGlobal++;
-                $erroresMensajes[] = 'Error insert WORD_FINAL: ' . $stmtArchivo->error;
+                $erroresMensajes[] = 'Error insert PLAN_IGUALDAD_DEFINITIVO: ' . $stmtArchivo->error;
                 $stmtArchivo->close();
                 continue;
             }
@@ -787,9 +1022,9 @@ foreach ($names as $i => $originalName) {
 
     // ================== Hoja 0: Empresa ==================
     $sheetEmpresa = $spreadsheet->getSheet(0);
-    $razon_social = limpiarRazonSocial($sheetEmpresa->getCell('C6')->getCalculatedValue());
-    $fecha_inicio = convertirFechaExcel($sheetEmpresa->getCell('E10')->getCalculatedValue());
-    $fecha_fin = convertirFechaExcel($sheetEmpresa->getCell('G10')->getCalculatedValue());
+    $razon_social = limpiarRazonSocial(obtenerValorCeldaSeguro($sheetEmpresa, 'C6'));
+    $fecha_inicio = convertirFechaExcel(obtenerValorCeldaSeguro($sheetEmpresa, 'E10'));
+    $fecha_fin = convertirFechaExcel(obtenerValorCeldaSeguro($sheetEmpresa, 'G10'));
 
     if (empty($razon_social) || !$fecha_inicio || !$fecha_fin) {
         $totalErroresGlobal++;
@@ -930,22 +1165,22 @@ foreach ($names as $i => $originalName) {
         if ($idClienteMedidaUsado !== null) {
             $stmtUpdate = $db->prepare(" 
                 UPDATE archivos 
-                SET nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_cliente_medida = ?, id_empresa = ?, subido_en = CURRENT_TIMESTAMP
+                SET asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_cliente_medida = ?, id_empresa = ?, subido_en = CURRENT_TIMESTAMP
                 WHERE id_archivo = ?
             ");
             if ($stmtUpdate) {
-                $stmtUpdate->bind_param("sssisiii", $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $idClienteMedidaUsado, $id_empresa, $idArchivoExistente);
+                $stmtUpdate->bind_param("ssssisiii", $asuntoArchivo, $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $idClienteMedidaUsado, $id_empresa, $idArchivoExistente);
                 $stmtUpdate->execute();
                 $stmtUpdate->close();
             }
         } else {
             $stmtUpdate = $db->prepare("
                 UPDATE archivos 
-                SET nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_empresa = ?, subido_en = CURRENT_TIMESTAMP
+                SET asunto = ?, nombre_original = ?, nombre_guardado = ?, ruta_relativa = ?, tamano_bytes = ?, mime = ?, id_empresa = ?, subido_en = CURRENT_TIMESTAMP
                 WHERE id_archivo = ?
             ");
             if ($stmtUpdate) {
-                $stmtUpdate->bind_param("sssisii", $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $id_empresa, $idArchivoExistente);
+                $stmtUpdate->bind_param("ssssisii", $asuntoArchivo, $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $id_empresa, $idArchivoExistente);
                 $stmtUpdate->execute();
                 $stmtUpdate->close();
             }
@@ -959,14 +1194,14 @@ foreach ($names as $i => $originalName) {
         if ($idClienteMedidaUsado !== null) {
             $stmtArchivo = $db->prepare("
                 INSERT INTO archivos 
-                (tipo, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_cliente_medida, id_empresa)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_cliente_medida, id_empresa)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
         } else {
             $stmtArchivo = $db->prepare("
                 INSERT INTO archivos 
-                (tipo, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
         }
 
@@ -977,9 +1212,9 @@ foreach ($names as $i => $originalName) {
         }
 
         if ($idClienteMedidaUsado !== null) {
-            $stmtArchivo->bind_param("ssssissii", $tipo, $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $sha256, $idClienteMedidaUsado, $id_empresa);
+            $stmtArchivo->bind_param("sssssissii", $tipo, $asuntoArchivo, $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $sha256, $idClienteMedidaUsado, $id_empresa);
         } else {
-            $stmtArchivo->bind_param("ssssissi", $tipo, $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $sha256, $id_empresa);
+            $stmtArchivo->bind_param("sssssissi", $tipo, $asuntoArchivo, $displayOriginalName, $nombreGuardado, $rutaRelativa, $size, $mime, $sha256, $id_empresa);
         }
 
         if (!$stmtArchivo->execute()) {
@@ -1082,16 +1317,20 @@ foreach ($names as $i => $originalName) {
         continue;
     }
 
-    $rows = $sheetEmpleados->rangeToArray(
-        "B{$inicioFila}:CC{$finFila}",
-        null,
-        true,
-        false,
-        true // claves por columna: B..CC
-    );
+    $rows = [];
+    $colInicioIdx = Coordinate::columnIndexFromString('B');
+    $colFinIdx = Coordinate::columnIndexFromString('CC');
+    for ($fila = $inicioFila; $fila <= $finFila; $fila++) {
+        $row = [];
+        for ($colIdx = $colInicioIdx; $colIdx <= $colFinIdx; $colIdx++) {
+            $col = Coordinate::stringFromColumnIndex($colIdx);
+            $row[$col] = obtenerValorCeldaSeguro($sheetEmpleados, $col . $fila);
+        }
+        $rows[] = $row;
+    }
 
     // Valor fijo de la fÃ³rmula Excel: MIN($D$4;[@[Fecha Fin Sit. Contract.]])
-    $fechaCorteFFinCal = convertirFechaExcel($sheetEmpleados->getCell('D4')->getCalculatedValue());
+    $fechaCorteFFinCal = convertirFechaExcel(obtenerValorCeldaSeguro($sheetEmpleados, 'D4'));
 
     $stmtEmp = $db->prepare("
         INSERT INTO datos_empleados (

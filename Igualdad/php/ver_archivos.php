@@ -286,6 +286,94 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($accion = (string)($_POST[
     header("Location: $redirect");
     exit;
   }
+} elseif (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($accion = (string)($_POST['accion'] ?? '')) === 'subir_archivo') {
+  if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
+    $msgError = 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.';
+  } else {
+    $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
+    $asunto = trim((string)($_POST['asunto'] ?? ''));
+    
+    // Validar empresa
+    if ($idEmpresa <= 0 || (!$esAdmin && !isset($idsEmpresaPermitidas[$idEmpresa]))) {
+      $msgError = 'Empresa no valida o sin permisos.';
+    } elseif ($asunto === '') {
+      $msgError = 'El asunto es obligatorio.';
+    } elseif (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
+      $msgError = 'No se recibio el archivo o hubo un error en la subida.';
+    } else {
+      $archivo = $_FILES['archivo'];
+      $nombreOriginal = (string)($archivo['name'] ?? 'archivo');
+      $tmpName = (string)($archivo['tmp_name'] ?? '');
+      $tamanoBytes = (int)($archivo['size'] ?? 0);
+      $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+
+      $extPermitidas = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'jpg', 'jpeg', 'png'];
+      if (!in_array($ext, $extPermitidas, true)) {
+        $msgError = 'Extension no permitida (pdf, doc, docx, xls, xlsx, csv, jpg, png).';
+      } else {
+        $uploadDir = __DIR__ . '/../uploads';
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+          $msgError = 'No se pudo crear la carpeta de subida.';
+        } else {
+          $db = db();
+          $razonSocial = 'EMPRESA';
+          $stmtEmp = $db->prepare('SELECT razon_social FROM empresa WHERE id_empresa = ? LIMIT 1');
+          if ($stmtEmp) {
+            $stmtEmp->bind_param('i', $idEmpresa);
+            $stmtEmp->execute();
+            $resEmp = $stmtEmp->get_result()->fetch_assoc();
+            $razonSocial = trim((string)($resEmp['razon_social'] ?? 'EMPRESA'));
+            $stmtEmp->close();
+          }
+
+          $empresaToken = preg_replace('/[^a-zA-Z0-9]/', '_', $razonSocial);
+          $uniqueSuffix = substr(md5(uniqid('', true)), 0, 8);
+          $nombreGuardado = $empresaToken . '_MANUAL_' . $uniqueSuffix . '.' . $ext;
+          $rutaDestino = $uploadDir . '/' . $nombreGuardado;
+
+          if (!move_uploaded_file($tmpName, $rutaDestino)) {
+            $msgError = 'No se pudo guardar el archivo en el servidor.';
+          } else {
+            $rutaRelativa = 'uploads/' . $nombreGuardado;
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = finfo_file($finfo, $rutaDestino) ?: 'application/octet-stream';
+            finfo_close($finfo);
+            $sha256 = hash_file('sha256', $rutaDestino) ?: null;
+
+            $stmtInsert = $db->prepare(
+              'INSERT INTO archivos (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            if ($stmtInsert) {
+              $tipoDoc = 'DOCUMENTACION';
+              $stmtInsert->bind_param('sssssissi', $tipoDoc, $asunto, $nombreOriginal, $nombreGuardado, $rutaRelativa, $tamanoBytes, $mime, $sha256, $idEmpresa);
+              $stmtInsert->execute();
+              $stmtInsert->close();
+              $mensaje = 'Documentacion subida correctamente.';
+            } else {
+              $msgError = 'Error al registrar el archivo en la base de datos.';
+            }
+          }
+        }
+      }
+    }
+  }
+
+  $redirect = app_path('/php/ver_archivos.php');
+  $idEmpresaRedirect = (int)($_POST['id_empresa_filtro'] ?? 0);
+  if ($idEmpresaRedirect > 0) {
+    $redirect .= '?id_empresa=' . $idEmpresaRedirect;
+    $sep = '&';
+  } else {
+    $sep = '?';
+  }
+  if ($mensaje !== '') {
+    $redirect .= $sep . 'msg=' . urlencode($mensaje);
+  } elseif ($msgError !== '') {
+    $redirect .= $sep . 'error=' . urlencode($msgError);
+  }
+  header("Location: $redirect");
+  exit;
 }
 
 $archivosListado = [];
@@ -293,18 +381,22 @@ $rutasYaIncluidas = [];
 $baseProject = realpath(__DIR__ . '/..');
 
 // Archivos guardados en la tabla archivos
-$stmt = db()->prepare(
-  "SELECT a.id_archivo, a.tipo, a.asunto, a.nombre_original, a.nombre_guardado, a.ruta_relativa, a.tamano_bytes, a.mime, a.subido_en,
+    $sql = "SELECT a.id_archivo, a.tipo, a.asunto, a.nombre_original, a.nombre_guardado, a.ruta_relativa, a.tamano_bytes, a.mime, a.subido_en,
           a.id_empresa AS id_empresa_archivo,
           COALESCE(e.razon_social, e2.razon_social) AS empresa_nombre,
           COALESCE(ac.id_empresa, a.id_empresa) AS empresa_id_resuelta
-   FROM archivos a
-   LEFT JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
-   LEFT JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
-   LEFT JOIN empresa e ON e.id_empresa = ac.id_empresa
-   LEFT JOIN empresa e2 ON e2.id_empresa = a.id_empresa
-   ORDER BY a.subido_en DESC, a.id_archivo DESC"
-);
+    FROM archivos a
+    LEFT JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
+    LEFT JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
+    LEFT JOIN empresa e ON e.id_empresa = ac.id_empresa
+    LEFT JOIN empresa e2 ON e2.id_empresa = a.id_empresa";
+
+    if ($esCliente) {
+        $sql .= " WHERE a.tipo IN ('DOCUMENTACION', 'IGUALDAD', 'SELECCION', 'SALUD', 'COMUNICACION', 'LGTBI', 'PLAN_IGUALDAD_DEFINITIVO', 'REGISTRO_RETRIBUTIVO', 'REGISTRO_PROPIO_CLIENTE')";
+    }
+
+    $sql .= " ORDER BY a.subido_en DESC, a.id_archivo DESC";
+    $stmt = db()->prepare($sql);
 $stmt->execute();
 
 $res = $stmt->get_result();
@@ -313,6 +405,26 @@ while ($row = $res->fetch_assoc()) {
   $idEmpresaRowArchivo = (int)($row['id_empresa_archivo'] ?? 0);
   $idEmpresaRow = $idEmpresaRowResuelta > 0 ? $idEmpresaRowResuelta : $idEmpresaRowArchivo;
   $empresaNombreRow = (string)($row['empresa_nombre'] ?? '');
+
+  // Fallback: Si no hay empresa_nombre (id_empresa es NULL), intentamos deducirla del nombre del archivo
+  if ($empresaNombreRow === '') {
+    $nombreArchivoParaDeducir = (string)($row['nombre_guardado'] ?? $row['nombre_original'] ?? '');
+    if ($nombreArchivoParaDeducir !== '') {
+        foreach ($mapEmpresasNorm as $norm => $razon) {
+            if ($norm !== '' && str_starts_with(strtoupper($nombreArchivoParaDeducir), strtoupper($norm . '_'))) {
+                $empresaNombreRow = $razon;
+                // Si encontramos la razón social, intentamos buscar su ID para que el filtro de ID también funcione
+                foreach (($empresasUsuario ?? []) as $emp) {
+                    if (($emp['razon_social'] ?? '') === $razon) {
+                        $idEmpresaRow = (int)($emp['id_empresa'] ?? 0);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+  }
 
   if (!$esAdmin) {
     if ($idEmpresaFiltro > 0) {
@@ -386,7 +498,7 @@ foreach ($roots as $kind => $dirPath) {
 
   $files = glob($dirPath . DIRECTORY_SEPARATOR . '*') ?: [];
   foreach ($files as $fullPath) {
-    if (!is_file($fullPath)) {
+    if ($esCliente || !is_file($fullPath)) {
       continue;
     }
 

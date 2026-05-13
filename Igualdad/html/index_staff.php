@@ -6,7 +6,6 @@ require __DIR__ . '/../php/auth.php';
 require_login();
 require_once __DIR__ . '/../php/helpers.php';
 require __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../php/generar_word_desdeexcel.php';
 
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? 'CLIENTE'));
 $esStaff = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true);
@@ -67,7 +66,7 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
 }
 
 $msg = (string)($_GET['msg'] ?? '');
-$sessionUsername = (string)($_SESSION['user']['username'] ?? $_SESSION['user']['nombre_usuario'] ?? 'usuario');
+$sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
 $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 $idEmpresaSeleccionada = (int)($_GET['id_empresa'] ?? 0);
@@ -192,7 +191,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                         <?php if ($esTecnico): ?>
                             <div class="sidebar-header">
                                 <div class="sidebar-avatar">👨‍💼</div>
-                                <h5 class="sidebar-title">Panel Técnico</h5>
+                                <h5 class="sidebar-title">Panel Personal Técnico</h5>
                             </div>
 
                             <div class="sidebar-user-info">
@@ -343,7 +342,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                         <select id="Tipo" name="tipo" class="form-control mb-3" required>
                             <option value="REGISTRO_RETRIBUTIVO">Registro Retributivo</option>
                             <?php if ($esTecnico): ?>
-                                <option value="WORD_FINAL">WORD_FINAL</option>
+                                <option value="PLAN_IGUALDAD_DEFINITIVO">Plan Igualdad Definitivo</option>
                             <?php endif; ?>
                         </select>
 
@@ -363,26 +362,45 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                             </a>
                         </div>
                         <div class="mt-4">
-                            <label class="form-label d-block">Datos Cuantitativos / Cuestionarios Cualitativos:</label>
+                            <label class="form-label d-block">Datos Cuantitativos / Cuestionarios Cualitativos / Medidas Seleccionadas:</label>
                             <?php if (!$registroSubido): ?>
                                 <div class="alert alert-warning py-2">
-                                    Debes subir primero el Registro Retributivo para desbloquear los Datos Cuantitativos / Cuestionarios Cualitativos.
+                                    Debes subir primero el Registro Retributivo para desbloquear los Datos Cuantitativos / Cuestionarios Cualitativos / Medidas Seleccionadas.
                                 </div>
                             <?php else: ?>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <button type="button" class="btn btn-outline-primary btn-open-complemento" data-tab="bajas">Ver Datos Cuantitativos / Cuestionarios Cualitativos</button>
-                                </div>
                             <?php endif; ?>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-open-complemento"
+                                    data-tab="bajas"
+                                    data-modal-title="Datos Cuantitativos / Cuestionarios Cualitativos"
+                                    <?= (!$registroSubido || $sinEmpresaFormulario) ? 'disabled' : '' ?>>
+                                    Abrir formularios
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-open-complemento"
+                                    data-tab="bajas"
+                                    data-solo-medidas="1"
+                                    data-modal-title="Medidas"
+                                    <?= $sinEmpresaFormulario ? 'disabled' : '' ?>>
+                                    Abrir medidas
+                                </button>
+                            </div>
                         </div>
                     </form>
 
                     <?php if ($registroSubido): ?>
-                        <form action="../php/regenerar_word.php" method="POST">
-                            <?= csrf_input() ?>
-                            <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaFormulario ?>">
-                            <input type="hidden" name="accion" value="regenerar_word">
-                            <button class="btn btn-dark px-4" type="submit">🔄 Regenerar Word</button>
-                        </form>
+                        <div class="mt-2">
+                            <form action="../php/regenerar_word.php" method="POST">
+                                <?= csrf_input() ?>
+                                <input type="hidden" name="id_empresa" value="<?= (int)$idEmpresaFormulario ?>">
+                                <input type="hidden" name="accion" value="regenerar_word">
+                                <button class="btn btn-dark px-4" type="submit">🔄 Regenerar Word</button>
+                            </form>
+                        </div>
                     <?php endif; ?>
                 </div>
             </main>
@@ -408,9 +426,10 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
         (function() {
             const modalElement = document.getElementById('modalComplementoFormularios');
             const iframe = document.getElementById('complementoFormulariosFrame');
+            const modalTitle = document.getElementById('modalComplementoFormulariosLabel');
             const botones = document.querySelectorAll('.btn-open-complemento');
 
-            if (!modalElement || !iframe || botones.length === 0 || typeof bootstrap === 'undefined') {
+            if (!modalElement || !iframe || !modalTitle || botones.length === 0 || typeof bootstrap === 'undefined') {
                 return;
             }
 
@@ -420,10 +439,16 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
             botones.forEach((btn) => {
                 btn.addEventListener('click', function() {
                     const tab = (btn.getAttribute('data-tab') || 'bajas').trim();
+                    const soloMedidas = (btn.getAttribute('data-solo-medidas') || '').trim() === '1';
+                    const title = (btn.getAttribute('data-modal-title') || 'Datos Cuantitativos / Cuestionarios Cualitativos').trim();
                     let src = 'complemento_formularios.php?embed=1&tab=' + encodeURIComponent(tab);
+                    if (soloMedidas) {
+                        src += '&solo_medidas=1';
+                    }
                     if (idEmpresaFija > 0) {
                         src += '&id_empresa=' + encodeURIComponent(String(idEmpresaFija));
                     }
+                    modalTitle.textContent = title;
                     iframe.src = src;
                     modal.show();
                 });
@@ -434,7 +459,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
             });
         })();
     </script>
-    
+
 </body>
 
 </html>

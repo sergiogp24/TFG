@@ -937,8 +937,6 @@ function rellenarTablaDinamicaHoja14(TemplateProcessor $template, \PhpOffice\Php
             'f14_ph' => 'J',
             'f14_pt' => 'K',
             'f14_tf' => 'L',
-            'f14_bg' => 'M',
-            'f14_if' => 'N',
         ],
         'ancla' => 'f14_c',
     ];

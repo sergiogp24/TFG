@@ -18,20 +18,12 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 function obtenerConteosPorRangoEdad(mysqli $db, int $idEmpresa, int $idAnoDatos): array
 {
     $stmt = $db->prepare(
-        "
-        SELECT
-            de.sexo,
-            de.fecha_nacimiento,
-            de.salario_base_eq,
-            de.salario_base_ef
+        " SELECT de.sexo, de.fecha_nacimiento, de.salario_base_eq, de.salario_base_ef
         FROM datos_empleados de
         INNER JOIN ano_datos ad ON ad.id_ano_datos = de.id_ano_datos
         INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-        WHERE ce.id_empresa = ?
-          AND de.id_ano_datos = ?
-          AND de.fecha_nacimiento IS NOT NULL
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
-          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
+        WHERE ce.id_empresa = ? AND de.id_ano_datos = ? AND de.fecha_nacimiento IS NOT NULL
+          AND de.salario_base_eq != 0 AND de.salario_base_ef != 0 AND de.salario_base_eq != 0 AND de.salario_base_ef != 0
         "
     );
 
@@ -2445,11 +2437,16 @@ function area_formaciones(mysqli $db, int $idEmpresa, $sheet): bool
     $stmt = $db->prepare(
         "SELECT
             tipo,
+            n_horas,
+            modalidad,
+            perfil_puesto,
+            horario,
+            caracter,
             COALESCE(SUM(n_mujeres), 0) AS n_mujeres,
             COALESCE(SUM(n_hombres), 0) AS n_hombres
         FROM area_formaciones
         WHERE id_empresa = ?
-        GROUP BY tipo
+        GROUP BY tipo, n_horas, modalidad, perfil_puesto, horario, caracter
         "
     );
 
@@ -2461,24 +2458,24 @@ function area_formaciones(mysqli $db, int $idEmpresa, $sheet): bool
     $stmt->execute();
     $result = $stmt->get_result();
 
-    $totalesPorTipo = [];
+    $filas = [];
     while ($row = $result->fetch_assoc()) {
         $tipo = normalizarTextoPuesto((string)($row['tipo'] ?? ''));
         if ($tipo === '') {
             continue;
         }
-        if (!isset($totalesPorTipo[$tipo])) {
-            $totalesPorTipo[$tipo] = [
-                'tipo' => (string)($row['tipo'] ?? ''),
-                'mujeres' => 0,
-                'hombres' => 0,
-            ];
-        }
-        $totalesPorTipo[$tipo]['mujeres'] += (int)($row['n_mujeres'] ?? 0);
-        $totalesPorTipo[$tipo]['hombres'] += (int)($row['n_hombres'] ?? 0);
+        
+        $filas[] = [
+            'tipo' => (string)($row['tipo'] ?? ''),
+            'n_horas' => (int)($row['n_horas'] ?? 0),
+            'modalidad' => (string)($row['modalidad'] ?? ''),
+            'perfil_puesto' => (string)($row['perfil_puesto'] ?? ''),
+            'horario' => (string)($row['horario'] ?? ''),
+            'caracter' => (string)($row['caracter'] ?? ''),
+            'mujeres' => (int)($row['n_mujeres'] ?? 0),
+            'hombres' => (int)($row['n_hombres'] ?? 0),
+        ];
     }
-
-    $filas = array_values($totalesPorTipo);
     usort($filas, static function (array $a, array $b): int {
         $totalA = (int)$a['mujeres'] + (int)$a['hombres'];
         $totalB = (int)$b['mujeres'] + (int)$b['hombres'];
@@ -2493,9 +2490,9 @@ function area_formaciones(mysqli $db, int $idEmpresa, $sheet): bool
     $filaPlantilla = 3;
     $filaTotal = $filaPlantilla + count($filas);
     $highestRow = max($sheet->getHighestRow(), $filaPlantilla);
-    $plantillaStyle = $sheet->getStyle('B' . $filaPlantilla . ':N' . $filaPlantilla);
+    $plantillaStyle = $sheet->getStyle('B' . $filaPlantilla . ':M' . $filaPlantilla);
     $alturaPlantilla = $sheet->getRowDimension($filaPlantilla)->getRowHeight();
-    $totalStyle = $highestRow > $filaPlantilla ? $sheet->getStyle('B' . $highestRow . ':N' . $highestRow) : $plantillaStyle;
+    $totalStyle = $highestRow > $filaPlantilla ? $sheet->getStyle('B' . $highestRow . ':M' . $highestRow) : $plantillaStyle;
 
     if ($highestRow >= $filaPlantilla) {
         $sheet->removeRow($filaPlantilla, $highestRow - $filaPlantilla + 1);
@@ -2506,27 +2503,29 @@ function area_formaciones(mysqli $db, int $idEmpresa, $sheet): bool
         $mujeres = (int)($filaDatos['mujeres'] ?? 0);
         $hombres = (int)($filaDatos['hombres'] ?? 0);
 
-        $sheet->duplicateStyle($plantillaStyle, 'B' . $filaExcel . ':N' . $filaExcel);
+        $sheet->duplicateStyle($plantillaStyle, 'B' . $filaExcel . ':M' . $filaExcel);
         if ($alturaPlantilla > 0) {
             $sheet->getRowDimension($filaExcel)->setRowHeight($alturaPlantilla);
         }
 
         $sheet->setCellValue('B' . $filaExcel, (string)($filaDatos['tipo'] ?? ''));
-        $sheet->setCellValue('C' . $filaExcel, $mujeres);
+        $sheet->setCellValue('C' . $filaExcel, (int)($filaDatos['n_horas'] ?? 0));
+        $sheet->setCellValue('D' . $filaExcel, $mujeres);
         $sheet->setCellValue('G' . $filaExcel, $hombres);
-        $sheet->setCellValue('D' . $filaExcel, '=IF(L' . $filaExcel . '=0,0,C' . $filaExcel . '/L' . $filaExcel . '*100)');
-        $sheet->setCellValue('E' . $filaExcel, '=IF($C$' . $filaTotal . '=0,0,C' . $filaExcel . '/$C$' . $filaTotal . '*100)');
-        $sheet->setCellValue('F' . $filaExcel, '=IF($L$' . $filaTotal . '=0,0,C' . $filaExcel . '/$L$' . $filaTotal . '*100)');
-        $sheet->setCellValue('H' . $filaExcel, '=IF(L' . $filaExcel . '=0,0,G' . $filaExcel . '/L' . $filaExcel . '*100)');
-        $sheet->setCellValue('I' . $filaExcel, '=IF($G$' . $filaTotal . '=0,0,G' . $filaExcel . '/$G$' . $filaTotal . '*100)');
-        $sheet->setCellValue('J' . $filaExcel, '=IF($L$' . $filaTotal . '=0,0,G' . $filaExcel . '/$L$' . $filaTotal . '*100)');
-        $sheet->setCellValue('K' . $filaExcel, '=F' . $filaExcel . '+J' . $filaExcel);
-        $sheet->setCellValue('L' . $filaExcel, '=C' . $filaExcel . '+G' . $filaExcel);
-        $sheet->setCellValue('M' . $filaExcel, '=H' . $filaExcel . '-D' . $filaExcel);
-        $sheet->setCellValue('N' . $filaExcel, '=IF(G' . $filaExcel . '=0,0,C' . $filaExcel . '/G' . $filaExcel . ')');
+        
+        $sheet->setCellValue('M' . $filaExcel, '=D' . $filaExcel . '+G' . $filaExcel);
+        
+        $sheet->setCellValue('E' . $filaExcel, '=IF(M' . $filaExcel . '=0,0,D' . $filaExcel . '/M' . $filaExcel . '*100)');
+        $sheet->setCellValue('F' . $filaExcel, '=IF($D$' . $filaTotal . '=0,0,D' . $filaExcel . '/$D$' . $filaTotal . '*100)');
+        $sheet->setCellValue('H' . $filaExcel, '=IF(M' . $filaExcel . '=0,0,G' . $filaExcel . '/M' . $filaExcel . '*100)');
+        
+        $sheet->setCellValue('I' . $filaExcel, (string)($filaDatos['modalidad'] ?? ''));
+        $sheet->setCellValue('J' . $filaExcel, (string)($filaDatos['perfil_puesto'] ?? ''));
+        $sheet->setCellValue('K' . $filaExcel, (string)($filaDatos['horario'] ?? ''));
+        $sheet->setCellValue('L' . $filaExcel, (string)($filaDatos['caracter'] ?? ''));
     }
 
-    $sheet->duplicateStyle($totalStyle, 'B' . $filaTotal . ':N' . $filaTotal);
+    $sheet->duplicateStyle($totalStyle, 'B' . $filaTotal . ':M' . $filaTotal);
     if ($alturaPlantilla > 0) {
         $sheet->getRowDimension($filaTotal)->setRowHeight($alturaPlantilla);
     }
@@ -2534,23 +2533,19 @@ function area_formaciones(mysqli $db, int $idEmpresa, $sheet): bool
     $sheet->setCellValue('B' . $filaTotal, 'TOTAL');
     if (count($filas) > 0) {
         $sheet->setCellValue('C' . $filaTotal, '=SUM(C' . $filaPlantilla . ':C' . ($filaTotal - 1) . ')');
+        $sheet->setCellValue('D' . $filaTotal, '=SUM(D' . $filaPlantilla . ':D' . ($filaTotal - 1) . ')');
         $sheet->setCellValue('G' . $filaTotal, '=SUM(G' . $filaPlantilla . ':G' . ($filaTotal - 1) . ')');
-        $sheet->setCellValue('L' . $filaTotal, '=SUM(L' . $filaPlantilla . ':L' . ($filaTotal - 1) . ')');
+        $sheet->setCellValue('M' . $filaTotal, '=SUM(M' . $filaPlantilla . ':M' . ($filaTotal - 1) . ')');
     } else {
         $sheet->setCellValue('C' . $filaTotal, 0);
+        $sheet->setCellValue('D' . $filaTotal, 0);
         $sheet->setCellValue('G' . $filaTotal, 0);
-        $sheet->setCellValue('L' . $filaTotal, 0);
+        $sheet->setCellValue('M' . $filaTotal, 0);
     }
 
-    $sheet->setCellValue('D' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,C' . $filaTotal . '/L' . $filaTotal . '*100)');
-    $sheet->setCellValue('E' . $filaTotal, '=IF(C' . $filaTotal . '=0,0,C' . $filaTotal . '/C' . $filaTotal . '*100)');
-    $sheet->setCellValue('F' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,C' . $filaTotal . '/L' . $filaTotal . '*100)');
-    $sheet->setCellValue('H' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,G' . $filaTotal . '/L' . $filaTotal . '*100)');
-    $sheet->setCellValue('I' . $filaTotal, '=IF(G' . $filaTotal . '=0,0,G' . $filaTotal . '/G' . $filaTotal . '*100)');
-    $sheet->setCellValue('J' . $filaTotal, '=IF(L' . $filaTotal . '=0,0,G' . $filaTotal . '/L' . $filaTotal . '*100)');
-    $sheet->setCellValue('K' . $filaTotal, '=F' . $filaTotal . '+J' . $filaTotal);
-    $sheet->setCellValue('M' . $filaTotal, '=H' . $filaTotal . '-D' . $filaTotal);
-    $sheet->setCellValue('N' . $filaTotal, '=IF(G' . $filaTotal . '=0,0,C' . $filaTotal . '/G' . $filaTotal . ')');
+    $sheet->setCellValue('E' . $filaTotal, '=IF(M' . $filaTotal . '=0,0,D' . $filaTotal . '/M' . $filaTotal . '*100)');
+    $sheet->setCellValue('F' . $filaTotal, 100);
+    $sheet->setCellValue('H' . $filaTotal, '=IF(M' . $filaTotal . '=0,0,G' . $filaTotal . '/M' . $filaTotal . '*100)');
 
     $stmt->close();
 

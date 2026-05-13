@@ -37,6 +37,32 @@ if (!$esStaff && $usuarioId > 0) {
         $empresaSesion = trim((string)($rowEmpresa['razon_social'] ?? ''));
     }
 }
+
+// Fetch companies for Staff selection
+$empresasStaff = [];
+if ($esStaff && $usuarioId > 0) {
+    $isAdminStaff = ($rol === 'ADMINISTRADOR');
+    $sqlStaff = "SELECT id_empresa, razon_social FROM empresa";
+    if (!$isAdminStaff) {
+        $sqlStaff .= " WHERE (EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?) OR EXISTS (SELECT 1 FROM contrato_empresa ce WHERE ce.id_empresa = empresa.id_empresa AND ce.id_usuario = ?) OR empresa.id_usuario = ?)";
+    }
+    $sqlStaff .= " ORDER BY razon_social ASC";
+    
+    $stmtStaff = db()->prepare($sqlStaff);
+    if ($stmtStaff) {
+        if (!$isAdminStaff) {
+            $stmtStaff->bind_param('iii', $usuarioId, $usuarioId, $usuarioId);
+        }
+        $stmtStaff->execute();
+        $resStaff = $stmtStaff->get_result();
+        while ($e = $resStaff->fetch_assoc()) {
+            $empresasStaff[] = $e;
+        }
+        $stmtStaff->close();
+    }
+}
+
+$idEmpresaPreseleccionada = (int)($_GET['id_empresa'] ?? 0);
 ?>
 <!doctype html>
 <html lang="es">
@@ -144,7 +170,14 @@ if (!$esStaff && $usuarioId > 0) {
 
                 <main class="col-12 col-lg-9 col-xl-10">
                     <div class="card p-4 shadow-sm border-0">
-                        <h5>Subir Documento por Tipo</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Subir Documento por Tipo</h5>
+                            <?php if ($idEmpresaPreseleccionada > 0): ?>
+                                <a class="btn btn-outline-secondary btn-sm" href="<?= h(app_path('/model/empresa.php?view=ver_empresa&id_empresa=' . (int)$idEmpresaPreseleccionada)) ?>">
+                                    Volver a la empresa
+                                </a>
+                            <?php endif; ?>
+                        </div>
 
                         <?php if ($msg !== ''): ?>
                             <div class="alert alert-info py-2"><?= h($msg) ?></div>
@@ -153,6 +186,18 @@ if (!$esStaff && $usuarioId > 0) {
                         <form action="../php/procesar_documento_tipo.php"
                             method="POST"
                             enctype="multipart/form-data">
+                            <?= csrf_input() ?>
+                            
+                            <label for="id_empresa_staff">Empresa:</label>
+                            <select id="id_empresa_staff" name="id_empresa" class="form-select mb-3" required>
+                                <option value="">-- Selecciona una empresa --</option>
+                                <?php foreach ($empresasStaff as $empStaff): ?>
+                                    <option value="<?= (int)$empStaff['id_empresa'] ?>" <?= ($idEmpresaPreseleccionada === (int)$empStaff['id_empresa']) ? 'selected' : '' ?>>
+                                        <?= h($empStaff['razon_social']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+
                             <label for="asunto_staff">Asunto:</label>
                             <input type="text" id="asunto_staff" name="asunto" class="form-control mb-3" required>
 
@@ -164,7 +209,7 @@ if (!$esStaff && $usuarioId > 0) {
                                 <option value="SALUD">SALUD</option>
                                 <option value="COMUNICACION">COMUNICACION</option>
                                 <option value="LGTBI">LGTBI</option>
-                                <option value="TOMA DE DATOS">TOMA DE DATOS</option>
+                                <option value="DOCUMENTACION">DOCUMENTACION</option>
                             </select>
 
                             <input type="file"
@@ -226,7 +271,14 @@ if (!$esStaff && $usuarioId > 0) {
 
                 <main class="col-12 col-lg-9 col-xl-10">
                     <div class="card p-4 shadow-sm border-0">
-                        <h5>Subir Documento por Tipo</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Subir Documento por Tipo</h5>
+                            <?php if ($idEmpresaPreseleccionada > 0): ?>
+                                <a class="btn btn-outline-secondary btn-sm" href="<?= h(app_path('/model/empresa.php?view=ver_empresa&id_empresa=' . (int)$idEmpresaPreseleccionada)) ?>">
+                                    Volver a la empresa
+                                </a>
+                            <?php endif; ?>
+                        </div>
 
                         <?php if ($msg !== ''): ?>
                             <div class="alert alert-info py-2"><?= h($msg) ?></div>
@@ -244,7 +296,7 @@ if (!$esStaff && $usuarioId > 0) {
                                 data-empresa-base="<?= h($empresaSesion) ?>"
                                 readonly>
 
-                            <label for="asunto_cliente">Asunto:</label>
+                            <label for="asunto_cliente">Asunto (Opcional):</label>
                             <input type="text" id="asunto_cliente" name="asunto" class="form-control mb-3" required>
 
                             <label for="tipo_cliente">Tipo de archivo:</label>
@@ -255,7 +307,7 @@ if (!$esStaff && $usuarioId > 0) {
                                 <option value="SALUD">SALUD</option>
                                 <option value="COMUNICACION">COMUNICACION</option>
                                 <option value="LGTBI">LGTBI</option>
-                                <option value="TOMA DE DATOS">TOMA DE DATOS</option>
+                                <option value="DOCUMENTACION">DOCUMENTACION</option>
                             </select>
 
                             <input type="file"

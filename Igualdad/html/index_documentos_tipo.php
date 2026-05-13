@@ -15,7 +15,7 @@ function h($s): string
 }
 
 $msg = (string)($_GET['msg'] ?? '');
-$sessionUsername = (string)($_SESSION['user']['username'] ?? $_SESSION['user']['nombre_usuario'] ?? 'usuario');
+$sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
 $usuarioId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 $panelCss = ($rol === 'TECNICO')

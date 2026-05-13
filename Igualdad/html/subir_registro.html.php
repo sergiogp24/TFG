@@ -28,13 +28,14 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
         FROM archivos a
         INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
         INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
-        WHERE a.tipo = ? AND ac.id_empresa = ?
+        WHERE a.tipo IN (?, ?) AND ac.id_empresa = ?
         LIMIT 1';
 
     $stmt = db()->prepare($sql);
     if ($stmt) {
         $tipoRegistro = 'REGISTRO_RETRIBUTIVO';
-        $stmt->bind_param('si', $tipoRegistro, $idEmpresa);
+        $tipoRegistroMalformateado = 'REGISTRO_PROPIO_CLIENTE';
+        $stmt->bind_param('ssi', $tipoRegistro, $tipoRegistroMalformateado, $idEmpresa);
         $stmt->execute();
         $result = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -48,7 +49,7 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
     $sql2 = '
         SELECT 1
         FROM archivos a
-        WHERE a.tipo = ? AND a.id_empresa = ?
+        WHERE a.tipo IN (?, ?) AND a.id_empresa = ?
         LIMIT 1';
 
     $stmt2 = db()->prepare($sql2);
@@ -57,7 +58,8 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
     }
 
     $tipoRegistro = 'REGISTRO_RETRIBUTIVO';
-    $stmt2->bind_param('si', $tipoRegistro, $idEmpresa);
+    $tipoRegistroMalformateado = 'REGISTRO_PROPIO_CLIENTE';
+    $stmt2->bind_param('ssi', $tipoRegistro, $tipoRegistroMalformateado, $idEmpresa);
     $stmt2->execute();
     $ok = (bool)$stmt2->get_result()->fetch_assoc();
     $stmt2->close();
@@ -191,7 +193,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                         <?php if ($esTecnico): ?>
                             <div class="sidebar-header">
                                 <div class="sidebar-avatar">👨‍💼</div>
-                                <h5 class="sidebar-title">Panel Técnico</h5>
+                                <h5 class="sidebar-title">Panel Personal Técnico</h5>
                             </div>
 
                             <div class="sidebar-user-info">
@@ -335,14 +337,14 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                             <div class="alert alert-warning py-2">No tienes empresas asignadas para subir archivos.</div>
                         <?php endif; ?>
 
-                        <label for="Asunto">Observaciones:</label>
+                        <label for="Asunto">Observaciones (Opcional):</label>
                         <input type="text" id="Asunto" name="asunto" class="form-control mb-3">
 
                         <label for="Tipo">Tipo de archivo:</label>
                         <select id="Tipo" name="tipo" class="form-control mb-3" required>
                             <option value="REGISTRO_RETRIBUTIVO">Registro Retributivo</option>
                             <?php if ($esTecnico): ?>
-                                <option value="WORD_FINAL">WORD_FINAL</option>
+                                <option value="PLAN_IGUALDAD_DEFINITIVO">Plan Igualdad Definitivo</option>
                             <?php endif; ?>
                         </select>
 

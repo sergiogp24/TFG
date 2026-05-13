@@ -32,7 +32,7 @@
 
       <div class="mt-3">
         <a class="btn btn-link text-dark"
-           href="admin.php?view=edit&id_usuario=<?= (int)$usuario['id_usuario'] ?>">
+           href="admin.php?view=edit&id_usuario=<?= (int)($usuario['id_usuario'] ?? 0) ?>">
           Volver
         </a>
       </div>
@@ -48,8 +48,8 @@
         <div>
           <h1 class="h5 m-0">Asignar empresas</h1>
           <div class="text-muted small mt-1">
-            Usuario: <strong><?= h($usuario['nombre_usuario']) ?></strong>
-            (<?= h($usuario['email']) ?>)
+            Usuario: <strong><?= h($usuario['nombre_usuario'] ?? '') ?></strong>
+            (<?= h($usuario['email'] ?? '') ?>)
           </div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
@@ -67,7 +67,7 @@
         <form method="post">
           <?= csrf_input() ?>
           <!-- ID del usuario al que se le asignan empresas -->
-          <input type="hidden" name="id_usuario" value="<?= (int)$usuario['id_usuario'] ?>">
+          <input type="hidden" name="id_usuario" value="<?= (int)($usuario['id_usuario'] ?? 0) ?>">
 
           <!-- Fila de utilidades: buscador + botones marcar/desmarcar -->
           <div class="row g-2 mb-3 align-items-stretch">
@@ -89,7 +89,8 @@
             - checkbox name="empresas[]" => se envía como array al POST.
             - Si el id está en $checked, la empresa aparece marcada (checked).-->
           <div class="empresa-list border rounded" id="list">
-            <?php foreach ($empresas as $e): ?>
+            <?php $checked = $checked ?? []; ?>
+            <?php foreach (($empresas ?? []) as $e): ?>
               <?php $eid = (int)$e['id_empresa']; ?>
 
               <label class="empresa-item d-flex align-items-center gap-2 px-3 py-2 border-bottom"

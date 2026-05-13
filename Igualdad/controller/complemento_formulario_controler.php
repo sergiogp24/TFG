@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../php/auth.php';
+require_once __DIR__ . '/../php/helpers.php';
 require_login();
 require __DIR__ . '/../config/config.php';
 
@@ -163,7 +164,7 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
     FROM archivos a
     INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
     INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
-    WHERE UPPER(TRIM(a.tipo)) = "REGISTRO_RETRIBUTIVO" AND ac.id_empresa = ?
+    WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND ac.id_empresa = ?
     LIMIT 1';
 
   $stmt = db()->prepare($sql);
@@ -183,7 +184,7 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
   $sqlDirecto = '
     SELECT 1
     FROM archivos a
-    WHERE UPPER(TRIM(a.tipo)) = "REGISTRO_RETRIBUTIVO" AND a.id_empresa = ?
+    WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND a.id_empresa = ?
     LIMIT 1';
 
   $stmtDirecto = db()->prepare($sqlDirecto);
@@ -558,6 +559,7 @@ $tabPorAccion = [
   'cuestionario_comunicacion_identidad_corporativa' => 'cuestionario_comunicacion_identidad_corporativa',
   'editar_cuestionario_comunicacion_identidad_corporativa' => 'cuestionario_comunicacion_identidad_corporativa',
   'eliminar_cuestionario_comunicacion_identidad_corporativa' => 'cuestionario_comunicacion_identidad_corporativa',
+  'subir_documentacion_rapida' => (string)($_POST['tab'] ?? 'bajas'),
 ];
 $tab = $tabPorAccion[$accion] ?? 'bajas';
 
@@ -765,13 +767,18 @@ try {
       $tipo = trim((string)($_POST['tipo'] ?? ''));
       $nMujeres = (int)($_POST['n_mujeres'] ?? 0);
       $nHombres = (int)($_POST['n_hombres'] ?? 0);
+      $nHoras = (int)($_POST['n_horas'] ?? 0);
+      $modalidad = trim((string)($_POST['modalidad'] ?? ''));
+      $perfilPuesto = trim((string)($_POST['perfil_puesto'] ?? ''));
+      $horario = trim((string)($_POST['horario'] ?? ''));
+      $caracter = trim((string)($_POST['caracter'] ?? ''));
 
       if ($tipo === '' || $nMujeres < 0 || $nHombres < 0) {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
 
-      $stmt = $db->prepare('INSERT INTO area_formaciones (tipo, n_mujeres, n_hombres, id_ano_datos, id_empresa) VALUES (?, ?, ?, ?, ?)');
-      $stmt->bind_param('siiii', $tipo, $nMujeres, $nHombres, $idAnoDatos, $idEmpresa);
+      $stmt = $db->prepare('INSERT INTO area_formaciones (tipo, n_mujeres, n_hombres, n_horas, modalidad, perfil_puesto, horario, caracter, id_ano_datos, id_empresa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      $stmt->bind_param('siiiisssii', $tipo, $nMujeres, $nHombres, $nHoras, $modalidad, $perfilPuesto, $horario, $caracter, $idAnoDatos, $idEmpresa);
       $stmt->execute();
       $stmt->close();
 
@@ -787,14 +794,19 @@ try {
       $tipo = trim((string)($_POST['tipo'] ?? ''));
       $nMujeres = (int)($_POST['n_mujeres'] ?? 0);
       $nHombres = (int)($_POST['n_hombres'] ?? 0);
+      $nHoras = (int)($_POST['n_horas'] ?? 0);
+      $modalidad = trim((string)($_POST['modalidad'] ?? ''));
+      $perfilPuesto = trim((string)($_POST['perfil_puesto'] ?? ''));
+      $horario = trim((string)($_POST['horario'] ?? ''));
+      $caracter = trim((string)($_POST['caracter'] ?? ''));
 
       if ($tipo === '' || $nMujeres < 0 || $nHombres < 0) {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
 
-      $sql = "UPDATE `{$table}` SET tipo = ?, n_mujeres = ?, n_hombres = ? WHERE `{$pk}` = ? AND id_empresa = ?";
+      $sql = "UPDATE `{$table}` SET tipo = ?, n_mujeres = ?, n_hombres = ?, n_horas = ?, modalidad = ?, perfil_puesto = ?, horario = ?, caracter = ? WHERE `{$pk}` = ? AND id_empresa = ?";
       $stmt = $db->prepare($sql);
-      $stmt->bind_param('siiii', $tipo, $nMujeres, $nHombres, $idRegistro, $idEmpresa);
+      $stmt->bind_param('siiiisssii', $tipo, $nMujeres, $nHombres, $nHoras, $modalidad, $perfilPuesto, $horario, $caracter, $idRegistro, $idEmpresa);
       $stmt->execute();
       $stmt->close();
 
@@ -833,7 +845,7 @@ try {
       $nMujeres = (int)($_POST['n_mujeres'] ?? 0);
       $nHombres = (int)($_POST['n_hombres'] ?? 0);
 
-      if (!in_array($tipo, ['Excedencias Voluntarias', 'Excedencias Cuidado Menores', 'Excedencias Cuidado de Personas Mayores'], true) || $nMujeres < 0 || $nHombres < 0) {
+      if (!in_array($tipo, ['Excedencias Voluntarias', 'Excedencias Cuidado Menores', 'Excedencias Cuidado de Personas Mayores', 'Otros'], true) || $nMujeres < 0 || $nHombres < 0) {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
 
@@ -856,7 +868,7 @@ try {
       $nMujeres = (int)($_POST['n_mujeres'] ?? 0);
       $nHombres = (int)($_POST['n_hombres'] ?? 0);
 
-      if (!in_array($tipo, ['Excedencias Voluntarias', 'Excedencias Cuidado Menores', 'Excedencias Cuidado de Personas Mayores'], true) || $nMujeres < 0 || $nHombres < 0) {
+      if (!in_array($tipo, ['Excedencias Voluntarias', 'Excedencias Cuidado Menores', 'Excedencias Cuidado de Personas Mayores', 'Otros'], true) || $nMujeres < 0 || $nHombres < 0) {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
 
@@ -905,7 +917,7 @@ try {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
 
-      if (!in_array($tipo, ['Lactancia', 'Nacimiento'], true)) {
+      if (!in_array($tipo, ['Lactancia', 'Nacimiento', 'Matrimonio', 'Hospitalizacion de familiares', 'Otros'], true)) {
         complemento_redirect($tab, 'Tipo de permiso invalido.', $embed);
       }
 
@@ -932,7 +944,7 @@ try {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
 
-      if (!in_array($tipo, ['Lactancia', 'Nacimiento'], true)) {
+      if (!in_array($tipo, ['Lactancia', 'Nacimiento', 'Matrimonio', 'Hospitalizacion de familiares', 'Otros'], true)) {
         complemento_redirect($tab, 'Tipo de permiso invalido.', $embed);
       }
 
@@ -999,6 +1011,80 @@ try {
     $stmt->close();
 
     complemento_redirect($tab, 'Cuestionario eliminado correctamente.', $embed);
+  }
+
+  if ($accion === 'subir_documentacion_rapida') {
+    $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
+    complemento_validar_empresa($idEmpresa, $idUsuario, $rol, $tab, $embed);
+
+    if (!isset($_FILES['archivo']) || $_FILES['archivo']['error'] !== UPLOAD_ERR_OK) {
+      complemento_redirect($tab, 'No se recibio el archivo o hubo un error en la subida.', $embed);
+    }
+
+    $asunto = trim((string)($_POST['asunto'] ?? ''));
+    if ($asunto === '') {
+      complemento_redirect($tab, 'El asunto es obligatorio.', $embed);
+    }
+
+    $archivo = $_FILES['archivo'];
+    $nombreOriginal = (string)($archivo['name'] ?? 'archivo');
+    $tmpName = (string)($archivo['tmp_name'] ?? '');
+    $tamanoBytes = (int)($archivo['size'] ?? 0);
+    $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+
+    $extPermitidas = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'];
+    if (!in_array($ext, $extPermitidas, true)) {
+      complemento_redirect($tab, 'Extension no permitida (pdf, doc, docx, xls, xlsx, csv).', $embed);
+    }
+
+    $uploadDir = __DIR__ . '/../uploads';
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+      complemento_redirect($tab, 'No se pudo crear la carpeta de subida.', $embed);
+    }
+
+    $db = db();
+    $razonSocial = 'EMPRESA';
+    $stmtEmp = $db->prepare('SELECT razon_social FROM empresa WHERE id_empresa = ? LIMIT 1');
+    if ($stmtEmp) {
+      $stmtEmp->bind_param('i', $idEmpresa);
+      $stmtEmp->execute();
+      $resEmp = $stmtEmp->get_result()->fetch_assoc();
+      $razonSocial = trim((string)($resEmp['razon_social'] ?? 'EMPRESA'));
+      $stmtEmp->close();
+    }
+
+    $empresaToken = preg_replace('/[^a-zA-Z0-9]/', '_', $razonSocial);
+    $uniqueSuffix = substr(md5(uniqid('', true)), 0, 8);
+    $nombreGuardado = $empresaToken . '_DOCUMENTACION_' . $uniqueSuffix . '.' . $ext;
+    $rutaDestino = $uploadDir . '/' . $nombreGuardado;
+
+    if (!move_uploaded_file($tmpName, $rutaDestino)) {
+      complemento_redirect($tab, 'No se pudo guardar el archivo en el servidor.', $embed);
+    }
+
+    $rutaRelativa = 'uploads/' . $nombreGuardado;
+    
+    // MIME detection
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = finfo_file($finfo, $rutaDestino) ?: 'application/octet-stream';
+    finfo_close($finfo);
+    
+    $sha256 = hash_file('sha256', $rutaDestino) ?: null;
+
+    $stmtInsert = $db->prepare(
+      'INSERT INTO archivos (tipo, asunto, nombre_original, nombre_guardado, ruta_relativa, tamano_bytes, mime, sha256, id_empresa)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    if (!$stmtInsert) {
+        complemento_redirect($tab, 'Error en la base de datos al preparar la subida.', $embed);
+    }
+    
+    $tipoDoc = 'DOCUMENTACION';
+    $stmtInsert->bind_param('sssssissi', $tipoDoc, $asunto, $nombreOriginal, $nombreGuardado, $rutaRelativa, $tamanoBytes, $mime, $sha256, $idEmpresa);
+    $stmtInsert->execute();
+    $stmtInsert->close();
+
+    complemento_redirect($tab, 'Documentacion subida correctamente.', $embed);
   }
 
   complemento_redirect($tab, 'Accion no valida.', $embed);

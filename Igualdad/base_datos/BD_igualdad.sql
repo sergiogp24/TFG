@@ -24,6 +24,7 @@ CREATE TABLE `usuario`(
  `apellidos`VARCHAR(255) DEFAULT NULL,
  `email`VARCHAR(255) UNIQUE NOT NULL,
  `telefono`VARCHAR(20)  DEFAULT NULL,
+ `firmacorreo`VARCHAR(255) DEFAULT NULL,
  `direccion`VARCHAR(255) DEFAULT NULL,
  `localidad`VARCHAR(20) DEFAULT NULL,
  `password`VARCHAR(255) NOT NULL,
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
   KEY `idx_token` (`token`),
   KEY `idx_expires_at` (`expires_at`)
 ) ENGINE=InnoDB;
-SELECT * FROM password_reset_token;
+
 -- --------------------------------------------------------
 
 --
@@ -60,6 +61,7 @@ CREATE TABLE reuniones(
  id_reunion INT PRIMARY KEY AUTO_INCREMENT,
  objetivo TEXT DEFAULT NULL,
  hora_reunion VARCHAR(255) NOT NULL,
+ tipo ENUM('CreadaUsu','CreadaAuto','FechaLimite') NOT NULL,
  fecha_reunion DATE NOT NULL
 ) ENGINE=InnoDB;
 
@@ -70,6 +72,7 @@ CREATE TABLE usuario_reunion(
  CONSTRAINT fk_ur_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
  CONSTRAINT fk_ur_reunion FOREIGN KEY (id_reunion) REFERENCES reuniones(id_reunion) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
 -- --------------------------------------------------------
 
 --
@@ -106,7 +109,7 @@ CREATE TABLE `empresa`(
   INDEX `idx_cliente_nif` (`nif`),
   INDEX `idx_empresa_razon_social` (`razon_social`)
 ) ENGINE=InnoDB;
-SELECT * FROM empresa;
+
 
 CREATE TABLE `cnae` (
   `id` INT  PRIMARY KEY AUTO_INCREMENT,
@@ -114,7 +117,7 @@ CREATE TABLE `cnae` (
   `id_empresa` INT NOT NULL,
    CONSTRAINT `fk_empresa_cnae` FOREIGN KEY (`id_empresa`) REFERENCES `empresa`(`id_empresa`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-SELECT * FROM cnae;
+
 -- --------------------------------------------------------
 --
 -- Estructura para la tabla RELACIONAL USUARIOS Y CLIENTES
@@ -191,7 +194,6 @@ INDEX idx_contrato_empresa_empresa (id_empresa),
 INDEX idx_contrato_empresa_usuario (id_usuario)
 )ENGINE=InnoDB;
 
-
 -- --------------------------------------------------------
 --
 -- Estructura para la tabla año_datos
@@ -206,7 +208,7 @@ CREATE TABLE `ano_datos`(
  CONSTRAINT fk_ano_datos_contrato_empresa FOREIGN KEY (id_contrato_empresa) REFERENCES contrato_empresa(id_contrato_empresa) ON DELETE CASCADE,
  INDEX idx__ano_datos_contrato_empresa (id_contrato_empresa)
  )ENGINE= InnoDB;
- SELECT * FROM ano_datos;
+
 -- --------------------------------------------------------
 
 --
@@ -255,7 +257,6 @@ CREATE TABLE `datos_empleados`(
   CONSTRAINT fk_ano_datos_datos_empleados FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
 INDEX idx_ano_datos_datos_empleados(id_ano_datos)
 )ENGINE=InnoDB;
-SELECT * FROM datos_empleados;
 
 -- --------------------------------------------------------
 
@@ -534,7 +535,7 @@ CREATE TABLE `baja_temporales`(
   CONSTRAINT fk_bajastemporales_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
 `id_bajas`INT NOT NULL,
 CONSTRAINT fk_temporales_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)ON DELETE CASCADE)ENGINE=InnoDB;
-SELECT * FROM baja_temporales;
+
 -- --------------------------------------------------------
 
 --
@@ -549,12 +550,10 @@ CREATE TABLE `baja_definitivas`(
 `num_hombres`INT NOT NULL DEFAULT 0,
 `id_ano_datos`INT NOT  NULL,
 `id_empresa` INT NOT NULL,
+`id_bajas`INT NOT NULL,
   CONSTRAINT fk_anodefinitivas_bajas FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(iD_ano_datos) ON DELETE CASCADE,
   CONSTRAINT fk_bajasdefinitivas_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
-`id_bajas`INT NOT NULL,
 CONSTRAINT fk_definitivas_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)ON DELETE CASCADE)ENGINE=InnoDB;
-
-
 
 -- --------------------------------------------------------
 
@@ -565,7 +564,7 @@ CONSTRAINT fk_definitivas_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas
 CREATE TABLE `area_excedencias`(
 `id_excedencias`INT AUTO_INCREMENT PRIMARY KEY,
 `motivo`VARCHAR(100) DEFAULT NULL,
-`tipo`ENUM('Excedencias Voluntarias','Excedencias Cuidado Menores','Excedencias Cuidado de Personas Mayores') NOT NULL,
+`tipo`ENUM('Excedencias Voluntarias','Excedencias Cuidado Menores','Excedencias Cuidado de Personas Mayores','Otros') NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
 `id_ano_datos`INT NOT NULL,
@@ -585,6 +584,11 @@ CREATE TABLE `area_formaciones`(
 `tipo`VARCHAR(100) DEFAULT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
+`n_horas`INT DEFAULT 0,
+`modalidad` ENUM('Presencial', 'Online', 'Mixta') DEFAULT NULL,
+`perfil_puesto`VARCHAR(100) DEFAULT NULL,
+`horario` ENUM('Dentro del horario', 'Fuera del horario') DEFAULT NULL,
+`caracter` ENUM('Obligatoria', 'Voluntaria') DEFAULT NULL,
 `id_ano_datos`INT NOT NULL,
 `id_empresa` INT NOT NULL,
   CONSTRAINT fk_formaciones_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
@@ -600,7 +604,7 @@ CREATE TABLE `area_formaciones`(
 CREATE TABLE `area_Permisos_retribuidos`(
 `id_permisos_retribuidos`INT AUTO_INCREMENT PRIMARY KEY,
 `motivo`VARCHAR(100) DEFAULT NULL,
-`tipo` ENUM('Lactancia','Nacimiento') NOT NULL,
+`tipo` ENUM('Lactancia','Nacimiento','Matrimonio','Hospitalizacion de familiares','Otros') NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
 `id_ano_datos`INT  NOT NULL,
@@ -623,7 +627,8 @@ CREATE TABLE `area_reducciones_jornada`(
 `id_ano_datos`INT NOT NULL,
   CONSTRAINT Fk_reducciones_empresa FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
    INDEX idx_reducciones_empresa (id_ano_datos))ENGINE=InnoDB;
-   -- --------------------------------------------------------
+   
+-- --------------------------------------------------------
 
 --
 -- Estructura para la tabla adaptaciones_jornada
@@ -639,7 +644,6 @@ CREATE TABLE `area_adaptaciones_jornada`(
    INDEX idx_adaptaciones_empresa (id_ano_datos))ENGINE=InnoDB;
 
 -- --------------------------------------------------------
-
 --
 -- Estructura Cuestionario Cualitativo
 --
@@ -667,7 +671,7 @@ CREATE TABLE `cuestionario_seleccion_personal`(
   CONSTRAINT fk_cuestionario_seleccion_personal_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   CONSTRAINT fk_seleccion_personal_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_seleccion_personal_empresa (id_ano_datos))ENGINE=InnoDB;
-SELECT * FROM cuestionario_seleccion_personal;
+
 -- --------------------------------------------------------
 
 --
@@ -718,7 +722,8 @@ CREATE TABLE `cuestionario_formacion`(
   CONSTRAINT fk_cuestionario_formacion_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   CONSTRAINT fk_cuestionario_formacion_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_formacion_empresa (id_ano_datos))ENGINE=InnoDB;
-    -- --------------------------------------------------------
+    
+-- --------------------------------------------------------
 
 --
 -- Estructura para la tabla cuestionario_conciliacion_corresponsabilidad
@@ -738,7 +743,7 @@ CREATE TABLE `cuestionario_conciliacion_corresponsabilidad`(
   CONSTRAINT fk_cuestionario_conciliacion_corresponsabilidad_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_conciliacion_corresponsabilidad_empresa (id_ano_datos))ENGINE=InnoDB;
 
-    -- --------------------------------------------------------
+-- --------------------------------------------------------
 
 --
 -- Estructura para la tabla cuestionario_infrarrepresentacion_femenina
@@ -833,11 +838,12 @@ CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
 
 --
 -- Estructura para la tabla archivo_registro_retributivo
--- tipo archivo importante
+--
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL','GENERADO WORD') NOT NULL,
+  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES',
+  'PLAN_IGUALDAD_DEFINITIVO','GENERADO WORD','REGISTRO_PROPIO_CLIENTE','DOCUMENTACION','FIRMACORREO') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -854,7 +860,6 @@ CREATE TABLE `archivos`(
   INDEX idx_archivos_tipo (tipo),
   INDEX idx_archivos_cliente_medida_fecha (id_cliente_medida, subido_en)
 ) ENGINE=InnoDB;
-Select * from archivos;
 
 CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   id_descarga INT AUTO_INCREMENT PRIMARY KEY,
@@ -867,109 +872,5 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_usuario (id_usuario),
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
--- --------------------------------------------------------
-select * from archivo_descarga_log;
---
---
--- Insertar roles
-
-INSERT INTO rol (nombre) VALUES
-('ADMINISTRADOR'),
-('TECNICO'),
-('CLIENTE');
-
--- --------------------------------------------------------
-
---
---
--- Insertar usuarios de prueba
-
-INSERT INTO usuario (
-  nombre_usuario, apellidos, email, telefono, direccion, localidad, password, rol_id
-) VALUES
-(
-  'admin', NULL, 'admin@igualdad.local', NULL, NULL, NULL,
-  '$2y$10$Eh5qPCYyxVoLzuWQK9RQh.uy0Q/SPcki94SGko7DV9Ephp0jL4BAu',
-  (SELECT id FROM rol WHERE nombre='ADMINISTRADOR' LIMIT 1)
-),
-(
-  'tecnico', NULL, 'tecnico@igualdad.local', NULL, NULL, NULL,
-  '$2y$10$VLXfptHN9s8O/HewHX9Oj.0BVP02y80Qtu/SOwBPzgt.g3qElCHm.',
-  (SELECT id FROM rol WHERE nombre='TECNICO' LIMIT 1)
-),
-(
-  'cliente', NULL, 'cliente@igualdad.local', NULL, NULL, NULL,
-  '$2y$10$5Xf3bUDpX..efGXRnVryn.wRMt1bGpc1ZxXTJonYjH8Q3Y7In1EJe',
-  (SELECT id FROM rol WHERE nombre='CLIENTE' LIMIT 1)
-);
-
-
-
--- 10 empresas de ejemplo
--- Nota: id_usuario lo dejo en NULL para no romper la FK (fk_usuario_empresa).
--- Si quieres asociarlas a un usuario concreto, cambia NULL por un id_usuario que exista en tu tabla usuario.
-
-INSERT INTO empresa (
-  razon_social, nif, domicilio_social, forma_juridica, ano_constitucional,
-  responsable, cargo, contacto, email, telefono,
-  sector, convenio,
-  personas_mujeres, personas_hombres, personas_total, centros_trabajo,
-  recogida_informacion, vigencia_plan, id_usuario
-) VALUES
-('Indra Sistemas S.A.', 'A28599033', 'Av. de Bruselas 35, 28108 Alcobendas (Madrid)', 'Sociedad Anónima', '1992',
- 'Laura Martínez', 'Directora RRHH', 'rrhh@indra-ejemplo.com', 'contacto@indra-ejemplo.com', '910000001',
- 'Tecnología', 'Convenio TIC', 220, 380, 600, 4,
- 'Encuestas internas y HRIS', '2025-2028', NULL),
-
-('Iberdrola Energía S.A.U.', 'A95758389', 'Plaza Euskadi 5, 48009 Bilbao', 'Sociedad Anónima Unipersonal', '1901',
- 'Carlos Gómez', 'Responsable de Personas', 'personas@iberdrola-ejemplo.com', 'info@iberdrola-ejemplo.com', '944000002',
- 'Energía', 'Convenio Energía', 450, 650, 1100, 8,
- 'Entrevistas y registros', '2024-2027', NULL),
-
-('Grupo Ilunion S.L.', 'B85123456', 'C/ Albacete 3, 28027 Madrid', 'Sociedad Limitada', '1988',
- 'Marta Ruiz', 'Gerente', 'marta.ruiz@ilunion-ejemplo.com', 'contacto@ilunion-ejemplo.com', '913000003',
- 'Servicios', 'Convenio Limpieza', 120, 80, 200, 3,
- 'Análisis documental', '2026-2029', NULL),
-
-('Limpiezas Moratinos S.L.', 'B90234567', 'Pol. Ind. Norte, Nave 12, 41020 Sevilla', 'Sociedad Limitada', '2006',
- 'Antonio Pérez', 'Administrador', 'antonio.perez@moratinos-ejemplo.com', 'info@moratinos-ejemplo.com', '955000004',
- 'Limpieza', 'Convenio Limpieza', 35, 25, 60, 1,
- 'Partes de trabajo y encuestas', '2025-2027', NULL),
-
-('Empresa Ejemplo Ficticio 3', 'B55512345', 'Pol. Ind. Norte, Nave 12, 41020 Sevilla', 'Sociedad Limitada', '2006',
- 'Antonio Pérez', 'Administrador', 'pepito.perez@moratinos-ejemplo.com', 'info@moratinos-ejemplo.com', '955000004',
- 'Limpieza', 'Convenio Limpieza', 35, 25, 60, 1,
- 'Partes de trabajo y encuestas', '2025-2027', NULL),
-
-('Consulting Siglo XXI S.L.', 'B76543210', 'C/ Gran Vía 28, 28013 Madrid', 'Sociedad Limitada', '2011',
- 'Elena Sánchez', 'CEO', 'elena.sanchez@consultingxxi-ejemplo.com', 'hola@consultingxxi-ejemplo.com', '911000005',
- 'Consultoría', 'Convenio Oficinas', 18, 22, 40, 1,
- 'Revisión de políticas', '2026-2028', NULL),
-
-('Transporte Atlántico S.A.', 'A12345678', 'Av. del Puerto 10, 36201 Vigo', 'Sociedad Anónima', '1999',
- 'Javier Castro', 'Director Operaciones', 'javier.castro@transatlantico-ejemplo.com', 'operaciones@transatlantico-ejemplo.com', '986000006',
- 'Logística', 'Convenio Transporte', 40, 110, 150, 2,
- 'Auditoría interna', '2025-2028', NULL),
-
-('Farmacia Central Madrid S.L.', 'B33445566', 'C/ Atocha 15, 28012 Madrid', 'Sociedad Limitada', '2017',
- 'Lucía Navarro', 'Titular', 'lucia.navarro@farmaciacentral-ejemplo.com', 'contacto@farmaciacentral-ejemplo.com', '914000007',
- 'Sanidad', 'Convenio Comercio', 12, 6, 18, 1,
- 'Registro horario y encuestas', '2026-2027', NULL),
-
-('Construcciones Sierra Norte S.A.', 'A55667788', 'C/ Obra Nueva 7, 47001 Valladolid', 'Sociedad Anónima', '2003',
- 'Roberto Molina', 'Jefe de Obra', 'roberto.molina@sierranorte-ejemplo.com', 'info@sierranorte-ejemplo.com', '983000008',
- 'Construcción', 'Convenio Construcción', 15, 65, 80, 2,
- 'Partes de obra', '2024-2026', NULL),
-
-('Hostelería Costa Azul S.L.', 'B77889900', 'Paseo Marítimo 1, 29620 Torremolinos', 'Sociedad Limitada', '2014',
- 'Sara León', 'Directora', 'sara.leon@costaazul-ejemplo.com', 'reservas@costaazul-ejemplo.com', '952000009',
- 'Hostelería', 'Convenio Hostelería', 55, 35, 90, 1,
- 'Encuestas de clima', '2026-2028', NULL),
-
-('Educación Futuro S.Coop.', 'F11223344', 'C/ Escuela 9, 50001 Zaragoza', 'Sociedad Cooperativa', '2019',
- 'Nuria Vidal', 'Coordinadora', 'nuria.vidal@educacionfuturo-ejemplo.com', 'contacto@educacionfuturo-ejemplo.com', '976000010',
- 'Educación', 'Convenio Enseñanza', 28, 12, 40, 1,
- 'Reuniones y actas', '2025-2027', NULL);
- 
 
 

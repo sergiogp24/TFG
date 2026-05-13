@@ -22,7 +22,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Archivos subidos</title>
+  <title>Documentación</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../css/global.css">
   <link rel="stylesheet" href="<?= $panelCss ?>">
@@ -31,104 +31,72 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
 <body class="bg-light">
   <div class="container-fluid py-4">
     <div class="row g-3">
-      <aside class="col-12 col-lg-3 col-xl-2">
-        <div class="card shadow-sm border-0 sidebar">
-          <div class="card-body">
-            <div class="sidebar-header">
-              <div class="sidebar-avatar"><?= $esAdmin ? '🧑‍💼' : ($esTecnico ? '👨‍💼' : '👤') ?></div>
-              <h5 class="sidebar-title"><?= $esAdmin ? 'Panel Admin' : ($esTecnico ? 'Panel Técnico' : 'Panel Cliente') ?></h5>
-            </div>
-
-            <div class="sidebar-user-info">
-              <div class="info-label">Usuario Actual</div>
-              <div class="info-value"><?= h($sessionUsername) ?></div>
-              <?php if ($sessionEmail !== ''): ?><div class="info-email">📧 <?= h($sessionEmail) ?></div><?php endif; ?>
-            </div>
-
-            <nav class="sidebar-nav">
-              <?php if ($esAdmin): ?>
-                <a class="nav-button" href="../model/admin.php?view=menu">
-                  <span class="nav-icon">📊</span>
-                  <span>Mi Panel</span>
-                </a>
-                <a class="nav-button" href="../model/admin.php?view=ver_usuarios">
-                  <span class="nav-icon">👥</span>
-                  <span>Usuarios</span>
-                </a>
-                <a class="nav-button" href="../model/empresa.php?view=ver_empresas&from=admin">
-                  <span class="nav-icon">🏢</span>
-                  <span>Directorio de empresas</span>
-                </a>
-                <button class="nav-button nav-collapse"
-                  type="button" data-bs-toggle="collapse" data-bs-target="#menuAreaPrivadaArchivosAdmin"
-                  aria-expanded="false">
-                  <span class="nav-icon">🔐</span>
-                  <span>Área Privada</span>
-                  <span class="collapse-icon">▾</span>
-                </button>
-
-                <div id="menuAreaPrivadaArchivosAdmin" class="collapse nav-submenu">
-                  <a class="nav-subbutton" href="../model/admin.php?view=perfil">
-                    <span>👤</span>
-                    <span>Mi cuenta</span>
-                  </a>
-                  <a class="nav-subbutton" href="../model/admin.php?view=reuniones">
-                    <span>📅</span>
-                    <span>Mis reuniones</span>
-                  </a>
-                </div>
-              <?php else: ?>
-                <a class="nav-button" href="<?= $esTecnico ? '../model/tecnico.php?view=menu' : '../html/index_cliente.php?view=mi_espacio' ?>">
-                  <span class="nav-icon">🏠</span>
-                  <span>Inicio</span>
-                </a>
-                <?php if ($esTecnico): ?>
-                  <a class="nav-button" href="../model/empresa.php?view=ver_empresas&from=tecnico">
-                    <span class="nav-icon">🏢</span>
-                    <span>Mis Empresas</span>
-                  </a>
-                <?php endif; ?>
-                <button class="nav-button nav-collapse"
-                  type="button" data-bs-toggle="collapse" data-bs-target="#menuAreaPrivadaArchivosUser"
-                  aria-expanded="false">
-                  <span class="nav-icon">🔐</span>
-                  <span>Área Privada</span>
-                  <span class="collapse-icon">▾</span>
-                </button>
-
-                <div id="menuAreaPrivadaArchivosUser" class="collapse nav-submenu">
-                  <a class="nav-subbutton" href="<?= $esTecnico ? '../model/tecnico.php?view=perfil' : '../html/index_cliente.php?view=perfil' ?>">
-                    <span>👤</span>
-                    <span>Mi cuenta</span>
-                  </a>
-                  <a class="nav-subbutton" href="<?= $esTecnico ? '../model/tecnico.php?view=reuniones' : '../html/index_cliente.php?view=reuniones' ?>">
-                    <span>📅</span>
-                    <span>Mis reuniones</span>
-                  </a>
-                </div>
-              <?php endif; ?>
-              <a class="nav-button active" href="../php/ver_archivos.php<?= $idEmpresaFiltro > 0 ? '?id_empresa=' . $idEmpresaFiltro : '' ?>">
-                <span class="nav-icon">📦</span>
-                <span>Archivos subidos</span>
-              </a>
-              <a class="nav-button nav-logout" href="../php/logout.php">
-                <span class="nav-icon">🚪</span>
-                <span>Cerrar sesión</span>
-              </a>
-            </nav>
-          </div>
-        </div>
-      </aside>
+      <!-- SIDEBAR -->
+      <?php include __DIR__ . '/../php/fragments/sidebar.php'; ?>
 
       <main class="col-12 col-lg-9 col-xl-10">
         <div class="card panel mx-auto shadow-sm border-0 panel-wide">
           <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
-              <h4 class="mb-0">Archivos subidos</h4>
+              <h4 class="mb-0">Documentación</h4>
               <div class="d-flex gap-2">
                 <?php if ($idEmpresaFiltro > 0): ?>
-                  <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= $idEmpresaFiltro ?>">Volver a la empresa</a>
+                  <?php if ($esCliente): ?>
+                    <a class="btn btn-outline-secondary btn-sm" href="../html/index_cliente.php?view=mi_espacio&id_empresa=<?= $idEmpresaFiltro ?>">Volver a la empresa</a>
+                  <?php else: ?>
+                    <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= $idEmpresaFiltro ?>">Volver a la empresa</a>
+                  <?php endif; ?>
                 <?php endif; ?>
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalSubirArchivo">
+                  <span>➕</span> Subir Documento
+                </button>
+              </div>
+            </div>
+
+            <!-- Modal Subir Archivo -->
+            <div class="modal fade" id="modalSubirArchivo" tabindex="-1" aria-labelledby="modalSubirArchivoLabel" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form method="POST" action="<?= h(app_path('/php/ver_archivos.php')) ?>" enctype="multipart/form-data">
+                    <?= csrf_input() ?>
+                    <input type="hidden" name="accion" value="subir_archivo">
+                    <input type="hidden" name="id_empresa_filtro" value="<?= $idEmpresaFiltro ?>">
+                    
+                    <div class="modal-header">
+                      <h5 class="modal-title" id="modalSubirArchivoLabel">Subir Nuevo Documento</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="mb-3">
+                        <label for="id_empresa_subida" class="form-label">Empresa</label>
+                        <?php if ($idEmpresaFiltro > 0): ?>
+                          <input type="text" class="form-control" value="<?= h($empresaFiltroNombre) ?>" readonly>
+                          <input type="hidden" name="id_empresa" value="<?= $idEmpresaFiltro ?>">
+                        <?php else: ?>
+                          <select name="id_empresa" id="id_empresa_subida" class="form-select" required>
+                            <option value="">Selecciona una empresa...</option>
+                            <?php foreach (($empresasUsuario ?? []) as $emp): ?>
+                              <option value="<?= (int)$emp['id_empresa'] ?>"><?= h($emp['razon_social']) ?></option>
+                            <?php endforeach; ?>
+                          </select>
+                        <?php endif; ?>
+                      </div>
+                      <div class="mb-3">
+                        <label for="asunto_subida" class="form-label">Asunto / Descripción</label>
+                        <input type="text" name="asunto" id="asunto_subida" class="form-control" placeholder="Ej: Escrituras, CIF, etc." required>
+                      </div>
+                      <div class="mb-3">
+                        <label for="archivo_subida" class="form-label">Archivo</label>
+                        <input type="file" name="archivo" id="archivo_subida" class="form-control" required>
+                        <div class="form-text">Formatos permitidos: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.</div>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                      <button type="submit" class="btn btn-primary">Subir Documento</button>
+                    </div>
+                  </form>
+                </div>
               </div>
             </div>
 

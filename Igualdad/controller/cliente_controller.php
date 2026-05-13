@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-session_start();
 
 require __DIR__ . '/../php/auth.php';
+
+require_once __DIR__ . '/../php/helpers.php';
 require_role('CLIENTE');
 
 require __DIR__ . '/../config/config.php';
@@ -30,18 +31,7 @@ function log_internal_error_cliente(string $context, Throwable $e): void
   ));
 }
 
-function ensure_reuniones_empresa_column(mysqli $db): void
-{
-  $check = $db->query("\n    SELECT 1\n    FROM information_schema.COLUMNS\n    WHERE TABLE_SCHEMA = DATABASE()\n      AND TABLE_NAME = 'reuniones'\n      AND COLUMN_NAME = 'id_empresa'\n    LIMIT 1\n  ");
-  $exists = ($check instanceof mysqli_result) && ($check->num_rows > 0);
-  if ($check instanceof mysqli_result) {
-    $check->close();
-  }
 
-  if (!$exists) {
-    $db->query("ALTER TABLE reuniones ADD COLUMN id_empresa INT NULL");
-  }
-}
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   http_response_code(405);
@@ -113,6 +103,12 @@ if ($accion === 'editar_perfil') {
     $_SESSION['user']['email'] = $email;
 
     redirect_cliente('perfil', 'Perfil actualizado correctamente');
+  } catch (mysqli_sql_exception $e) {
+    log_internal_error_cliente('cliente.editar_perfil', $e);
+    if ((int)$e->getCode() === 1062) {
+      redirect_cliente('perfil', 'No se pudo actualizar: el email ya está en uso por otro usuario.');
+    }
+    redirect_cliente('perfil', 'Error al actualizar el perfil. Intentalo de nuevo.');
   } catch (Throwable $e) {
     log_internal_error_cliente('cliente.editar_perfil', $e);
     redirect_cliente('perfil', 'No se pudo actualizar el perfil. Intentalo de nuevo.');
@@ -146,7 +142,6 @@ if ($accion === 'crear_reunion') {
   }
 
   $db = db();
-  ensure_reuniones_empresa_column($db);
 
   $stmtEmpresaValida = $db->prepare('
     SELECT 1

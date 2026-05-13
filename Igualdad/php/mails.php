@@ -19,7 +19,7 @@ function correo_config(): array
 
 function correo_url_login(): string
 {
-    return 'https://igualdad.consultingsigloxxi.es/Igualdad/model/admin.php?view=menu';
+    return app_path('/model/admin.php?view=menu');
 }
 
 function correo_url_base(): string
@@ -33,7 +33,7 @@ function correo_url_base(): string
         }
     }
 
-    return 'https://igualdad.consultingsigloxxi.es/Igualdad';
+    return app_base_url();
 }
 
 function correo_crear_mailer(): PHPMailer
@@ -419,8 +419,9 @@ function correo_enviar_contacto_tecnico_empresa(
       </html>
     ';
 
-        $altBody = "Tecnico: {$tecnicoNombre}" . ($tecnicoEmail !== '' ? " ({$tecnicoEmail})" : '') . "\nEmpresa: {$empresaNombre}\n\n{$mensaje}";
+    $altBody = "Tecnico: {$tecnicoNombre}" . ($tecnicoEmail !== '' ? " ({$tecnicoEmail})" : '') . "\nEmpresa: {$empresaNombre}\n\n{$mensaje}";
 
+    // Enviar a la empresa
     correo_enviar_html(
         $emailDestino,
         $empresaNombre,
@@ -433,6 +434,22 @@ function correo_enviar_contacto_tecnico_empresa(
             }
         }
     );
+
+    // Enviar copia idéntica al técnico para constancia
+    if ($tecnicoEmail !== '' && filter_var($tecnicoEmail, FILTER_VALIDATE_EMAIL) !== false) {
+        try {
+            correo_enviar_html(
+                $tecnicoEmail,
+                $tecnicoNombre,
+                '[Contacto tecnico] ' . $asunto,
+                $body,
+                $altBody
+            );
+        } catch (Throwable $e) {
+            // Log the error but don't throw - the email to empresa was already sent
+            error_log('Error sending identical copy email to tecnico ' . $tecnicoEmail . ': ' . $e->getMessage());
+        }
+    }
 }
 
 function correo_enviar_recordatorio_registro_retributivo(string $email, string $nombre, string $companySection, string $serviceSection): void
@@ -604,6 +621,25 @@ function correo_enviar_confirmacion_registro_retributivo(string $email, string $
     );
 }
 
+function correo_enviar_confirmacion_registro_retributivo_tecnico(
+    string $emailTecnico,
+    string $nombreTecnico,
+    string $clienteNombre,
+    string $empresaNombre
+): void {
+    correo_enviar_notificacion_tecnico_resumen(
+        $emailTecnico,
+        $nombreTecnico,
+        'Registro Retributivo subido',
+        'Archivo recibido',
+        'El cliente ha subido el Registro Retributivo en la plataforma.',
+        [
+            'Cliente: ' . $clienteNombre,
+            'Empresa: ' . $empresaNombre,
+        ]
+    );
+}
+
 function correo_obtener_empresa_y_servicio(mysqli $db, int $idEmpresa): ?array
 {
     if ($idEmpresa <= 0) {
@@ -650,6 +686,182 @@ function correo_obtener_empresa_y_servicio(mysqli $db, int $idEmpresa): ?array
         'servicio' => $servicio,
     ];
 }
+
+function correo_obtener_tecnicos_empresa(mysqli $db, int $idEmpresa): array
+{
+    if ($idEmpresa <= 0) {
+        return [];
+    }
+
+    $stmt = $db->prepare(
+        "SELECT DISTINCT x.id_usuario, x.nombre_usuario, x.email
+         FROM (
+             SELECT u.id_usuario, u.nombre_usuario, u.email
+             FROM usuario_empresa ue
+             INNER JOIN usuario u ON u.id_usuario = ue.id_usuario
+             INNER JOIN rol r ON r.id = u.rol_id
+             WHERE ue.id_empresa = ?
+               AND UPPER(TRIM(r.nombre)) LIKE 'TECNICO%'
+
+             UNION
+
+             SELECT u.id_usuario, u.nombre_usuario, u.email
+             FROM empresa e
+             INNER JOIN usuario u ON u.id_usuario = e.id_usuario
+             INNER JOIN rol r ON r.id = u.rol_id
+             WHERE e.id_empresa = ?
+               AND UPPER(TRIM(r.nombre)) LIKE 'TECNICO%'
+         ) x
+         WHERE TRIM(COALESCE(x.email, '')) <> ''
+         ORDER BY x.nombre_usuario ASC, x.id_usuario ASC"
+    );
+
+    if (!$stmt) {
+        return [];
+    }
+
+    $stmt->bind_param('ii', $idEmpresa, $idEmpresa);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $tecnicos = [];
+    while ($row = $result->fetch_assoc()) {
+        $email = trim((string)($row['email'] ?? ''));
+        if ($email === '') {
+            continue;
+        }
+
+        $tecnicos[] = [
+            'id_usuario' => (int)($row['id_usuario'] ?? 0),
+            'nombre_usuario' => trim((string)($row['nombre_usuario'] ?? 'Técnico')),
+            'email' => $email,
+        ];
+    }
+
+    $stmt->close();
+
+    return $tecnicos;
+}
+
+function correo_enviar_notificacion_tecnico_resumen(
+    string $emailTecnico,
+    string $nombreTecnico,
+    string $asunto,
+    string $titulo,
+    string $intro,
+    array $lineas
+): void {
+    $lineasHtml = '';
+    foreach ($lineas as $linea) {
+        $textoLinea = trim((string)$linea);
+        if ($textoLinea === '') {
+            continue;
+        }
+
+        $lineasHtml .= '<li>' . htmlspecialchars($textoLinea, ENT_QUOTES, 'UTF-8') . '</li>';
+    }
+
+    if ($lineasHtml === '') {
+        return;
+    }
+
+    $body = '
+      <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 680px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #1f4aa2;">' . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8') . '</h2>
+            <p>' . htmlspecialchars($intro, ENT_QUOTES, 'UTF-8') . '</p>
+            <ul>' . $lineasHtml . '</ul>
+            <p>Un saludo,</p>
+            <p><strong>Equipo My Equality</strong></p>
+          </div>
+        </body>
+      </html>
+    ';
+
+    correo_enviar_html(
+        $emailTecnico,
+        $nombreTecnico,
+        $asunto,
+        $body,
+        strip_tags($body)
+    );
+}
+
+function correo_enviar_notificacion_tecnico_nuevo_cliente(
+    string $emailTecnico,
+    string $nombreTecnico,
+    string $clienteNombre,
+    array $empresasAsignadas
+): void {
+    $nombresEmpresas = [];
+    foreach ($empresasAsignadas as $empresaAsignada) {
+        $nombreEmpresa = trim((string)($empresaAsignada['razon_social'] ?? ''));
+        if ($nombreEmpresa !== '') {
+            $nombresEmpresas[] = $nombreEmpresa;
+        }
+    }
+
+    $nombresEmpresas = array_values(array_unique($nombresEmpresas));
+    $listaEmpresas = correo_formatear_lista($nombresEmpresas);
+    if ($listaEmpresas === '') {
+        $listaEmpresas = 'la empresa asignada';
+    }
+
+    correo_enviar_notificacion_tecnico_resumen(
+        $emailTecnico,
+        $nombreTecnico,
+        'Nuevo cliente asignado a tu empresa',
+        'Nuevo cliente dado de alta',
+        'Se ha dado de alta un nuevo cliente asociado a tu empresa en la plataforma.',
+        [
+            'Cliente: ' . $clienteNombre,
+            'Empresa(s): ' . $listaEmpresas,
+            'Revisa la plataforma para continuar con el seguimiento.',
+        ]
+    );
+}
+
+function correo_enviar_notificacion_tecnico_cliente_inicio_sesion(
+    string $emailTecnico,
+    string $nombreTecnico,
+    string $clienteNombre,
+    string $empresaNombre
+): void {
+    correo_enviar_notificacion_tecnico_resumen(
+        $emailTecnico,
+        $nombreTecnico,
+        'Cliente ha iniciado sesión',
+        'Acceso a la plataforma',
+        'Un cliente ha iniciado sesión en la plataforma por primera vez.',
+        [
+            'Cliente: ' . $clienteNombre,
+            'Empresa: ' . $empresaNombre,
+        ]
+    );
+}
+
+function correo_enviar_notificacion_tecnico_primer_archivo(
+    string $emailTecnico,
+    string $nombreTecnico,
+    string $clienteNombre,
+    string $empresaNombre,
+    string $tipoArchivo
+): void {
+    correo_enviar_notificacion_tecnico_resumen(
+        $emailTecnico,
+        $nombreTecnico,
+        'Primer archivo subido por un cliente',
+        'Primer archivo recibido',
+        'El cliente ha subido su primer archivo en la plataforma.',
+        [
+            'Cliente: ' . $clienteNombre,
+            'Empresa: ' . $empresaNombre,
+            'Tipo de archivo: ' . $tipoArchivo,
+        ]
+    );
+}
+
 function correo_enviar_notificacion_tecnico_nueva_empresa(
     string $emailTecnico,
     string $nombreTecnico,

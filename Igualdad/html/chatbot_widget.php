@@ -20,7 +20,7 @@ $jsPath = $basePath . '/assets/js/chatbot.js';
     <div class="chat-header">
         <div class="chat-header-info">
             <div class="chat-header-icon"></div>
-            <span>Asistente Virtual IA</span>
+            <span>Tu Asistente Virtual</span>
         </div>
         <button id="chat-close-btn" class="chat-close-btn">&times;</button>
     </div>
@@ -38,7 +38,7 @@ $jsPath = $basePath . '/assets/js/chatbot.js';
     
     <div class="chat-input-area">
         <input type="text" id="chat-input" class="chat-input" placeholder="Escribe tu mensaje aquí..." autocomplete="off">
-        <button id="chat-send-btn" class="chat-send-btn">
+        <button id="chat-send-btn" class="chat-send-btn" data-csrf="<?= csrf_token() ?>" data-api="<?= h(app_path('/php/api_chat.php')) ?>">
             <i class="fas fa-paper-plane"></i>
         </button>
     </div>
