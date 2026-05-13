@@ -60,6 +60,7 @@ CREATE TABLE reuniones(
  id_reunion INT PRIMARY KEY AUTO_INCREMENT,
  objetivo TEXT DEFAULT NULL,
  hora_reunion VARCHAR(255) NOT NULL,
+ tipo ENUM('CreadaUsu','CreadaAuto','FechaLimite') NOT NULL,
  fecha_reunion DATE NOT NULL
 ) ENGINE=InnoDB;
 
@@ -70,6 +71,7 @@ CREATE TABLE usuario_reunion(
  CONSTRAINT fk_ur_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
  CONSTRAINT fk_ur_reunion FOREIGN KEY (id_reunion) REFERENCES reuniones(id_reunion) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
 -- --------------------------------------------------------
 
 --
@@ -190,6 +192,7 @@ INDEX idx_contrato_empresa_empresa (id_empresa),
   CONSTRAINT fk_contrato_empresa_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
 INDEX idx_contrato_empresa_usuario (id_usuario)
 )ENGINE=InnoDB;
+
 -- --------------------------------------------------------
 --
 -- Estructura para la tabla año_datos
@@ -253,7 +256,6 @@ CREATE TABLE `datos_empleados`(
   CONSTRAINT fk_ano_datos_datos_empleados FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
 INDEX idx_ano_datos_datos_empleados(id_ano_datos)
 )ENGINE=InnoDB;
-
 
 -- --------------------------------------------------------
 
@@ -547,12 +549,10 @@ CREATE TABLE `baja_definitivas`(
 `num_hombres`INT NOT NULL DEFAULT 0,
 `id_ano_datos`INT NOT  NULL,
 `id_empresa` INT NOT NULL,
+`id_bajas`INT NOT NULL,
   CONSTRAINT fk_anodefinitivas_bajas FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(iD_ano_datos) ON DELETE CASCADE,
   CONSTRAINT fk_bajasdefinitivas_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
-`id_bajas`INT NOT NULL,
 CONSTRAINT fk_definitivas_bajas FOREIGN KEY (id_bajas) REFERENCES bajas(id_bajas)ON DELETE CASCADE)ENGINE=InnoDB;
-
-
 
 -- --------------------------------------------------------
 
@@ -583,6 +583,11 @@ CREATE TABLE `area_formaciones`(
 `tipo`VARCHAR(100) DEFAULT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
+`n_horas`INT DEFAULT 0,
+`modalidad` ENUM('Presencial', 'Online', 'Mixta') DEFAULT NULL,
+`perfil_puesto`VARCHAR(100) DEFAULT NULL,
+`horario` ENUM('Dentro del horario', 'Fuera del horario') DEFAULT NULL,
+`caracter` ENUM('Obligatoria', 'Voluntaria') DEFAULT NULL,
 `id_ano_datos`INT NOT NULL,
 `id_empresa` INT NOT NULL,
   CONSTRAINT fk_formaciones_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
@@ -621,7 +626,8 @@ CREATE TABLE `area_reducciones_jornada`(
 `id_ano_datos`INT NOT NULL,
   CONSTRAINT Fk_reducciones_empresa FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
    INDEX idx_reducciones_empresa (id_ano_datos))ENGINE=InnoDB;
-   -- --------------------------------------------------------
+   
+-- --------------------------------------------------------
 
 --
 -- Estructura para la tabla adaptaciones_jornada
@@ -715,7 +721,8 @@ CREATE TABLE `cuestionario_formacion`(
   CONSTRAINT fk_cuestionario_formacion_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   CONSTRAINT fk_cuestionario_formacion_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_formacion_empresa (id_ano_datos))ENGINE=InnoDB;
-    -- --------------------------------------------------------
+    
+-- --------------------------------------------------------
 
 --
 -- Estructura para la tabla cuestionario_conciliacion_corresponsabilidad
@@ -735,7 +742,7 @@ CREATE TABLE `cuestionario_conciliacion_corresponsabilidad`(
   CONSTRAINT fk_cuestionario_conciliacion_corresponsabilidad_ano FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(id_ano_datos) ON DELETE CASCADE,
     INDEX idx_cuestionario_conciliacion_corresponsabilidad_empresa (id_ano_datos))ENGINE=InnoDB;
 
-    -- --------------------------------------------------------
+-- --------------------------------------------------------
 
 --
 -- Estructura para la tabla cuestionario_infrarrepresentacion_femenina
@@ -830,11 +837,11 @@ CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
 
 --
 -- Estructura para la tabla archivo_registro_retributivo
--- tipo archivo importante
+--
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','WORD_FINAL','GENERADO WORD', 'REGISTRO_MALFORMATEADO') NOT NULL,
+  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES','PLAN_IGUALDAD_DEFINITIVO','GENERADO WORD', 'REGISTRO_MALFORMATEADO','DOCUMENTACION') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -852,7 +859,6 @@ CREATE TABLE `archivos`(
   INDEX idx_archivos_cliente_medida_fecha (id_cliente_medida, subido_en)
 ) ENGINE=InnoDB;
 
-
 CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   id_descarga INT AUTO_INCREMENT PRIMARY KEY,
   id_empresa INT NOT NULL,
@@ -867,8 +873,8 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
 -- --------------------------------------------------------
 
 --
---
 -- Insertar roles
+-- 
 
 INSERT INTO rol (nombre) VALUES
 ('ADMINISTRADOR'),
@@ -968,6 +974,9 @@ INSERT INTO empresa (
  'Educación', 'Convenio Enseñanza', 28, 12, 40, 1,
  'Reuniones y actas', '2025-2027', NULL);
  
+
+
+
  -- INSERTS PARA LA BASE DE DATOS IGUALDAD AREAS
 
 -- ========================================================
