@@ -872,6 +872,8 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_usuario (id_usuario),
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 -- --------------------------------------------------------
 
 --
