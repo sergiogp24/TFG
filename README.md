@@ -188,29 +188,6 @@ Paso 3: Generación de Plan
 - **REGISTRO_RETRIBUTIVO**: Archivo Excel con datos de empleados (genera automáticamente cuadro de porcentajes y Word)
 - **REGISTRO_MALFORMATEADO**: Archivo propio del usuario (sin procesamiento automático)
 
----
-
-## 🔑 Variables de Entorno (.env)
-
-```env
-# Base de Datos
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=igualdadconsulting
-DB_USER=root
-DB_PASS=
-
-# API Externa
-GEMINI_API_KEY=AIzaSy...  # Clave API de Google Gemini
-
-# Aplicación
-APP_BASE_URL=http://localhost/Igualdad
-APP_BASE_PATH=/Igualdad
-APP_ENV=development
-```
-
----
-
 ## 🗄️ Base de Datos
 
 ### Tablas Principales
