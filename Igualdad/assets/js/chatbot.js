@@ -48,13 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
         try {
-            // Reemplazar "/Igualdad" si la app no está en la raíz, o usar ruta absoluta
-            // Asumiremos que el frontend sabe la ruta correcta, usamos una relativa genérica
-            const apiUrl = '../php/api_chat.php'; 
-            
-            // Intentar adivinar la base url (por si estamos en /html/)
-            const basePath = window.location.pathname.includes('/html/') ? '../' : './';
-            const finalApiUrl = basePath + 'php/api_chat.php';
+            const finalApiUrl = sendBtn.getAttribute('data-api') || '../php/api_chat.php';
 
             const response = await fetch(finalApiUrl, {
                 method: 'POST',
@@ -63,7 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({ 
                     message: text,
-                    history: chatHistory 
+                    history: chatHistory,
+                    _csrf_token: sendBtn.getAttribute('data-csrf')
                 })
             });
 
@@ -96,8 +91,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgDiv = document.createElement('div');
         msgDiv.classList.add('chat-message', sender);
         
+        // Escapar HTML para evitar XSS
+        const safe = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
         // Convertir saltos de línea en <br>
-        msgDiv.innerHTML = text.replace(/\n/g, '<br>');
+        msgDiv.innerHTML = safe.replace(/\n/g, '<br>');
         
         // Insertar justo antes del indicador de "escribiendo..."
         chatMessages.insertBefore(msgDiv, typingIndicator);
