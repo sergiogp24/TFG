@@ -18,7 +18,7 @@ if ($id <= 0) fail(400, 'ID inválido');
 $defaultId = 1;
 $tomaDatosId = 2;
 $defaultPath = __DIR__ . '/../PlantillaRegistroRetributivo/Herramienta_Registro_Retributivo.xlsx';
-$tomaDatosPath = __DIR__ . '/../PlantillaRegistroRetributivo/TOMADEDATOS.xlsx';
+$tomaDatosPath = __DIR__ . '/../PlantillaRegistroRetributivo/TOMA_DE_DATOS.xlsx';
 
 if ($id === $defaultId || $id === $tomaDatosId) {
   $targetPath = ($id === $defaultId) ? $defaultPath : $tomaDatosPath;
