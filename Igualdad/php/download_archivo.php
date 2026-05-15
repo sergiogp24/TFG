@@ -16,15 +16,19 @@ if ($id <= 0) fail(400, 'ID inválido');
 
 // Ruta fija para la plantilla de registro retributivo (Herramienta_Registro_Redtributivo.xlsx)
 $defaultId = 1;
+$tomaDatosId = 2;
 $defaultPath = __DIR__ . '/../PlantillaRegistroRetributivo/Herramienta_Registro_Retributivo.xlsx';
+$tomaDatosPath = __DIR__ . '/../PlantillaRegistroRetributivo/TOMADEDATOS.xlsx';
 
-if ($id === $defaultId) {
-  $fullPath = realpath($defaultPath);
+if ($id === $defaultId || $id === $tomaDatosId) {
+  $targetPath = ($id === $defaultId) ? $defaultPath : $tomaDatosPath;
+  $fullPath = realpath($targetPath);
+  
   if ($fullPath === false || !is_file($fullPath)) {
     fail(404, 'Archivo no existe en disco');
   }
 
-  $filename = 'Herramienta_Registro_Retributivo.xlsx';
+  $filename = basename($targetPath);
   $mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   $filesize = filesize($fullPath);
 
@@ -33,7 +37,7 @@ if ($id === $defaultId) {
   }
   header('Content-Description: File Transfer');
   header('Content-Type: ' . $mime);
-  header('Content-Disposition: attachment; filename="' . basename($filename) . '"');
+  header('Content-Disposition: attachment; filename="' . $filename . '"');
   header('Content-Length: ' . (string)$filesize);
   header('Cache-Control: no-store, no-cache, must-revalidate');
   header('Pragma: no-cache');

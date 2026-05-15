@@ -355,11 +355,19 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
 
                         <button class="btn btn-primary" type="submit" <?= $sinEmpresaFormulario ? 'disabled' : '' ?>>Subir documentacion</button>
 
-                        <div class="mt-3">
-                            <label class="form-label">Descargar plantilla (si no tienes un formato):</label>
-                            <a class="btn btn-outline-secondary" href="<?= h(app_path('/php/download_archivo.php?id=1')) ?>">
-                                Descargar formato
-                            </a>
+                        <div class="mt-3 d-flex flex-wrap gap-2">
+                            <div>
+                                <label class="form-label d-block">Descargar plantilla (si no tienes un formato):</label>
+                                <a class="btn btn-outline-secondary" href="<?= h(app_path('/php/download_archivo.php?id=1')) ?>">
+                                    Descargar formato
+                                </a>
+                            </div>
+                            <div>
+                                <label class="form-label d-block">Descargar toma de datos:</label>
+                                <a class="btn btn-outline-info" href="<?= h(app_path('/php/download_archivo.php?id=2')) ?>">
+                                    Descargar toma de datos
+                                </a>
+                            </div>
                         </div>
                         <div class="mt-4">
                             <label class="form-label d-block">Datos Cuantitativos / Cuestionarios Cualitativos / Medidas Seleccionadas:</label>

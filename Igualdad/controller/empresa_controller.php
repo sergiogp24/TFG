@@ -545,13 +545,29 @@ if ($accion === 'enviar_correo_empresa') {
       }
     }
 
+    // Obtener la firma del técnico desde la BD (campo firmacorreo)
+    $tecnicoFirma = '';
+    if ($currentUserId > 0) {
+      $stmtF = db()->prepare('SELECT firmacorreo FROM usuario WHERE id_usuario = ? LIMIT 1');
+      if ($stmtF) {
+        $stmtF->bind_param('i', $currentUserId);
+        $stmtF->execute();
+        $rowF = $stmtF->get_result()->fetch_assoc() ?: null;
+        $stmtF->close();
+        if ($rowF !== null) {
+          $tecnicoFirma = trim((string)($rowF['firmacorreo'] ?? ''));
+        }
+      }
+    }
+
     correo_enviar_contacto_tecnico_empresa(
       $emailDestino,
       $nombreEmpresa,
       $tecnicoNombre,
       $tecnicoEmail,
       $asunto,
-      $cuerpo
+      $cuerpo,
+      $tecnicoFirma
     );
 
     redirect_view_empresas('ver_empresa', 'Correo enviado correctamente.', $idEmpresa);

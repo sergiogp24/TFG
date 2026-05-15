@@ -853,12 +853,18 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                         <div class="col-12 col-xl-5">
                                             <div class="upload-action-card h-100">
                                                 <div class="upload-action-icon">▣</div>
-                                                <h5 class="mb-1">Descargar plantilla</h5>
-                                                <div class="upload-action-text mb-3">Si necesitas el formato base, bájalo y rellénalo antes de volver a subirlo.</div>
+                                                <h5 class="mb-1">Descargar plantilla del Registro Retributivo</h5>
+                                                <div class="upload-action-text mb-3">Si no dispones del Registro Retributivo puedes descargarte la plantilla del Ministerio o la plantilla de Toma de Datos para rellenarla.</div>
 
-                                                <a class="btn btn-outline-secondary px-4 align-self-start" href="<?= h(app_path('/php/download_archivo.php?id=1')) ?>">
-                                                    Descargar plantilla
-                                                </a>
+                                                <div class="d-flex flex-wrap gap-2">
+                                                    <a class="btn btn-outline-secondary px-4 align-self-start" href="<?= h(app_path('/php/download_archivo.php?id=1')) ?>">
+                                                        Descargar plantilla Ministerio
+                                                    </a>
+                                                    <a class="btn btn-outline-info px-4 align-self-start" href="<?= h(app_path('/php/download_archivo.php?id=2')) ?>">
+                                                        Descargar toma de datos
+                                                    </a>
+                                                </div>
+                                            
 
                                                 <div class="mt-4">
                                                     <label class="form-label d-block mb-2">Datos Cuantitativos / Cuestionarios Cualitativos</label>

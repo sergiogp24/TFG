@@ -20,11 +20,11 @@ if ($userRole === 'ADMINISTRADOR') {
     $sidebarRoleLabel = 'Panel Admin';
 } elseif ($userRole === 'TECNICO') {
     $sidebarAvatar = '👨‍💼';
-    $sidebarRoleLabel = 'Panel Técnico';
+    $sidebarRoleLabel = 'Panel del Personal Técnico';
     $sidebarGradient = 'linear-gradient(135deg, var(--color-teal), var(--color-blue))';
 } elseif ($userRole === 'CLIENTE') {
     $sidebarAvatar = '🏢';
-    $sidebarRoleLabel = 'Panel Cliente';
+    $sidebarRoleLabel = 'Panel del Cliente';
     $sidebarGradient = 'linear-gradient(135deg, var(--color-teal), var(--color-green))';
 }
 ?>

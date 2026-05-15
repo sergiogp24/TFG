@@ -177,10 +177,6 @@ function generarImagen0Pastel(float $mujeres, float $hombres, string $ruta): boo
 
 function generarImagen0PastelQuickChart(float $mujeres, float $hombres, string $ruta): bool
 {
-    if (!extension_loaded('curl')) {
-        return false;
-    }
-
     $total = $mujeres + $hombres;
     $chartConfig = [
         'type' => 'pie',
@@ -223,22 +219,8 @@ function generarImagen0PastelQuickChart(float $mujeres, float $hombres, string $
         return false;
     }
 
-    $ch = curl_init('https://quickchart.io/chart');
-    if ($ch === false) {
-        return false;
-    }
-
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-
-    $imageData = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($imageData === false || $httpCode !== 200) {
+    $imageData = enviarQuickChartPayload($payload);
+    if ($imageData === null) {
         return false;
     }
 
@@ -1405,20 +1387,57 @@ function generarGraficoBarrasAgrupadasDesdeConfig(
     $quickchartUrl = 'https://quickchart.io/chart';
     $payload = json_encode(['width' => $cfg['ancho'], 'height' => $alto, 'format' => 'png', 'chart' => $chartConfig]);
 
-    $ch = curl_init($quickchartUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    $imageData = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($imageData !== false && $httpCode === 200) {
+    $imageData = enviarQuickChartPayload($payload);
+    if ($imageData !== null) {
         file_put_contents($ruta, $imageData);
         return file_exists($ruta);
     }
     return false;
+}
+
+function enviarQuickChartPayload(string $payload): ?string
+{
+    $url = 'https://quickchart.io/chart';
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        if ($ch !== false) {
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+
+            $imageData = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if (is_string($imageData) && $httpCode === 200) {
+                return $imageData;
+            }
+        }
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $payload,
+            'timeout' => 20,
+            'ignore_errors' => true,
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ],
+    ]);
+
+    $imageData = @file_get_contents($url, false, $context);
+    if (is_string($imageData) && $imageData !== '') {
+        return $imageData;
+    }
+
+    return null;
 }
 
 /**
