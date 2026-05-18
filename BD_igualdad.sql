@@ -97,7 +97,7 @@ CREATE TABLE `empresa`(
   `recogida_informacion` VARCHAR(255) DEFAULT NULL,
   `vigencia_plan` VARCHAR(255) DEFAULT NULL,
   `id_usuario` INT DEFAULT NULL,
-  CONSTRAINT `fk_usuario_empresa` FOREIGN KEY (`id_usuario`) REFERENCES `usuario`(`id_usuario`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_usuario_empresa` FOREIGN KEY (`id_usuario`) REFERENCES `usuario`(`id_usuario`) ON DELETE CASCADE,
   INDEX `idx_cliente_usuario` (`id_usuario`),
   INDEX `idx_cliente_nif` (`nif`),
   INDEX `idx_empresa_razon_social` (`razon_social`)
@@ -886,7 +886,6 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_usuario (id_usuario),
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 
 -- --------------------------------------------------------
 
