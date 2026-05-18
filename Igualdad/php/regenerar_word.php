@@ -178,9 +178,10 @@ try {
     }
 
     // Forzar descarga
+    $safeFilename = str_replace(["\r", "\n", '"', '\\'], '', basename($rutaWord));
     header('Content-Description: File Transfer');
     header('Content-Type: ' . $mime);
-    header('Content-Disposition: attachment; filename="' . basename($rutaWord) . '"');
+    header("Content-Disposition: attachment; filename=\"{$safeFilename}\"; filename*=UTF-8''" . rawurlencode(basename($rutaWord)));
     header('Content-Transfer-Encoding: binary');
     header('Expires: 0');
     header('Cache-Control: must-revalidate');

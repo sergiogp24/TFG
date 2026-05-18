@@ -237,10 +237,8 @@ if ($kind === 'archivos') {
 if ($kind === 'empresa_word' && $rol === 'TECNICO' && $userId > 0 && $downloadEmpresaId > 0) {
   try {
     $db = db();
-    $db->query("\n CREATE TABLE IF NOT EXISTS archivo_descarga_log (\n id_descarga INT AUTO_INCREMENT PRIMARY KEY,\n id_empresa INT NOT NULL,\n id_usuario INT NOT NULL,\n tipo_descarga VARCHAR(60) NOT NULL,\n  archivo VARCHAR(255) NULL,\n  descargado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n        INDEX idx_descarga_empresa (id_empresa),\n        INDEX idx_descarga_usuario (id_usuario),\n INDEX idx_descarga_tipo (tipo_descarga)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n ");
-
     $tipoDescarga = 'WORD_GENERADO';
-    $archivoDescargado = isset($filename) ? (string)$filename : basename((string)$fullPath);
+    $archivoDescargado = (string)$filename;
     $stmtLog = $db->prepare("\n INSERT INTO archivo_descarga_log (id_empresa, id_usuario, tipo_descarga, archivo)\n VALUES (?, ?, ?, ?)\n ");
     if ($stmtLog) {
       $stmtLog->bind_param('iiss', $downloadEmpresaId, $userId, $tipoDescarga, $archivoDescargado);
@@ -257,9 +255,10 @@ if (ob_get_level()) {
   @ob_end_clean();
 }
 
+$safeFilename = str_replace(["\r", "\n", '"', '\\'], '', $filename);
 header('Content-Description: File Transfer');
 header('Content-Type: ' . $mime);
-header('Content-Disposition: attachment; filename="' . (isset($filename) ? $filename : basename((string)$fullPath)) . '"');
+header("Content-Disposition: attachment; filename=\"{$safeFilename}\"; filename*=UTF-8''" . rawurlencode($filename));
 header('Content-Length: ' . (string)$filesize);
 header('Cache-Control: no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
@@ -267,3 +266,8 @@ header('Expires: 0');
 
 readfile($fullPath);
 exit;
+
+
+
+
+

@@ -279,10 +279,6 @@ function obtener_empresas_pendientes_rr_cliente(mysqli $db, int $usuarioId): arr
     return $resultado;
 }
 
-function construir_contexto_reuniones(mysqli $db, int $usuarioId): string {
-    return respuesta_reuniones_pendientes($db, $usuarioId);
-}
-
 function construir_contexto_rr_pendiente(mysqli $db, int $usuarioId): string {
     $empresasFaltanRR = obtener_empresas_pendientes_rr_cliente($db, $usuarioId);
     if (empty($empresasFaltanRR)) {
@@ -372,7 +368,7 @@ if (empty($userMessage)) {
     exit;
 }
 
-$reunionesText = construir_contexto_reuniones($db, $usuarioId);
+$reunionesText = respuesta_reuniones_pendientes($db, $usuarioId);
 $empresasFaltanText = construir_contexto_rr_pendiente($db, $usuarioId);
 
 // Prompt de sistema orientado a cliente

@@ -99,6 +99,10 @@ if ($accion === 'editar_perfil') {
     $stmt->execute();
     $stmt->close();
 
+    if ($password !== '') {
+      session_regenerate_id(true);
+    }
+
     $_SESSION['user']['nombre_usuario'] = $username;
     $_SESSION['user']['email'] = $email;
 

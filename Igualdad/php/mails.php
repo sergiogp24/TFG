@@ -90,7 +90,7 @@ function correo_enviar_html(
 
     $mail->addAddress($emailDestino, $nombreDestino);
     // Escapar asunto para evitar inyección de cabeceras y XSS
-    $mail->Subject = htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8');
+    $mail->Subject = $asunto;
     $mail->Body = $html;
 
     if ($textoPlano !== '') {
@@ -451,12 +451,18 @@ function correo_enviar_contacto_tecnico_empresa(
 
             // Si hay una firma (ruta relativa), intentamos embedirla en el email
             if ($tecnicoFirma !== '') {
-                $relative = ltrim($tecnicoFirma, '/');
-                $fullPath = __DIR__ . '/../' . $relative;
-                if (is_file($fullPath)) {
+                $relative  = ltrim($tecnicoFirma, '/');
+                $resolved  = realpath(__DIR__ . '/../' . $relative);
+                $allowedBase = realpath(__DIR__ . '/../uploads');
+                if (
+                    $resolved !== false
+                    && $allowedBase !== false
+                    && str_starts_with($resolved, $allowedBase . DIRECTORY_SEPARATOR)
+                    && is_file($resolved)
+                ) {
                     try {
                         $cid = 'firma_' . bin2hex(random_bytes(8));
-                        $mail->addEmbeddedImage($fullPath, $cid, basename($fullPath));
+                        $mail->addEmbeddedImage($resolved, $cid, basename($resolved));
 
                         // Insertar la imagen antes del cierre del body principal si es posible
                         $suffix = "\n          </div>\n        </body>\n      </html>\n    ";
@@ -464,7 +470,6 @@ function correo_enviar_contacto_tecnico_empresa(
                             $imgHtml = '<div style="margin-top:12px;"><img src="cid:' . $cid . '" alt="Firma" style="max-width:480px;  height:auto;"></div>' . $suffix;
                             $mail->Body = str_replace($suffix, $imgHtml, $mail->Body);
                         } else {
-                            // Si no coincide el sufijo, simplemente aniadimos al final del body
                             $mail->Body .= '<div style="margin-top:12px;"><img src="cid:' . $cid . '" alt="Firma" style="max-width:480px;  height:auto;"></div>';
                         }
                     } catch (\Throwable $e) {
@@ -486,12 +491,18 @@ function correo_enviar_contacto_tecnico_empresa(
                 $altBody,
                 static function (PHPMailer $mail) use ($tecnicoFirma): void {
                     if ($tecnicoFirma !== '') {
-                        $relative = ltrim($tecnicoFirma, '/');
-                        $fullPath = __DIR__ . '/../' . $relative;
-                        if (is_file($fullPath)) {
+                        $relative    = ltrim($tecnicoFirma, '/');
+                        $resolved    = realpath(__DIR__ . '/../' . $relative);
+                        $allowedBase = realpath(__DIR__ . '/../uploads');
+                        if (
+                            $resolved !== false
+                            && $allowedBase !== false
+                            && str_starts_with($resolved, $allowedBase . DIRECTORY_SEPARATOR)
+                            && is_file($resolved)
+                        ) {
                             try {
                                 $cid = 'firma_' . bin2hex(random_bytes(8));
-                                $mail->addEmbeddedImage($fullPath, $cid, basename($fullPath));
+                                $mail->addEmbeddedImage($resolved, $cid, basename($resolved));
                                 $suffix = "\n          </div>\n        </body>\n      </html>\n    ";
                                 if (str_contains($mail->Body, $suffix)) {
                                     $imgHtml = '<div style="margin-top:12px;"><img src="cid:' . $cid . '" alt="Firma" style="max-width:480px;  height:auto;"></div>' . $suffix;

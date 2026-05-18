@@ -13,40 +13,46 @@ header('Content-Type: text/html; charset=UTF-8');
 $error = '';
 $success = '';
 $identifier = '';
-// Control de intentos de recuperación por IP/sesión
+// Rate limiting basado en BD (no bypasseable borrando la cookie de sesión)
 $maxRecoveryAttempts = 5;
-$recoveryBlockTime = 60 * 60; // 1 hora
-$ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-$now = time();
-if (!isset($_SESSION['recovery_attempts'])) {
-  $_SESSION['recovery_attempts'] = [];
+$recoveryBlockSeconds = 60 * 60; // 1 hora
+$ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 45);
+
+// Limpiar intentos expirados
+$stmtCleanFp = db()->prepare("DELETE FROM rate_limit_log WHERE ip = ? AND action = 'forgot_password' AND attempted_at < DATE_SUB(NOW(), INTERVAL ? SECOND)");
+if ($stmtCleanFp) {
+  $stmtCleanFp->bind_param('si', $ip, $recoveryBlockSeconds);
+  $stmtCleanFp->execute();
+  $stmtCleanFp->close();
 }
-// Limpiar intentos antiguos
-foreach ($_SESSION['recovery_attempts'] as $key => $data) {
-  if ($data['time'] < $now - $recoveryBlockTime) {
-    unset($_SESSION['recovery_attempts'][$key]);
-  }
+
+// Contar intentos recientes
+$stmtCountFp = db()->prepare("SELECT COUNT(*) AS total FROM rate_limit_log WHERE ip = ? AND action = 'forgot_password' AND attempted_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)");
+$recoveryBlocked = false;
+if ($stmtCountFp) {
+  $stmtCountFp->bind_param('si', $ip, $recoveryBlockSeconds);
+  $stmtCountFp->execute();
+  $countRowFp = $stmtCountFp->get_result()->fetch_assoc();
+  $stmtCountFp->close();
+  $recoveryBlocked = ((int)($countRowFp['total'] ?? 0) >= $maxRecoveryAttempts);
 }
-if (!isset($_SESSION['recovery_attempts'][$ip])) {
-  $_SESSION['recovery_attempts'][$ip] = ['count' => 0, 'time' => $now];
-}
-if ($_SESSION['recovery_attempts'][$ip]['count'] >= $maxRecoveryAttempts && $now - $_SESSION['recovery_attempts'][$ip]['time'] < $recoveryBlockTime) {
+
+if ($recoveryBlocked) {
   $error = 'Demasiados intentos de recuperación. Intenta de nuevo en una hora.';
-  $_SESSION['recovery_attempts'][$ip]['time'] = $now;
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $error === '') {
   if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
     $error = 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.';
-    $_SESSION['recovery_attempts'][$ip]['count']++;
-    $_SESSION['recovery_attempts'][$ip]['time'] = $now;
+    $stmtAttemptFp = db()->prepare("INSERT INTO rate_limit_log (ip, action) VALUES (?, 'forgot_password')");
+    if ($stmtAttemptFp) { $stmtAttemptFp->bind_param('s', $ip); $stmtAttemptFp->execute(); $stmtAttemptFp->close(); }
   } else {
     $identifier = trim((string)($_POST['identifier'] ?? ''));
 
     if ($identifier === '') {
       $error = 'Introduce tu email o nombre de usuario.';
-      $_SESSION['recovery_attempts'][$ip]['count']++;
-      $_SESSION['recovery_attempts'][$ip]['time'] = $now;
+      $stmtAttemptFp = db()->prepare("INSERT INTO rate_limit_log (ip, action) VALUES (?, 'forgot_password')");
+      if ($stmtAttemptFp) { $stmtAttemptFp->bind_param('s', $ip); $stmtAttemptFp->execute(); $stmtAttemptFp->close(); }
     } else {
       $success = 'Si los datos son correctos, te hemos enviado un enlace para restablecer tu contrasena.';
 
@@ -62,8 +68,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $error === '') {
 
           $email = (string)$user['email'];
           $username = (string)$user['nombre_usuario'];
-          $token = bin2hex(random_bytes(32)); // Token seguro de 64 caracteres
-          $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Token válido por 24 horas 
+          $token = bin2hex(random_bytes(32));
+          $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60));
 
           save_password_reset_token($email, $token, $expiresAt);
 
@@ -76,9 +82,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $error === '') {
           $success = '';
         }
       }
-      // Registrar intento solo si el usuario existe o no, para evitar enumeración
-      $_SESSION['recovery_attempts'][$ip]['count']++;
-      $_SESSION['recovery_attempts'][$ip]['time'] = $now;
+      // Registrar intento siempre (evita enumeración de usuarios)
+      $stmtAttemptFp = db()->prepare("INSERT INTO rate_limit_log (ip, action) VALUES (?, 'forgot_password')");
+      if ($stmtAttemptFp) { $stmtAttemptFp->bind_param('s', $ip); $stmtAttemptFp->execute(); $stmtAttemptFp->close(); }
     }
   }
 }

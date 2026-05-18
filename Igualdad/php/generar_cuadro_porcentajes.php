@@ -2003,12 +2003,6 @@ FROM (
         if ($sheetFormaciones === null) {
             $sheetFormaciones = $spreadsheet->getSheetByName('Formaciones');
         }
-        if ($sheetFormaciones === null) {
-            $sheetFormaciones = $spreadsheet->getSheetByName('FORMACION');
-        }
-        if ($sheetFormaciones === null) {
-            $sheetFormaciones = $spreadsheet->getSheetByName('Formacion');
-        }
         if ($sheetFormaciones === null || $spreadsheet->getIndex($sheetFormaciones) !== 14) {
             $sheetFormaciones = $spreadsheet->getSheet(14);
         }
@@ -2819,16 +2813,16 @@ function actualizarDatosCuantitativosExcel(mysqli $db, string $rutaExcel, int $i
     }
 
     // ================== HOJA 14: FORMACIONES ==================
-    $sheetFormaciones = null;
-    foreach (['FORMACIONES', 'Formaciones', 'FORMACION', 'Formacion', 'FORMACIÓN', 'Formación'] as $name) {
+    $sheetFormacionesAct = null;
+    foreach (['FORMACIONES', 'Formaciones'] as $name) {
         $sheet = $spreadsheet->getSheetByName($name);
-        if ($sheet !== null) { $sheetFormaciones = $sheet; break; }
+        if ($sheet !== null) { $sheetFormacionesAct = $sheet; break; }
     }
-    if ($sheetFormaciones === null) {
-        try { $sheetFormaciones = $spreadsheet->getSheet(14); } catch (\Exception $e) {}
+    if ($sheetFormacionesAct === null) {
+        try { $sheetFormacionesAct = $spreadsheet->getSheet(14); } catch (\Exception $e) {}
     }
-    if ($sheetFormaciones !== null) {
-        area_formaciones($db, $idEmpresa, $sheetFormaciones);
+    if ($sheetFormacionesAct !== null) {
+        area_formaciones($db, $idEmpresa, $sheetFormacionesAct);
     }
 
     $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');

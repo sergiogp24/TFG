@@ -75,11 +75,6 @@ if ($fromPanel === 'tecnico') {
                                 </div>
                             <?php endif; ?>
 
-                            <?php if (!empty($alertasAsignacion)): ?>
-                                <?php foreach ($alertasAsignacion as $alertaAsignada): ?>
-                                    <div class="alert alert-warning py-2"><?= h((string)$alertaAsignada) ?></div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
                         <?php endif; ?>
 
                         <?php if ($view === 'ver_empresas'): ?>

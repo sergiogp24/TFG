@@ -243,6 +243,10 @@ if ($accion === 'editar_perfil') {
     $stmt->execute();
     $stmt->close();
 
+    if ($password !== '') {
+      session_regenerate_id(true);
+    }
+
     // Actualizar sesión
     $_SESSION['user']['nombre_usuario'] = $username;
 

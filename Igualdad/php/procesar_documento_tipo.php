@@ -9,7 +9,6 @@ require __DIR__ . '/../config/config.php';
 
 function redirect_documentos(string $msg): void
 {
-    $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
     $baseUrl = '/html/subir_documento_tipo.html.php';
     header('Location: ' . app_path($baseUrl . '?msg=') . urlencode($msg));
     exit;
@@ -199,7 +198,12 @@ try {
                         @unlink($absPathOld);
                     }
                 }
-                $db->query("DELETE FROM archivos WHERE id_archivo = $idOld");
+                $stmtDel = $db->prepare('DELETE FROM archivos WHERE id_archivo = ?');
+                if ($stmtDel) {
+                    $stmtDel->bind_param('i', $idOld);
+                    $stmtDel->execute();
+                    $stmtDel->close();
+                }
             }
             $stmtOld->close();
         }

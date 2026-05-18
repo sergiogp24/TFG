@@ -9,18 +9,6 @@ require_once __DIR__ . '/../php/helpers.php';
 require_once __DIR__ . '/../php/mails.php';
 require __DIR__ . '/../config/config.php';
 
-function ensure_reuniones_empresa_column(mysqli $db): void
-{
-    $check = $db->query("SELECT 1\n        FROM information_schema.COLUMNS\n        WHERE TABLE_SCHEMA = DATABASE()\n          AND TABLE_NAME = 'reuniones'\n          AND COLUMN_NAME = 'id_empresa'\n        LIMIT 1\n    ");
-    $exists = ($check instanceof mysqli_result) && ($check->num_rows > 0);
-    if ($check instanceof mysqli_result) {
-        $check->close();
-    }
-
-    if (!$exists) {
-        $db->query('ALTER TABLE reuniones ADD COLUMN id_empresa INT NULL');
-    }
-}
 
 function formatear_fecha_resumen(string $fecha): string
 {
@@ -152,7 +140,6 @@ $proximaReunion = null;
 $clienteTecnicosEmpresa = [];
 
 if ($usuarioId > 0) {
-    ensure_reuniones_empresa_column(db());
     $stmtEmpresas = db()->prepare(
         'SELECT t.id_empresa, t.razon_social, GROUP_CONCAT(DISTINCT ce.tipo_contrato SEPARATOR ", ") AS tipo_contrato
          FROM (

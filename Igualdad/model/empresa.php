@@ -35,52 +35,6 @@ function normalize_role(string $role): string
   ]);
 }
 
-function load_assignment_alerts_from_cookie(int $userId): array
-{
-  $alertas = [];
-  if ($userId <= 0) {
-    return $alertas;
-  }
-
-  $stmt = db()->prepare("\n SELECT ue.id_empresa, COALESCE(e.razon_social, '') AS razon_social\n    FROM usuario_empresa ue\n    LEFT JOIN empresa e ON e.id_empresa = ue.id_empresa\n    WHERE ue.id_usuario = ?\n    ORDER BY ue.id_empresa ASC\n  ");
-  $stmt->bind_param('i', $userId);
-  $stmt->execute();
-  $res = $stmt->get_result();
-
-  $currentIds = [];
-  $namesById = [];
-  while ($row = $res->fetch_assoc()) {
-    $idEmpresa = (int)($row['id_empresa'] ?? 0);
-    if ($idEmpresa <= 0) {
-      continue;
-    }
-    $currentIds[] = $idEmpresa;
-    $namesById[$idEmpresa] = trim((string)($row['razon_social'] ?? ''));
-  }
-  $stmt->close();
-
-  $cookieName = 'asig_empresas_' . $userId;
-  $prevIds = [];
-  $hadCookie = isset($_COOKIE[$cookieName]);
-  if (isset($_COOKIE[$cookieName])) {
-    $decoded = json_decode((string)$_COOKIE[$cookieName], true);
-    if (is_array($decoded)) {
-      foreach ($decoded as $prevId) {
-        $prevInt = (int)$prevId;
-        if ($prevInt > 0) {
-          $prevIds[] = $prevInt;
-        }
-      }
-    }
-  }
-
-  $prevIds = array_values(array_unique($prevIds));
-  $currentIds = array_values(array_unique($currentIds));
-
-  setcookie($cookieName, json_encode($currentIds), time() + (86400 * 180), '/');
-
-  return $alertas;
-}
 
 function company_scope_where(string $where, string $companyExpr, bool $isTecnico): string
 {
@@ -235,9 +189,6 @@ if ($currentUserId > 0) {
 }
 
 $alertasAsignacion = [];
-if ($esTecnico && $currentUserId > 0) {
-  $alertasAsignacion = load_assignment_alerts_from_cookie($currentUserId);
-}
 
 $empresas = [];
 $searchQ = trim((string)($_GET['q'] ?? ''));
@@ -408,7 +359,6 @@ if ($view === 'ver_empresa') {
           ];
         }
 
-        // 🔥 SOLO GUARDAS EL SERVICIO (NO ARRAY ENTERO)
         $tecnicosById[$idTecnico]['servicios'][] =
           $rowTecnico['tipo_contrato'] ?? 'SIN CONTRATO';
       }

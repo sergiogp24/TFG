@@ -54,24 +54,17 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
 -- --------------------------------------------------------
 
 --
--- Estructura para la tablas de Reuniones
+-- Tabla de rate limiting para bloquear IPs con demasiados intentos fallidos
 --
 
-CREATE TABLE reuniones(
- id_reunion INT PRIMARY KEY AUTO_INCREMENT,
- objetivo TEXT DEFAULT NULL,
- hora_reunion VARCHAR(255) NOT NULL,
- tipo ENUM('CreadaUsu','CreadaAuto','FechaLimite') NOT NULL,
- fecha_reunion DATE NOT NULL
+CREATE TABLE IF NOT EXISTS `rate_limit_log` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+  `ip` VARCHAR(45) NOT NULL,
+  `action` VARCHAR(50) NOT NULL DEFAULT 'login',
+  `attempted_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_rate_ip_action` (`ip`, `action`, `attempted_at`)
 ) ENGINE=InnoDB;
 
-CREATE TABLE usuario_reunion(
- id_usuario INT NOT NULL,
- id_reunion INT NOT NULL,
- PRIMARY KEY (id_usuario, id_reunion),
- CONSTRAINT fk_ur_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
- CONSTRAINT fk_ur_reunion FOREIGN KEY (id_reunion) REFERENCES reuniones(id_reunion) ON DELETE CASCADE
-) ENGINE=InnoDB;
 
 -- --------------------------------------------------------
 
@@ -109,7 +102,29 @@ CREATE TABLE `empresa`(
   INDEX `idx_cliente_nif` (`nif`),
   INDEX `idx_empresa_razon_social` (`razon_social`)
 ) ENGINE=InnoDB;
+-- --------------------------------------------------------
 
+--
+-- Estructura para la tablas de Reuniones
+--
+
+CREATE TABLE reuniones(
+ id_reunion INT PRIMARY KEY AUTO_INCREMENT,
+ objetivo TEXT DEFAULT NULL,
+ hora_reunion VARCHAR(255) NOT NULL,
+ tipo ENUM('CreadaUsu','CreadaAuto','FechaLimite') NOT NULL,
+ fecha_reunion DATE NOT NULL,
+ id_empresa INT NULL,
+ CONSTRAINT fk_reuniones_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE usuario_reunion(
+ id_usuario INT NOT NULL,
+ id_reunion INT NOT NULL,
+ PRIMARY KEY (id_usuario, id_reunion),
+ CONSTRAINT fk_ur_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+ CONSTRAINT fk_ur_reunion FOREIGN KEY (id_reunion) REFERENCES reuniones(id_reunion) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 CREATE TABLE `cnae` (
   `id` INT  PRIMARY KEY AUTO_INCREMENT,
@@ -857,7 +872,6 @@ CREATE TABLE `archivos`(
   CONSTRAINT fk_archivo_cliente_medida FOREIGN KEY (id_cliente_medida) REFERENCES cliente_medida(id_cliente_medida) ON DELETE SET NULL,
   CONSTRAINT fk_archivos_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE,
   INDEX idx_archivos_cliente_medida (id_cliente_medida),
-  INDEX idx_archivos_tipo (tipo),
   INDEX idx_archivos_cliente_medida_fecha (id_cliente_medida, subido_en)
 ) ENGINE=InnoDB;
 
@@ -872,5 +886,3 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_usuario (id_usuario),
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-

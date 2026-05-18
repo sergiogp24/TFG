@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/auth.php';
+require_login();
 require __DIR__ . '/../config/config.php';
 
 function fail(int $code, string $msg): void
@@ -35,9 +36,10 @@ if ($id === $defaultId || $id === $tomaDatosId) {
   if (ob_get_level()) {
     @ob_end_clean();
   }
+  $safeFilename = str_replace(["\r", "\n", '"', '\\'], '', $filename);
   header('Content-Description: File Transfer');
   header('Content-Type: ' . $mime);
-  header('Content-Disposition: attachment; filename="' . $filename . '"');
+  header("Content-Disposition: attachment; filename=\"{$safeFilename}\"; filename*=UTF-8''" . rawurlencode($filename));
   header('Content-Length: ' . (string)$filesize);
   header('Cache-Control: no-store, no-cache, must-revalidate');
   header('Pragma: no-cache');
@@ -49,9 +51,6 @@ if ($id === $defaultId || $id === $tomaDatosId) {
 
 $db = db();
 
-// Si es el archivo por defecto (id 1), lo dejamos público.
-$isDefault = $id === 1;
-
 // Buscar archivo en BD (tabla archivos)
 $stmt = $db->prepare("\n  SELECT a.id_archivo, a.nombre_original, a.ruta_relativa, a.mime, a.id_cliente_medida\n  FROM archivos a\n  WHERE a.id_archivo = ?\n  LIMIT 1\n");
 $stmt->bind_param('i', $id);
@@ -61,22 +60,19 @@ $stmt->close();
 
 if (!$row) fail(404, 'Archivo no encontrado');
 
-// Si el autor no es el usuario y no es archivo público (id 1), bloqueamos.
-if (!$isDefault) {
-  $rol = (string)($_SESSION['user']['rol'] ?? '');
-  $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
+$rol = (string)($_SESSION['user']['rol'] ?? '');
+$currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
-  // ADMINISTRADOR/TECNICO pueden descargar cualquiera; CLIENTE solo el suyo.
-  if ($rol === 'CLIENTE') {
-    $stmt = $db->prepare("\n      SELECT 1\n      FROM archivos a\n      JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n      JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = ac.id_empresa\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
-    $stmt->bind_param('ii', $id, $currentUserId);
-    $stmt->execute();
-    $hasAccess = (bool)$stmt->get_result()->fetch_assoc();
-    $stmt->close();
+// ADMINISTRADOR/TECNICO pueden descargar cualquiera; CLIENTE solo el suyo.
+if ($rol === 'CLIENTE') {
+  $stmt = $db->prepare("\n      SELECT 1\n      FROM archivos a\n      JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n      JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = ac.id_empresa\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
+  $stmt->bind_param('ii', $id, $currentUserId);
+  $stmt->execute();
+  $hasAccess = (bool)$stmt->get_result()->fetch_assoc();
+  $stmt->close();
 
-    if (!$hasAccess) {
-      fail(403, 'No tienes permiso para descargar este archivo');
-    }
+  if (!$hasAccess) {
+    fail(403, 'No tienes permiso para descargar este archivo');
   }
 }
 
@@ -98,9 +94,10 @@ if (ob_get_level()) {
   @ob_end_clean();
 }
 
+$safeFilename = str_replace(["\r", "\n", '"', '\\'], '', basename($filename));
 header('Content-Description: File Transfer');
 header('Content-Type: ' . $mime);
-header('Content-Disposition: attachment; filename="' . basename($filename) . '"');
+header("Content-Disposition: attachment; filename=\"{$safeFilename}\"; filename*=UTF-8''" . rawurlencode(basename($filename)));
 header('Content-Length: ' . (string)$filesize);
 header('Cache-Control: no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');

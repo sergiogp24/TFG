@@ -8,24 +8,31 @@ require __DIR__ . '/../config/config.php';
 
 
 $error = '';
-// Control de intentos fallidos de login por IP/sesión
+// Rate limiting basado en BD (no bypasseable borrando la cookie de sesión)
 $maxLoginAttempts = 5;
-$loginBlockTime = 3 * 60; // 3 minutos
-$ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-$now = time();
-if (!isset($_SESSION['login_attempts'])) {
-  $_SESSION['login_attempts'] = [];
+$loginBlockSeconds = 3 * 60; // 3 minutos
+$ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 45);
+
+// Limpiar intentos expirados de esta IP
+$stmtClean = db()->prepare("DELETE FROM rate_limit_log WHERE ip = ? AND action = 'login' AND attempted_at < DATE_SUB(NOW(), INTERVAL ? SECOND)");
+if ($stmtClean) {
+  $stmtClean->bind_param('si', $ip, $loginBlockSeconds);
+  $stmtClean->execute();
+  $stmtClean->close();
 }
-// Limpiar intentos antiguos
-foreach ($_SESSION['login_attempts'] as $key => $data) {
-  if ($data['time'] < $now - $loginBlockTime) {
-    unset($_SESSION['login_attempts'][$key]);
-  }
+
+// Contar intentos recientes
+$stmtCount = db()->prepare("SELECT COUNT(*) AS total FROM rate_limit_log WHERE ip = ? AND action = 'login' AND attempted_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)");
+$loginBlocked = false;
+if ($stmtCount) {
+  $stmtCount->bind_param('si', $ip, $loginBlockSeconds);
+  $stmtCount->execute();
+  $countRow = $stmtCount->get_result()->fetch_assoc();
+  $stmtCount->close();
+  $loginBlocked = ((int)($countRow['total'] ?? 0) >= $maxLoginAttempts);
 }
-if (!isset($_SESSION['login_attempts'][$ip])) {
-  $_SESSION['login_attempts'][$ip] = ['count' => 0, 'time' => $now];
-}
-if ($_SESSION['login_attempts'][$ip]['count'] >= $maxLoginAttempts && $now - $_SESSION['login_attempts'][$ip]['time'] < $loginBlockTime) {
+
+if ($loginBlocked) {
   $error = 'Demasiados intentos fallidos. Intenta de nuevo en unos minutos.';
   require __DIR__ . '/../html/login.html.php';
   exit;
@@ -63,28 +70,29 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     // Validación básica que no permite campos vacíos
     if ($username === '' || $password === '') {
       $error = 'Rellena usuario y contraseña.';
-      $_SESSION['login_attempts'][$ip]['count']++;
-      $_SESSION['login_attempts'][$ip]['time'] = $now;
+      $stmtAttempt = db()->prepare("INSERT INTO rate_limit_log (ip, action) VALUES (?, 'login')");
+      if ($stmtAttempt) { $stmtAttempt->bind_param('s', $ip); $stmtAttempt->execute(); $stmtAttempt->close(); }
     } else {
 
       //Consulta para buscar el usuario por username.
       $sql = " SELECT u.id_usuario, u.nombre_usuario,u.apellidos, u.email, u.telefono, u.direccion, u.localidad, u.password, r.nombre AS rol FROM usuario u LEFT JOIN rol r ON r.id = u.rol_id
         WHERE u.nombre_usuario = ? LIMIT 1 ";
 
-      $stmt = db()->prepare($sql);      
-      $stmt->bind_param('s', $username); 
-      $stmt->execute();                 
+      $stmt = db()->prepare($sql);
+      $stmt->bind_param('s', $username);
+      $stmt->execute();
       $user = $stmt->get_result()->fetch_assoc();
-      $stmt->close();              
+      $stmt->close();
 
       //Verificación de credenciales
       if (!$user || !password_verify($password, (string)$user['password'])) {
         $error = 'Usuario o contraseña incorrectos.';
-        $_SESSION['login_attempts'][$ip]['count']++;
-        $_SESSION['login_attempts'][$ip]['time'] = $now;
+        $stmtAttempt = db()->prepare("INSERT INTO rate_limit_log (ip, action) VALUES (?, 'login')");
+        if ($stmtAttempt) { $stmtAttempt->bind_param('s', $ip); $stmtAttempt->execute(); $stmtAttempt->close(); }
       } else {
-        // Login correcto: limpiar contador
-        $_SESSION['login_attempts'][$ip] = ['count' => 0, 'time' => $now];
+        // Login correcto: limpiar intentos
+        $stmtClear = db()->prepare("DELETE FROM rate_limit_log WHERE ip = ? AND action = 'login'");
+        if ($stmtClear) { $stmtClear->bind_param('s', $ip); $stmtClear->execute(); $stmtClear->close(); }
 
         // Evita un atacante forzando un session_id conocido.
         session_regenerate_id(true);

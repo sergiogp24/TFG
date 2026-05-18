@@ -763,22 +763,35 @@ try {
 
     $db = db();
 
+    $validModalidades = ['Presencial', 'Online', 'Mixta'];
+    $validHorarios    = ['Dentro del horario', 'Fuera del horario'];
+    $validCaracteres  = ['Obligatoria', 'Voluntaria'];
+
     if ($accion === 'formacion') {
-      $tipo = trim((string)($_POST['tipo'] ?? ''));
-      $nMujeres = (int)($_POST['n_mujeres'] ?? 0);
-      $nHombres = (int)($_POST['n_hombres'] ?? 0);
-      $nHoras = (int)($_POST['n_horas'] ?? 0);
-      $modalidad = trim((string)($_POST['modalidad'] ?? ''));
+      $tipo        = trim((string)($_POST['tipo'] ?? ''));
+      $nMujeres    = (int)($_POST['n_mujeres'] ?? 0);
+      $nHombres    = (int)($_POST['n_hombres'] ?? 0);
+      $nHoras      = (int)($_POST['n_horas'] ?? 0);
+      $modalidad   = trim((string)($_POST['modalidad'] ?? ''));
       $perfilPuesto = trim((string)($_POST['perfil_puesto'] ?? ''));
-      $horario = trim((string)($_POST['horario'] ?? ''));
-      $caracter = trim((string)($_POST['caracter'] ?? ''));
+      $horario     = trim((string)($_POST['horario'] ?? ''));
+      $caracter    = trim((string)($_POST['caracter'] ?? ''));
 
       if ($tipo === '' || $nMujeres < 0 || $nHombres < 0) {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
+      if ($modalidad !== '' && !in_array($modalidad, $validModalidades, true)) {
+        complemento_redirect($tab, 'Modalidad no valida.', $embed);
+      }
+      if ($horario !== '' && !in_array($horario, $validHorarios, true)) {
+        complemento_redirect($tab, 'Horario no valido.', $embed);
+      }
+      if ($caracter !== '' && !in_array($caracter, $validCaracteres, true)) {
+        complemento_redirect($tab, 'Caracter no valido.', $embed);
+      }
 
-      $stmt = $db->prepare('INSERT INTO area_formaciones (tipo, n_mujeres, n_hombres, n_horas, modalidad, perfil_puesto, horario, caracter, id_ano_datos, id_empresa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      $stmt->bind_param('siiiisssii', $tipo, $nMujeres, $nHombres, $nHoras, $modalidad, $perfilPuesto, $horario, $caracter, $idAnoDatos, $idEmpresa);
+      $stmt = $db->prepare('INSERT INTO area_formaciones (tipo, n_mujeres, n_hombres, n_horas, modalidad, perfil_puesto, horario, caracter, id_ano_datos, id_empresa) VALUES (?, ?, ?, ?, NULLIF(?, \'\'), ?, NULLIF(?, \'\'), NULLIF(?, \'\'), ?, ?)');
+      $stmt->bind_param('siiissssii', $tipo, $nMujeres, $nHombres, $nHoras, $modalidad, $perfilPuesto, $horario, $caracter, $idAnoDatos, $idEmpresa);
       $stmt->execute();
       $stmt->close();
 
@@ -791,22 +804,31 @@ try {
     }
 
     if ($accion === 'editar_formacion') {
-      $tipo = trim((string)($_POST['tipo'] ?? ''));
-      $nMujeres = (int)($_POST['n_mujeres'] ?? 0);
-      $nHombres = (int)($_POST['n_hombres'] ?? 0);
-      $nHoras = (int)($_POST['n_horas'] ?? 0);
-      $modalidad = trim((string)($_POST['modalidad'] ?? ''));
+      $tipo        = trim((string)($_POST['tipo'] ?? ''));
+      $nMujeres    = (int)($_POST['n_mujeres'] ?? 0);
+      $nHombres    = (int)($_POST['n_hombres'] ?? 0);
+      $nHoras      = (int)($_POST['n_horas'] ?? 0);
+      $modalidad   = trim((string)($_POST['modalidad'] ?? ''));
       $perfilPuesto = trim((string)($_POST['perfil_puesto'] ?? ''));
-      $horario = trim((string)($_POST['horario'] ?? ''));
-      $caracter = trim((string)($_POST['caracter'] ?? ''));
+      $horario     = trim((string)($_POST['horario'] ?? ''));
+      $caracter    = trim((string)($_POST['caracter'] ?? ''));
 
       if ($tipo === '' || $nMujeres < 0 || $nHombres < 0) {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
+      if ($modalidad !== '' && !in_array($modalidad, $validModalidades, true)) {
+        complemento_redirect($tab, 'Modalidad no valida.', $embed);
+      }
+      if ($horario !== '' && !in_array($horario, $validHorarios, true)) {
+        complemento_redirect($tab, 'Horario no valido.', $embed);
+      }
+      if ($caracter !== '' && !in_array($caracter, $validCaracteres, true)) {
+        complemento_redirect($tab, 'Caracter no valido.', $embed);
+      }
 
-      $sql = "UPDATE `{$table}` SET tipo = ?, n_mujeres = ?, n_hombres = ?, n_horas = ?, modalidad = ?, perfil_puesto = ?, horario = ?, caracter = ? WHERE `{$pk}` = ? AND id_empresa = ?";
+      $sql = "UPDATE `{$table}` SET tipo = ?, n_mujeres = ?, n_hombres = ?, n_horas = ?, modalidad = NULLIF(?, ''), perfil_puesto = ?, horario = NULLIF(?, ''), caracter = NULLIF(?, '') WHERE `{$pk}` = ? AND id_empresa = ?";
       $stmt = $db->prepare($sql);
-      $stmt->bind_param('siiiisssii', $tipo, $nMujeres, $nHombres, $nHoras, $modalidad, $perfilPuesto, $horario, $caracter, $idRegistro, $idEmpresa);
+      $stmt->bind_param('siiissssii', $tipo, $nMujeres, $nHombres, $nHoras, $modalidad, $perfilPuesto, $horario, $caracter, $idRegistro, $idEmpresa);
       $stmt->execute();
       $stmt->close();
 

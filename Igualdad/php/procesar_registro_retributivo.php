@@ -259,8 +259,15 @@ $idEmpresaPost = (int)($_POST['id_empresa'] ?? 0);
 
 // Soporte para regenerar Word sin subir archivo: acción POST 'accion=regenerar_word'
 if (isset($_POST['accion']) && $_POST['accion'] === 'regenerar_word') {
+    if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['exito' => false, 'mensaje' => 'La sesión ha expirado. Recarga la página.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     ini_set('display_errors', '0');
-    set_time_limit(60);  // 1 minuto es suficiente
+    set_time_limit(60);
 
     // Permitir CLIENTE y TECNICO
     if ($rol !== 'CLIENTE' && $rol !== 'TECNICO') {
@@ -421,28 +428,6 @@ if (isset($_POST['accion']) && $_POST['accion'] === 'regenerar_word') {
     }
 
     try {
-        // Obtener año de los datos si existe
-        $stmtAno = db()->prepare(
-            'SELECT YEAR(ad.fecha_inicio) AS ano_referencia
-             FROM ano_datos ad
-             INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-             WHERE ce.id_empresa = ?
-             ORDER BY ad.id_ano_datos DESC
-             LIMIT 1'
-        );
-        if (!$stmtAno) {
-            throw new RuntimeException('Error preparando consulta de año de datos');
-        }
-        $stmtAno->bind_param('i', $idEmpresa);
-        $stmtAno->execute();
-        $rowAno = $stmtAno->get_result()->fetch_assoc();
-        $stmtAno->close();
-
-        $anioRegistro = null;
-        if ($rowAno) {
-            $anioRegistro = (string)($rowAno['ano_referencia'] ?? null);
-        }
-
         // Buscar el último Word generado para sobrescribirlo
         $stmtWordDestino = db()->prepare(
             'SELECT tipo, ruta_relativa
@@ -703,9 +688,6 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
-// Dar tiempo suficiente para procesar Excel grande
-set_time_limit(300);
-
 // ================== PROCESAR ARCHIVOS ==================
 foreach ($names as $i => $originalName) {
     if (empty($originalName) || $errors[$i] !== UPLOAD_ERR_OK) {
@@ -809,27 +791,6 @@ foreach ($names as $i => $originalName) {
         );
         $idArchivoExistente = null;
 
-    if ($avisarTecnicosPrimerArchivo && $totalArchivosGuardados > 0 && $idEmpresaContexto > 0) {
-        $clienteNombreAviso = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
-        $empresaNombreAviso = trim((string)($empresaNombreVista ?? ''));
-        if ($empresaNombreAviso === '') {
-            $empresaNombreAviso = 'Empresa #' . $idEmpresaContexto;
-        }
-
-        foreach (correo_obtener_tecnicos_empresa($db, $idEmpresaContexto) as $tecnicoEmpresa) {
-            try {
-                correo_enviar_notificacion_tecnico_primer_archivo(
-                    (string)($tecnicoEmpresa['email'] ?? ''),
-                    (string)($tecnicoEmpresa['nombre_usuario'] ?? 'Técnico'),
-                    $clienteNombreAviso,
-                    $empresaNombreAviso,
-                    $tipo
-                );
-            } catch (Throwable $e) {
-                registrarLogProcesarRegistroRetributivo('Error enviando aviso de primer archivo a tecnico: ' . $e->getMessage());
-            }
-        }
-    }
         if ($stmtDup) {
             $stmtDup->bind_param('i', $idEmpresaRegistro);
             $stmtDup->execute();
@@ -902,6 +863,57 @@ foreach ($names as $i => $originalName) {
         }
 
         $totalArchivosGuardados++;
+
+        if ($avisarTecnicosPrimerArchivo && $totalArchivosGuardados === 1 && $idEmpresaContexto > 0) {
+            $clienteNombreAviso = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
+            $empresaNombreAviso = trim((string)($empresaNombreVista ?? ''));
+            if ($empresaNombreAviso === '') {
+                $empresaNombreAviso = 'Empresa #' . $idEmpresaContexto;
+            }
+
+            foreach (correo_obtener_tecnicos_empresa($db, $idEmpresaContexto) as $tecnicoEmpresa) {
+                try {
+                    correo_enviar_notificacion_tecnico_primer_archivo(
+                        (string)($tecnicoEmpresa['email'] ?? ''),
+                        (string)($tecnicoEmpresa['nombre_usuario'] ?? 'Técnico'),
+                        $clienteNombreAviso,
+                        $empresaNombreAviso,
+                        $tipo
+                    );
+                } catch (Throwable $e) {
+                    registrarLogProcesarRegistroRetributivo('Error enviando aviso de primer archivo a tecnico: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // Confirmación al cliente
+        $clienteEmailRpc  = trim((string)($_SESSION['user']['email'] ?? ''));
+        $clienteNombreRpc = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
+        if ($clienteEmailRpc !== '' && filter_var($clienteEmailRpc, FILTER_VALIDATE_EMAIL)) {
+            try {
+                correo_enviar_confirmacion_registro_retributivo($clienteEmailRpc, $clienteNombreRpc);
+            } catch (Throwable $e) {
+                registrarLogProcesarRegistroRetributivo('Error al enviar confirmación RPC al cliente: ' . $e->getMessage());
+            }
+        }
+
+        // Notificación al técnico
+        if ($idEmpresaContexto > 0) {
+            $empresaNombreRpc = $empresaNombreVista !== '' ? $empresaNombreVista : 'la empresa';
+            foreach (correo_obtener_tecnicos_empresa($db, $idEmpresaContexto) as $tecnicoRpc) {
+                try {
+                    correo_enviar_confirmacion_registro_retributivo_tecnico(
+                        (string)($tecnicoRpc['email'] ?? ''),
+                        (string)($tecnicoRpc['nombre_usuario'] ?? 'Técnico'),
+                        $clienteNombreRpc,
+                        $empresaNombreRpc
+                    );
+                } catch (Throwable $e) {
+                    registrarLogProcesarRegistroRetributivo('Error al notificar técnico del RPC subido: ' . $e->getMessage());
+                }
+            }
+        }
+
         continue;
     }
 
@@ -1257,11 +1269,21 @@ foreach ($names as $i => $originalName) {
                     $stmtUpdAno->close();
                 }
                 // Borramos los empleados antiguos asociados a este año (para sobrescribir con los nuevos)
-                $db->query("DELETE FROM datos_empleados WHERE id_ano_datos = $id_ano_datos");
+                $stmtDelEmp = $db->prepare('DELETE FROM datos_empleados WHERE id_ano_datos = ?');
+                if ($stmtDelEmp) {
+                    $stmtDelEmp->bind_param('i', $id_ano_datos);
+                    $stmtDelEmp->execute();
+                    $stmtDelEmp->close();
+                }
             } else {
                 // Si hubiera duplicados accidentales para el mismo año, los limpiamos
                 $idExtra = (int)$rowAnoExistente['id_ano_datos'];
-                $db->query("DELETE FROM ano_datos WHERE id_ano_datos = $idExtra");
+                $stmtDelAno = $db->prepare('DELETE FROM ano_datos WHERE id_ano_datos = ?');
+                if ($stmtDelAno) {
+                    $stmtDelAno->bind_param('i', $idExtra);
+                    $stmtDelAno->execute();
+                    $stmtDelAno->close();
+                }
             }
         }
         $stmtCheckAno->close();
@@ -1671,17 +1693,40 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
                     }
                 }
 
-                // Enviar email de confirmación
-                try {
-                    correo_enviar_confirmacion_registro_retributivo($emailUsuario, $nombreUsuario);
-                } catch (\Throwable $mailError) {
-                    registrarLogProcesarRegistroRetributivo("Error al enviar email de recordatorio: " . $mailError->getMessage());
-                }
             }
             $stmtGetReunion->close();
         }
     } catch (\Throwable $e) {
         registrarLogProcesarRegistroRetributivo("Error al actualizar/eliminar reunión 'Subir R.R': " . $e->getMessage());
+    }
+
+    // Enviar email de confirmación al cliente (siempre, independientemente de si hay reunión)
+    $clienteEmailConfirm  = trim((string)($_SESSION['user']['email'] ?? ''));
+    $clienteNombreConfirm = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
+    if ($clienteEmailConfirm !== '' && filter_var($clienteEmailConfirm, FILTER_VALIDATE_EMAIL)) {
+        try {
+            correo_enviar_confirmacion_registro_retributivo($clienteEmailConfirm, $clienteNombreConfirm);
+        } catch (\Throwable $mailError) {
+            registrarLogProcesarRegistroRetributivo('Error al enviar email de confirmación al cliente: ' . $mailError->getMessage());
+        }
+    }
+
+    // Notificar a los técnicos asignados a la empresa que el Registro Retributivo ha sido subido
+    if (isset($id_empresa) && $id_empresa > 0) {
+        $clienteNombreNotif  = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
+        $empresaNombreNotif  = $empresaNombreVista !== '' ? $empresaNombreVista : 'la empresa';
+        foreach (correo_obtener_tecnicos_empresa($db, $id_empresa) as $tecnicoNotif) {
+            try {
+                correo_enviar_confirmacion_registro_retributivo_tecnico(
+                    (string)($tecnicoNotif['email'] ?? ''),
+                    (string)($tecnicoNotif['nombre_usuario'] ?? 'Técnico'),
+                    $clienteNombreNotif,
+                    $empresaNombreNotif
+                );
+            } catch (\Throwable $mailError) {
+                registrarLogProcesarRegistroRetributivo('Error al notificar tecnico del RR subido: ' . $mailError->getMessage());
+            }
+        }
     }
 
     redirigirMenuSubida($urlMenuSubida, 'Subido con Exito', 1, $idEmpresaContexto);

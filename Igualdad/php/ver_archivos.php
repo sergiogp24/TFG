@@ -211,7 +211,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($accion = (string)($_POST[
         $realFullPath = realpath($fullPath);
         $realBasePath = realpath($basePath . DIRECTORY_SEPARATOR . 'uploads');
 
-        if (!$realFullPath || !$realBasePath || strpos($realFullPath, $realBasePath) !== 0) {
+        if (!$realFullPath || !$realBasePath || !str_starts_with($realFullPath, $realBasePath)) {
           $msgError = 'Ruta inválida.';
         } else {
           // Verificar permiso para técnico (que sea archivo de su empresa)
@@ -308,9 +308,29 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($accion = (string)($_POST[
       $ext = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
 
       $extPermitidas = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'jpg', 'jpeg', 'png'];
+      $mimesPermitidos = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+        'image/jpeg',
+        'image/png',
+        'application/vnd.ms-office',
+        'application/octet-stream',
+      ];
       if (!in_array($ext, $extPermitidas, true)) {
         $msgError = 'Extension no permitida (pdf, doc, docx, xls, xlsx, csv, jpg, png).';
       } else {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeReal = $finfo ? (string)finfo_file($finfo, $tmpName) : '';
+        if ($finfo) finfo_close($finfo);
+        if (!in_array($mimeReal, $mimesPermitidos, true)) {
+          $msgError = 'El contenido del archivo no coincide con su extensión.';
+        }
+      }
+      if ($msgError === '') {
         $uploadDir = __DIR__ . '/../uploads';
         if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
           $msgError = 'No se pudo crear la carpeta de subida.';

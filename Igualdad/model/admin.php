@@ -78,18 +78,8 @@ if ($resMantenimientos) {
 }
 
 $adminOperationalSummary = [];
-$tablaDescargaExiste = false;
-$resTablaDescarga = db()->query("SHOW TABLES LIKE 'archivo_descarga_log'");
-if ($resTablaDescarga instanceof mysqli_result && $resTablaDescarga->num_rows > 0) {
-  $tablaDescargaExiste = true;
-}
-if ($resTablaDescarga instanceof mysqli_result) {
-  $resTablaDescarga->close();
-}
 
-$sqlDescargaWordTecnico = $tablaDescargaExiste
-  ? "EXISTS (\n      SELECT 1\n      FROM archivo_descarga_log dl\n      INNER JOIN usuario u3 ON u3.id_usuario = dl.id_usuario\n      INNER JOIN rol r3 ON r3.id = u3.rol_id\n      WHERE dl.id_empresa = e.id_empresa\n        AND UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'\n        AND UPPER(r3.nombre) LIKE 'TECNICO%'\n      LIMIT 1\n    )"
-  : "0";
+$sqlDescargaWordTecnico = "EXISTS (\n      SELECT 1\n      FROM archivo_descarga_log dl\n      INNER JOIN usuario u3 ON u3.id_usuario = dl.id_usuario\n      INNER JOIN rol r3 ON r3.id = u3.rol_id\n      WHERE dl.id_empresa = e.id_empresa\n        AND UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'\n        AND UPPER(r3.nombre) LIKE 'TECNICO%'\n      LIMIT 1\n    )";
 
 $resOperational = db()->query("\n  SELECT\n    e.id_empresa,\n    e.razon_social,\n    COALESCE((\n      SELECT ce.tipo_contrato\n      FROM contrato_empresa ce\n      WHERE ce.id_empresa = e.id_empresa\n      ORDER BY ce.id_contrato_empresa DESC\n      LIMIT 1\n    ), 'SIN CONTRATO') AS tipo_contrato,\n    COALESCE((\n      SELECT u.nombre_usuario\n      FROM usuario_empresa ue\n      INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n      INNER JOIN rol r ON r.id = u.rol_id\n      WHERE ue.id_empresa = e.id_empresa\n        AND UPPER(r.nombre) LIKE 'TECNICO%'\n      ORDER BY ue.id_usuario ASC\n      LIMIT 1\n    ), 'Sin tecnico asignado') AS tecnico_nombre,\n    EXISTS (\n      SELECT 1 FROM archivos a1\n      WHERE a1.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a1.tipo)) = 'REGISTRO_RETRIBUTIVO'\n      LIMIT 1\n    ) AS tiene_registro,\n    EXISTS (\n      SELECT 1 FROM archivos a2\n      WHERE a2.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a2.tipo)) = 'TOMA DE DATOS'\n      LIMIT 1\n    ) AS tiene_toma_datos,\n    EXISTS (\n      SELECT 1 FROM archivos a3\n      WHERE a3.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a3.asunto, ''))) = 'GENERADO WORD'\n      LIMIT 1\n    ) AS tiene_word,\n    EXISTS (\n      SELECT 1 FROM archivos a4\n      WHERE a4.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a4.asunto, ''))) = 'GENERADO PORCENTAJES'\n      LIMIT 1\n    ) AS tiene_porcentajes,\n    EXISTS (\n      SELECT 1 FROM archivos a5\n      WHERE a5.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a5.tipo)) = 'PLAN_IGUALDAD_DEFINITIVO'\n      LIMIT 1\n    ) AS tiene_word_final,\n    {$sqlDescargaWordTecnico} AS tiene_descarga_word_tecnico\n  FROM empresa e\n  WHERE EXISTS (\n      SELECT 1\n      FROM usuario_empresa ue2\n      INNER JOIN usuario u2 ON u2.id_usuario = ue2.id_usuario\n      INNER JOIN rol r2 ON r2.id = u2.rol_id\n      WHERE ue2.id_empresa = e.id_empresa\n        AND UPPER(r2.nombre) LIKE 'TECNICO%'\n    )\n  ORDER BY e.razon_social ASC\n");
 

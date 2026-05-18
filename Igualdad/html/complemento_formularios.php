@@ -828,7 +828,7 @@ if ($idEmpresaSeleccionada > 0) {
 
                                 <div>
                                     <label class="form-label" for="formacion_tipo">Tipo</label>
-                                    <input id="formacion_tipo" type="text" name="tipo" class="form-control" maxlength="100">
+                                    <input id="formacion_tipo" type="text" name="tipo" class="form-control" maxlength="100" required>
                                 </div>
 
                                 <div class="row g-3">
