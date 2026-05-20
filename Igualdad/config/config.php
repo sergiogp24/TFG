@@ -58,11 +58,11 @@ function _get_env_config(string $key, string $default): string {
     return ($val !== false) ? $val : $default;
 }
 
-define('DB_HOST', _get_env_config('DB_HOST', '127.0.0.1'));
-define('DB_PORT', (int)_get_env_config('DB_PORT', '3306'));
-define('DB_USER', _get_env_config('DB_USER', 'root'));
+define('DB_HOST', _get_env_config('DB_HOST', ''));
+define('DB_PORT', (int)_get_env_config('DB_PORT', ''));
+define('DB_USER', _get_env_config('DB_USER', ''));
 define('DB_PASS', _get_env_config('DB_PASS', ''));
-define('DB_NAME', _get_env_config('DB_NAME', 'igualdadconsulting'));
+define('DB_NAME', _get_env_config('DB_NAME', ''));
 define('GEMINI_API_KEY', _get_env_config('GEMINI_API_KEY', ''));
 
 // Helper function to get env vars with defaults
