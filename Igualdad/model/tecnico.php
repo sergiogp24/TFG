@@ -8,6 +8,10 @@ require_role('TECNICO');
 
 require __DIR__ . '/../config/config.php';
 
+// Controlador para las páginas y acciones del técnico.
+// Gestiona vistas: menú, área privada, perfil, reuniones y contacto con empresas.
+// Realiza consultas para estadísticas, listas de empresas, reuniones y perfil.
+
 $view = (string)($_GET['view'] ?? 'menu');
 $allowed = ['menu', 'privada', 'perfil', 'reuniones', 'contacto_empresa'];
 if (!in_array($view, $allowed, true)) $view = 'menu';
@@ -17,6 +21,7 @@ $tecnicoId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
 $tecnicoEmail = '';
 if ($tecnicoId > 0) {
+  // Obtener email del técnico para notificaciones y contacto
   $stmt = db()->prepare("SELECT email FROM usuario WHERE id_usuario = ? LIMIT 1");
   $stmt->bind_param('i', $tecnicoId);
   $stmt->execute();
@@ -33,6 +38,7 @@ $tecnicoStats = [
 ];
 
 if ($tecnicoId > 0) {
+  // Calcular estadísticas del técnico: empresas, planes, mantenimientos y reuniones
   $scopeSql = "
     SELECT DISTINCT ue.id_empresa AS id_empresa
     FROM usuario_empresa ue
@@ -102,6 +108,7 @@ if ($tecnicoId > 0) {
 
 $tecnicoPerfil = null;
 if ($view === 'perfil' && $tecnicoId > 0) {
+  // Cargar datos completos del perfil cuando se solicita la vista de perfil
   $stmt = db()->prepare("
     SELECT
       id_usuario,
@@ -123,6 +130,7 @@ if ($view === 'perfil' && $tecnicoId > 0) {
 
 $tecnicoEmpresasContacto = [];
 if (in_array($view, ['menu', 'contacto_empresa'], true) && $tecnicoId > 0) {
+  // Empresas con las que el técnico tiene relación (para enviar mensajes/contacto)
   $stmtEmpresasContacto = db()->prepare("\n    SELECT DISTINCT\n      e.id_empresa,\n      e.razon_social,\n      TRIM(COALESCE(e.email, '')) AS email\n    FROM empresa e\n    WHERE EXISTS (\n      SELECT 1\n      FROM usuario_empresa ue\n      WHERE ue.id_empresa = e.id_empresa\n        AND ue.id_usuario = ?\n    ) OR e.id_usuario = ?\n    ORDER BY e.razon_social ASC\n  ");
   $stmtEmpresasContacto->bind_param('ii', $tecnicoId, $tecnicoId);
   $stmtEmpresasContacto->execute();
@@ -139,10 +147,11 @@ $tecnicoClientesEmpresa = [];
 $tecnicoTodasReuniones = [];
 
 if (in_array($view, ['privada', 'reuniones'], true) && $tecnicoId > 0) {
+  // Enviar recordatorios y limpiar reuniones pasadas
   correo_enviar_recordatorio_rr_reuniones_vencidas(db());
   db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
   
-  // Mis reuniones
+  // Cargar reuniones asignadas al técnico
   $stmt = db()->prepare("
     SELECT
       r.id_reunion,

@@ -5,8 +5,11 @@
  */
 declare(strict_types=1);
 
+// Variables de contexto: vista actual, rol y datos del usuario en sesión.
+// `view` puede venir de la plantilla que incluye este fragmento.
 $view = (string)($view ?? 'menu');
 $userRole = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
+// Normalizar nombre y email usando variables posibles definidas por cada controlador
 $userName = (string)($adminUsername ?? $tecnicoUsername ?? $sessionUsername ?? $_SESSION['user']['nombre_usuario'] ?? 'Usuario');
 $userEmail = (string)($adminEmail ?? $tecnicoEmail ?? $sessionEmail ?? $_SESSION['user']['email'] ?? '');
 
@@ -28,6 +31,8 @@ if ($userRole === 'ADMINISTRADOR') {
     $sidebarGradient = 'linear-gradient(135deg, var(--color-teal), var(--color-green))';
 }
 ?>
+
+<!-- Inicio del sidebar: muestra avatar, rol y navegación contextual según permiso -->
 
 <aside class="col-12 col-md-3 col-xl-2">
     <div class="card shadow-sm border-0 sidebar">
@@ -55,6 +60,7 @@ if ($userRole === 'ADMINISTRADOR') {
             <nav class="sidebar-nav d-flex flex-column gap-2">
 
                 <?php if ($userRole === 'ADMINISTRADOR'): ?>
+                    <!-- Sección: opciones para Administrador -->
                     <!-- Panel Admin -->
                     <a class="nav-button <?= ($view === 'menu') ? 'active' : '' ?>" href="<?= app_path('/model/admin.php?view=menu') ?>">
                         <div class="d-flex align-items-center gap-2">
@@ -78,6 +84,7 @@ if ($userRole === 'ADMINISTRADOR') {
                     </a>
 
                 <?php elseif ($userRole === 'TECNICO'): ?>
+                    <!-- Sección: opciones para Técnico -->
                     <!-- Mi Panel -->
                     <a class="nav-button <?= ($view === 'menu') ? 'active' : '' ?>" href="<?= app_path('/model/tecnico.php?view=menu') ?>">
                         <div class="d-flex align-items-center gap-2">
@@ -109,6 +116,7 @@ if ($userRole === 'ADMINISTRADOR') {
                     </div>
 
                 <?php elseif ($userRole === 'CLIENTE'): ?>
+                    <!-- Sección: opciones para Cliente -->
                     <!-- Mis Empresas -->
                     <a class="nav-button <?= ($view === 'empresas') ? 'active' : '' ?>" href="<?= app_path('/html/index_cliente.php?view=empresas') ?>">
                         <div class="d-flex align-items-center gap-2">
@@ -133,6 +141,7 @@ if ($userRole === 'ADMINISTRADOR') {
                 <?php endif; ?>
 
                 <!-- Área Privada (Común a todos) -->
+                <!-- Contiene acceso a perfil y reuniones; el prefijo de URL varía por rol -->
                 <?php 
                 $isPrivateView = in_array($view, ['privada', 'perfil', 'reuniones'], true); 
                 $prefix = ($userRole === 'ADMINISTRADOR') ? app_path('/model/admin.php') : (($userRole === 'TECNICO') ? app_path('/model/tecnico.php') : app_path('/html/index_cliente.php'));
@@ -156,6 +165,7 @@ if ($userRole === 'ADMINISTRADOR') {
                 </div>
 
                 <!-- Botón Volver (si existe link) -->
+                <!-- Botón Volver: opcional, inyectado por la vista si necesita volver a una página previa -->
                 <?php if (!empty($volverLink)): ?>
                     <div class="mt-2">
                         <a class="nav-button nav-back" href="<?= h($volverLink) ?>">
@@ -168,6 +178,7 @@ if ($userRole === 'ADMINISTRADOR') {
                 <?php endif; ?>
 
                 <!-- Cerrar Sesión -->
+                <!-- Botón de cierre de sesión (común a todos los roles) -->
                 <div class="mt-2">
                     <a class="nav-button nav-logout" href="<?= h(app_path('/php/logout.php')) ?>">
                         <div class="d-flex align-items-center gap-2">

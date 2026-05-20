@@ -19,6 +19,14 @@ function redirect_tecnico(string $view = 'menu', string $msg = ''): void
   exit;
 }
 
+/**
+ * Redirige a una vista del panel de técnico.
+ * Añade opcionalmente un mensaje a la querystring como `msg`.
+ *
+ * @param string $view Nombre de la vista (por defecto 'menu')
+ * @param string $msg  Mensaje opcional para mostrar en la vista destino
+ */
+
 function log_internal_error_tecnico(string $context, Throwable $e): void
 {
   error_log(sprintf(
@@ -29,6 +37,11 @@ function log_internal_error_tecnico(string $context, Throwable $e): void
     $e->getLine()
   ));
 }
+
+/**
+ * Registra excepciones relacionadas con operaciones del técnico en el log.
+ * Incluye contexto, mensaje y ubicación para depuración.
+ */
 
 
 
@@ -43,6 +56,11 @@ if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
 
 $accion = (string)($_POST['accion'] ?? '');
 
+/**
+ * Acción: Enviar un correo desde el técnico a una empresa.
+ * Verifica permisos de relación entre técnico y empresa, valida datos
+ * y usa `correo_enviar_contacto_tecnico_empresa` para el envío.
+ */
 if ($accion === 'contactar_empresa') {
   $tecnicoId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
@@ -98,6 +116,11 @@ if ($accion === 'contactar_empresa') {
   }
 }
 
+/**
+ * Acción: Editar el perfil del técnico.
+ * Valida campos de usuario, email, teléfono y contraseña antes de
+ * actualizar la fila en `usuario`.
+ */
 if ($accion === 'editar_perfil') {
   $id = (int)($_POST['id'] ?? 0);
   $username = trim((string)($_POST['nombre_usuario'] ?? ''));
@@ -180,6 +203,11 @@ if ($accion === 'editar_perfil') {
   }
 }
 
+/**
+ * Acción: Crear reunión asociada a una empresa.
+ * Valida fecha/hora, permisos sobre la empresa y guarda en `reuniones`
+ * y `usuario_reunion` (incluye asignación de cliente si procede).
+ */
 if ($accion === 'crear_reunion') {
   $tecnicoId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idClienteReunion = (int)($_POST['id_cliente_reunion'] ?? 0);
@@ -285,6 +313,11 @@ if ($accion === 'crear_reunion') {
   }
 }
 
+/**
+ * Acción: Editar datos de una reunión existente.
+ * Verifica que el técnico está presente en la reunión y actualiza
+ * la fila en `reuniones`.
+ */
 if ($accion === 'editar_reunion') {
   $tecnicoId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idReunion = (int)($_POST['id_reunion'] ?? 0);
@@ -331,6 +364,10 @@ if ($accion === 'editar_reunion') {
   }
 }
 
+/**
+ * Acción: Eliminar una reunión a la que el técnico está asignado.
+ * Comprueba permiso en `usuario_reunion` antes de borrar de `reuniones`.
+ */
 if ($accion === 'eliminar_reunion') {
   $tecnicoId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idReunion = (int)($_POST['id_reunion'] ?? 0);

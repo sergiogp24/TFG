@@ -1,4 +1,12 @@
 <!doctype html>
+<!--
+  Plantilla: Login
+  ---------------
+  Formulario de inicio de sesión para usuarios. Envía `nombre_usuario` y
+  `password` a `login.php` vía POST. Se incluye `csrf_input()` para mitigar
+  CSRF. Los mensajes de error/éxito provienen del servidor y se muestran
+  en esta vista si están definidos.
+-->
 <html lang="es">
 
 <head>
@@ -25,21 +33,26 @@
         </div>
       </div>
 
-      <!-- MENSAJE DE ERROR -->
+      <!-- Mensaje de error devuelto por el servidor (p. ej. credenciales inválidas) -->
       <?php if (!empty($error)): ?>
         <div class="login-error">
           <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?>
         </div>
       <?php endif; ?>
 
-      <!-- MENSAJE DE ÉXITO -->
+      <!-- Mensaje de éxito devuelto por el servidor (p. ej. cuenta creada, reseteo) -->
       <?php if (!empty($success)): ?>
         <div class="login-success">
           <?= htmlspecialchars($success, ENT_QUOTES, 'UTF-8') ?>
         </div>
       <?php endif; ?>
 
-      <!-- FORMULARIO DE LOGIN -->
+
+      <!-- FORMULARIO DE LOGIN
+           - Acción: `login.php` (procesa autenticación y redirección).
+           - Campos requeridos: `nombre_usuario`, `password`.
+           - `csrf_input()` imprime el token CSRF que el servidor validará.
+      -->
       <form method="post" action="login.php">
         <?= csrf_input() ?>
 
@@ -79,7 +92,7 @@
           </div>
         </div>
 
-        <!-- Enlace de recuperación -->
+        <!-- Enlace de recuperación: redirige a la página de restablecimiento de contraseña -->
         <div style="text-align: right; margin-bottom: 24px;">
           <a href="forgot_password.php" style="color: var(--color-blue); text-decoration: none; font-weight: 500; font-size: 0.9rem;">
             ¿Has olvidado tu contraseña?
@@ -90,7 +103,7 @@
         <button type="submit" class="login-button">Entrar</button>
       </form>
 
-      <!-- Pie de página -->
+      <!-- Pie de página con copyright -->
       <div class="login-footer">
         © <?= date('Y') ?> Consultoría Igualdad
       </div>
@@ -99,6 +112,7 @@
   </div>
 
   <script>
+    // Toggle de visibilidad del campo contraseña (mejora UX sin cambiar comportamiento del servidor)
     (function() {
       const passwordInput = document.getElementById('password');
       const toggleButton = document.getElementById('toggle-password');

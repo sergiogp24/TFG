@@ -1,4 +1,12 @@
 <!doctype html>
+<!--
+  Plantilla: Asignación de Empresas
+  ---------------------------------
+  Propósito: Permitir a un administrador asignar o retirar empresas asociadas
+  a un usuario. Interfaz basada en un modal con búsqueda client-side y opciones
+  para marcar/desmarcar todas las empresas antes de enviar el formulario.
+  Acceso previsto: usuarios con permisos administrativos.
+-->
 <html lang="es">
 <head>
   <!-- Codificación y responsive -->
@@ -56,6 +64,9 @@
       </div>
 
       <div class="modal-body">
+        <!-- Cuerpo del modal: muestra mensajes de resultado y el formulario
+             para asignar empresas. El formulario envía 'empresas[]' con los
+             ids seleccionados y el 'id_usuario' objetivo. -->
         <?php if (!empty($ok)): ?>
           <div class="alert alert-success"><?= h($ok) ?></div>
         <?php endif; ?>
@@ -63,7 +74,7 @@
           <div class="alert alert-danger"><?= h($error) ?></div>
         <?php endif; ?>
 
-        <!--Formulario POST:Envía el id del usuario + el array empresas[] con los ids marcados.-->
+        <!--Formulario POST: Envía el id del usuario + el array empresas[] con los ids marcados. -->
         <form method="post">
           <?= csrf_input() ?>
           <!-- ID del usuario al que se le asignan empresas -->
@@ -87,7 +98,9 @@
             - Cada empresa es un label clickable (mejora la UX).
             - data-name guarda el nombre en minúsculas para filtrar con JS.
             - checkbox name="empresas[]" => se envía como array al POST.
-            - Si el id está en $checked, la empresa aparece marcada (checked).-->
+            - Si el id está en $checked, la empresa aparece marcada (checked).
+            - La lista se filtra en el cliente; el servidor validará los ids al recibirlos.
+          -->
           <div class="empresa-list border rounded" id="list">
             <?php foreach (($empresas ?? []) as $e): ?>
               <?php $eid = (int)$e['id_empresa']; ?>
@@ -160,6 +173,7 @@
     modal.show();
   });
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Dependencias JS: Bootstrap bundle (modals, utilidades) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

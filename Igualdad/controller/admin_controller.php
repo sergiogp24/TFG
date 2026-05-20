@@ -3,16 +3,23 @@
 declare(strict_types=1);
 
 
+// Carga de utilidades y control de acceso
+// - `auth.php` controla la sesión y helpers de autenticación
 require __DIR__ . '/../php/auth.php';
 
+// Helpers y control de rol: solo administradores pueden ejecutar este controller
 require_once __DIR__ . '/../php/helpers.php';
 require_role('ADMINISTRADOR');
 
+// Configuración global y utilidades (db(), env(), app_path(), etc.)
 require __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../php/password_reset_tokens.php';
 require_once __DIR__ . '/../php/mails.php';
 
-// Redirige al menú principal del admin 
+/**
+ * Redirige al listado/menú principal del administrador.
+ * Opcionalmente acepta un mensaje que se pasará como querystring `?msg=`.
+ */
 function redirect_menu(string $msg = ''): void
 {
   $to = app_path('/model/admin.php');
@@ -21,7 +28,10 @@ function redirect_menu(string $msg = ''): void
   exit;
 }
 
-// Redirige a una vista concreta del admin 
+/**
+ * Redirige a una vista concreta dentro de `model/admin.php`.
+ * Ejemplo: `redirect_view('add')` -> `model/admin.php?view=add`.
+ */
 function redirect_view(string $view, string $msg = ''): void
 {
   $to = app_path('/model/admin.php?view=') . urlencode($view);
@@ -30,6 +40,10 @@ function redirect_view(string $view, string $msg = ''): void
   exit;
 }
 
+/**
+ * Loguea errores internos en el sistema usando error_log.
+ * El parámetro $context debería describir la acción (ej. 'admin.crear_usuario').
+ */
 function log_internal_error(string $context, Throwable $e): void
 {
   error_log(sprintf(
@@ -41,12 +55,20 @@ function log_internal_error(string $context, Throwable $e): void
   ));
 }
 
+/**
+ * Normaliza el nombre del rol a mayúsculas sin tildes para facilitar
+ * comparaciones (por ejemplo, 'Técnico' -> 'TECNICO').
+ */
 function normalize_role_name(string $roleName): string
 {
   $upper = strtoupper(trim($roleName));
   return str_replace(['Á', 'É', 'Í', 'Ó', 'Ú'], ['A', 'E', 'I', 'O', 'U'], $upper);
 }
 
+/**
+ * Comprueba si un `rol` (por id) contiene la palabra TECNICO.
+ * Útil para determinar permisos o campos adicionales (ej. firma de correo).
+ */
 function is_tecnico_role(mysqli $db, int $rolId): bool
 {
   if ($rolId <= 0) {
@@ -67,6 +89,11 @@ function is_tecnico_role(mysqli $db, int $rolId): bool
   return str_contains($rolNormalizado, 'TECNICO');
 }
 
+/**
+ * Elimina un archivo de firma de correo previamente subido. Se aceptan
+ * rutas relativas que estén dentro de `uploads/` y cuyo nombre empiece por
+ * `firma_` para evitar borrados accidentales.
+ */
 function remove_firmacorreo_file(?string $relativePath): void
 {
   $relativePath = trim((string)$relativePath);
@@ -104,6 +131,14 @@ function remove_firmacorreo_file(?string $relativePath): void
   }
 }
 
+/**
+ * Valida y guarda la imagen de firma subida para un usuario técnico.
+ * - Comprueba errores de upload, tamaño y tipo MIME
+ * - Genera un nombre aleatorio con prefijo `firma_`
+ * - Borra la firma anterior si existe
+ *
+ * Devuelve la ruta relativa dentro de `uploads/`.
+ */
 function save_firmacorreo_upload(array $file, ?string $existingRelativePath = null): string
 {
   $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
@@ -161,7 +196,12 @@ function save_firmacorreo_upload(array $file, ?string $existingRelativePath = nu
   return $relativeDir . '/' . $fileName;
 }
 
-// VALIDACIÓN DE MÉTODO HTTP
+/*
+ * Validación inicial de la petición
+ * - Solo se aceptan peticiones POST en este controller
+ * - Validación CSRF básica
+ * - Lectura del parámetro `accion` que determina la operación
+ */
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   http_response_code(405);
   exit('Método no permitido');
@@ -171,7 +211,7 @@ if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
   redirect_menu('La sesion ha expirado. Recarga la pagina e intentalo de nuevo.');
 }
 
-// LECTURA DE ACCIÓN
+// Acción solicitada por el formulario (ej: 'editar_perfil', 'crear', ...)
 $accion = (string)($_POST['accion'] ?? '');
 
 // EDITAR PERFIL DEL ADMIN
@@ -699,6 +739,9 @@ if ($accion === 'eliminar') {
 }
 
 if ($accion === 'crear_reunion') {
+  // Los administradores no pueden crear reuniones manualmente; solo pueden verlas.
+  redirect_view('reuniones', 'No tienes permiso para crear reuniones');
+
   $adminId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idClienteReunion = (int)($_POST['id_cliente_reunion'] ?? 0);
   $objetivo = trim((string)($_POST['objetivo'] ?? ''));

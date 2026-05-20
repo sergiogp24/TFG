@@ -12,6 +12,21 @@ require_login();
 require __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../php/mails.php';
 
+/**
+ * Controlador: Gestión de Empresas
+ * -------------------------------
+ * Este archivo maneja las acciones relacionadas con empresas, contratos y
+ * planes: creación, edición, eliminación, subida de archivos y envío de
+ * notificaciones por correo. Solo usuarios con rol `ADMINISTRADOR` o
+ * `TECNICO` pueden ejecutar sus acciones.
+ *
+ * Acciones principales (POST `accion`):
+ * - add_empresas, editar_empresas, eliminar_empresas
+ * - add_contratos, edit_contratos, delete_contratos
+ * - edit_plan, delete_plan_empresa
+ * - enviar_correo_empresa
+ */
+
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
 $esAdministrador = ($rol === 'ADMINISTRADOR');
 $esTecnico = ($rol === 'TECNICO');
@@ -22,6 +37,12 @@ if (!$esAdministrador && !$esTecnico) {
   exit('Acceso denegado');
 }
 
+/**
+ * Comprueba si un técnico o usuario tiene relación con una empresa.
+ *
+ * Devuelve true cuando el usuario está asignado en `usuario_empresa`, es
+ * propietario en `empresa` o tiene un contrato en `contrato_empresa`.
+ */
 function tecnico_tiene_empresa(int $idEmpresa, int $idUsuario): bool
 {
   if ($idEmpresa <= 0 || $idUsuario <= 0) {
@@ -63,6 +84,11 @@ if ($esTecnico && $accion !== 'editar_empresas' && $accion !== 'add_contratos' &
   exit('Acceso denegado');
 }
 
+/**
+ * Redirige al listado de empresas (`ver_empresas`) opcionalmente con mensaje.
+ *
+ * @param string $msg Mensaje opcional que se añade a la querystring
+ */
 function redirect_menu_empresas(string $msg = ''): void
 {
   $to = app_path('/model/empresa.php?view=ver_empresas');
@@ -71,6 +97,14 @@ function redirect_menu_empresas(string $msg = ''): void
   exit;
 }
 
+/**
+ * Redirige a una vista específica del gestor de empresas añadiendo
+ * parámetros contextuales comunes (id_empresa, tipo_contrato, from, msg).
+ *
+ * @param string $view Nombre de la vista objetivo
+ * @param string $msg  Mensaje opcional
+ * @param int    $idEmpresa Id de empresa (si 0 se extrae de POST/GET)
+ */
 function redirect_view_empresas(string $view, string $msg = '', int $idEmpresa = 0): void
 {
   $to = app_path('/model/empresa.php?view=') . urlencode($view);
@@ -93,6 +127,12 @@ function redirect_view_empresas(string $view, string $msg = '', int $idEmpresa =
   exit;
 }
 
+/**
+ * Registra una excepción en el log de PHP con un contexto corto.
+ *
+ * @param string    $context Etiqueta contextual para facilitar búsquedas en el log
+ * @param Throwable $e       Excepción capturada
+ */
 function log_internal_error_empresa(string $context, Throwable $e): void
 {
   error_log(sprintf(
@@ -104,6 +144,11 @@ function log_internal_error_empresa(string $context, Throwable $e): void
   ));
 }
 
+/**
+ * Asegura que la restricción FK `fk_archivo_cliente_medida` use ON DELETE SET NULL
+ * para evitar borrados en cascada que puedan eliminar archivos cuando se borren
+ * medidas/áreas. La operación se aplica una sola vez por petición.
+ */
 function asegurar_fk_archivos_cliente_medida_no_cascade(): void
 {
   static $aplicado = false;
@@ -145,6 +190,10 @@ function asegurar_fk_archivos_cliente_medida_no_cascade(): void
   );
 }
 
+/**
+ * Comprueba si un usuario tiene un rol de técnico.
+ * Busca el nombre del rol en la tabla `rol` y acepta 'TECNICO' o 'TÉCNICO'.
+ */
 function usuario_es_tecnico(int $idUsuario): bool
 {
   if ($idUsuario <= 0) {
@@ -161,6 +210,10 @@ function usuario_es_tecnico(int $idUsuario): bool
   return in_array($rolNombre, ['TECNICO', 'TÉCNICO'], true);
 }
 
+/**
+ * Normaliza una lista de ids, elimina duplicados y valores no positivos.
+ * Devuelve un array de ids únicos y reindexado.
+ */
 function limpiar_ids_unicos(array $ids): array
 {
   $result = [];
@@ -173,8 +226,15 @@ function limpiar_ids_unicos(array $ids): array
   return array_values($result);
 }
 
+/**
+ * Filtra una lista de ids y devuelve sólo aquellos que corresponden a
+ * usuarios con rol de técnico.
+ *
+ * @param array $idsTecnicos Lista de ids potenciales de técnicos
+ * @return array Lista de ids que efectivamente son técnicos válidos
+ */
 function obtener_tecnicos_validos(array $idsTecnicos): array
-{
+{ 
   $ids = limpiar_ids_unicos($idsTecnicos);
   $validos = [];
 
@@ -187,8 +247,12 @@ function obtener_tecnicos_validos(array $idsTecnicos): array
   return $validos;
 }
 
+/**
+ * Indica si la tabla `cnae` existe en la base de datos.
+ * Usado para decidir si se muestran selectores o campos CNAE.
+ */
 function tabla_cnae_disponible(): bool
-{
+{ 
   static $checked = false;
   static $exists = false;
 
@@ -203,8 +267,12 @@ function tabla_cnae_disponible(): bool
   return $exists;
 }
 
+/**
+ * Procesa una cadena de CNAEs (separada por líneas o comas) y devuelve
+ * un array normalizado de valores únicos y en minúsculas.
+ */
 function parsear_cnaes(string $raw): array
-{
+{ 
   $parts = preg_split('/[\r\n,;]+/u', $raw);
   if (!is_array($parts)) {
     return [];
@@ -229,6 +297,10 @@ function parsear_cnaes(string $raw): array
   return array_values($result);
 }
 
+/**
+ * Guarda la lista de CNAEs asociados a una empresa, reinsertando los valores.
+ * Si la tabla `cnae` no existe o $idEmpresa es inválido no hace nada.
+ */
 function guardar_cnaes_empresa(int $idEmpresa, array $cnaes): void
 {
   if ($idEmpresa <= 0 || !tabla_cnae_disponible()) {
@@ -265,6 +337,11 @@ function guardar_cnaes_empresa(int $idEmpresa, array $cnaes): void
   $stmtInsert->close();
 }
 
+/**
+ * Sincroniza la relación entre una empresa y sus técnicos.
+ * Inserta y borra filas en `usuario_empresa` para que coincidan con
+ * la lista proporcionada en $idsTecnicos.
+ */
 function sincronizar_tecnico_empresa(int $idEmpresa, array $idsTecnicos): void
 {
   if ($idEmpresa <= 0) {
@@ -358,6 +435,15 @@ function sincronizar_tecnico_empresa(int $idEmpresa, array $idsTecnicos): void
   $stmtTecnico->close();
 }
 
+/**
+ * Procesa y guarda archivos subidos para una empresa.
+ * Valida extensiones/mime, tamaño y los mueve a `uploads/`, registrando
+ * los metadatos en la tabla `archivos`.
+ *
+ * @param int $idEmpresa Id de la empresa destino
+ * @param array|mixed $filesInput Estructura `$_FILES['nombre']` o similar
+ * @return array Resultado con claves 'ok' y 'errores'
+ */
 function guardar_archivos_empresa(int $idEmpresa, $filesInput): array
 {
   $result = ['ok' => 0, 'errores' => []];
@@ -477,6 +563,7 @@ function guardar_archivos_empresa(int $idEmpresa, $filesInput): array
   return $result;
 }
 
+// Comprobaciones iniciales de la petición: solo aceptamos POST y validamos CSRF
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   http_response_code(405);
   exit('Método no permitido');
@@ -486,6 +573,8 @@ if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
   redirect_menu_empresas('La sesion ha expirado. Recarga la pagina e intentalo de nuevo.');
 }
 
+// Acción: Enviar correo desde técnico/administrador a la empresa
+// Parámetros esperados (POST): id_empresa, asunto_correo, cuerpo_correo
 if ($accion === 'enviar_correo_empresa') {
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
   $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
@@ -577,8 +666,12 @@ if ($accion === 'enviar_correo_empresa') {
   }
 }
 
-//  CREAR EMPRESA
-
+/**
+ * Acción: Crear empresa (POST `add_empresas`).
+ * - Valida datos obligatorios
+ * - Inserta registro en `empresa`
+ * - Guarda CNAEs, sincroniza técnicos y sube archivos adjuntos
+ */
 if ($accion === 'add_empresas') {
   $razon_social = trim((string)($_POST['razon_social'] ?? ''));
   $nif = trim((string)($_POST['nif'] ?? ''));
@@ -698,6 +791,10 @@ if ($accion === 'add_empresas') {
   }
 }
 
+/**
+ * Acción: Editar empresa (POST `editar_empresas`).
+ * Actualiza campos, CNAEs, técnicos y archivos adjuntos.
+ */
 // EDITAR EMPRESAS
 if ($accion === 'editar_empresas') {
   $id_empresa       = (int)($_POST['id_empresa'] ?? 0);
@@ -873,8 +970,11 @@ if ($accion === 'editar_empresas') {
 
 
 
+/**
+ * Acción: Eliminar empresa (POST `eliminar_empresas`).
+ * Borra referencias en `usuario_empresa` y elimina la empresa.
+ */
 // ELIMINAR EMPRESA
-
 if ($accion === 'eliminar_empresas') {
   $id = (int)($_POST['id_empresa'] ?? 0);
   if ($id <= 0) redirect_view_empresas('delete_empresas', 'ID inválido');
@@ -897,6 +997,10 @@ if ($accion === 'eliminar_empresas') {
     redirect_view_empresas('delete_empresas', 'No se pudo eliminar la empresa. Intentalo de nuevo.');
   }
 }
+/**
+ * Acción: Crear contrato para una empresa (POST `add_contratos`).
+ * Valida permisos, crea el contrato y enlaza áreas/medidas.
+ */
 // CREAR CONTRATO
 if ($accion === 'add_contratos') {
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
@@ -1099,6 +1203,84 @@ if ($accion === 'add_contratos') {
       $stmtInsert->close();
     }
 
+    // Si es un Plan de Igualdad, crear una reunión tipo FechaLimite para recordar la subida del registro
+    if ($tipoContrato === 'PLAN IGUALDAD') {
+      try {
+        $horaReunion = '09:00';
+        // La reunión se programa a +14 días desde la creación del servicio
+        // (fecha de ahora + 14 días)
+        $fechaReunion = (new DateTime('+14 days'))->format('Y-m-d');
+        $tipoReunion = 'FechaLimite';
+
+        // Construir objetivo con el nombre de la empresa para mantener compatibilidad con procesar_registro_retributivo
+        $stmtEmpresaNombre = $db->prepare("SELECT razon_social, id_usuario FROM empresa WHERE id_empresa = ? LIMIT 1");
+        $empresaNombre = '';
+        $empresaPropietario = 0;
+        if ($stmtEmpresaNombre) {
+          $stmtEmpresaNombre->bind_param('i', $idEmpresa);
+          $stmtEmpresaNombre->execute();
+          $rowE = $stmtEmpresaNombre->get_result()->fetch_assoc() ?: null;
+          $stmtEmpresaNombre->close();
+          if ($rowE) {
+            $empresaNombre = trim((string)($rowE['razon_social'] ?? ''));
+            $empresaPropietario = (int)($rowE['id_usuario'] ?? 0);
+          }
+        }
+
+        $objetivoReunion = 'Subir R.R';
+        if ($empresaNombre !== '') {
+          $objetivoReunion .= ' - ' . $empresaNombre;
+        }
+
+        // Evitar duplicados exactos por empresa/fecha/tipo
+        $stmtCheck = $db->prepare("SELECT 1 FROM reuniones WHERE id_empresa = ? AND tipo = 'FechaLimite' AND fecha_reunion = ? LIMIT 1");
+        $exists = false;
+        if ($stmtCheck) {
+          $stmtCheck->bind_param('is', $idEmpresa, $fechaReunion);
+          $stmtCheck->execute();
+          $exists = (bool)$stmtCheck->get_result()->fetch_assoc();
+          $stmtCheck->close();
+        }
+
+        if ($exists) {
+          // Ya existe reunión similar, no crear de nuevo
+        } else {
+          $stmtReu = $db->prepare("INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion, id_empresa, tipo) VALUES (?, ?, ?, ?, ?)");
+          if ($stmtReu) {
+            $stmtReu->bind_param('sssis', $objetivoReunion, $horaReunion, $fechaReunion, $idEmpresa, $tipoReunion);
+            $stmtReu->execute();
+            $idReunion = (int)$stmtReu->insert_id;
+            $stmtReu->close();
+
+            if ($idReunion > 0) {
+              // Asignar la reunión a todos los usuarios relacionados con la empresa (usuario_empresa + propietario de la empresa)
+              $stmtUsers = $db->prepare("SELECT id_usuario FROM usuario_empresa WHERE id_empresa = ? UNION SELECT id_usuario FROM empresa WHERE id_empresa = ?");
+              if ($stmtUsers) {
+                $stmtUsers->bind_param('ii', $idEmpresa, $idEmpresa);
+                $stmtUsers->execute();
+                $resUsers = $stmtUsers->get_result();
+                $stmtUsers->close();
+
+                $stmtUR = $db->prepare("INSERT INTO usuario_reunion (id_usuario, id_reunion) VALUES (?, ?)");
+                if ($stmtUR) {
+                  while ($rowU = $resUsers->fetch_assoc()) {
+                    $uId = (int)($rowU['id_usuario'] ?? 0);
+                    if ($uId <= 0) continue;
+                    $stmtUR->bind_param('ii', $uId, $idReunion);
+                    $stmtUR->execute();
+                  }
+                  $stmtUR->close();
+                }
+              }
+            }
+          }
+        }
+      } catch (Throwable $e) {
+        // No hacemos rollback completo por este fallo puntual, solo lo registramos
+        error_log('[empresa.create_plan_reunion] ' . $e->getMessage());
+      }
+    }
+
     $db->commit();
 
     unset($_SESSION['add_contrato_old'], $_SESSION['add_contrato_error']);
@@ -1110,7 +1292,10 @@ if ($accion === 'add_contratos') {
   }
 }
 
-// EDITAR CONTRATO
+/**
+ * Acción: Editar contrato (POST `edit_contratos`).
+ * Actualiza fechas, áreas y medidas asociadas al contrato.
+ */
 if ($accion === 'edit_contratos') {
   $idContrato = (int)($_POST['id_contrato_empresa'] ?? 0);
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
@@ -1394,7 +1579,10 @@ if ($accion === 'edit_contratos') {
   }
 }
 
-// ELIMINAR CONTRATO
+/**
+ * Acción: Eliminar contrato (POST `delete_contratos`).
+ * Borra el contrato y limpia áreas/medidas asociadas cuando aplique.
+ */
 if ($accion === 'delete_contratos') {
   $idContrato = (int)($_POST['id_contrato_empresa'] ?? 0);
   $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
@@ -1467,7 +1655,10 @@ if ($accion === 'delete_contratos') {
   }
 }
 
-// EDITAR PLAN Y MEDIDAS DE EMPRESA
+/**
+ * Acción: Editar plan y medidas de empresa (POST `edit_plan`).
+ * Reemplaza las áreas/medidas del plan y preserva archivos ligados a medidas.
+ */
 if ($accion === 'edit_plan') {
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
   $inicioPlan = trim((string)($_POST['inicio_plan'] ?? ''));
@@ -1602,7 +1793,10 @@ if ($accion === 'edit_plan') {
   }
 }
 
-// ELIMINAR PLAN DE EMPRESA
+/**
+ * Acción: Eliminar plan de empresa (POST `delete_plan_empresa`).
+ * Borra áreas contratadas, medidas y preserva archivos relacionados.
+ */
 if ($accion === 'delete_plan_empresa') {
   $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
   $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);

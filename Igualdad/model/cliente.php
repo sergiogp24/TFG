@@ -1,6 +1,17 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Modelo: Cliente (área privada)
+ * --------------------------------
+ * Carga los datos mínimos necesarios para que un usuario con rol CLIENTE
+ * pueda ver su panel: nombre, email, subidas y vistas relacionadas.
+ * Variables expuestas a la vista `html/index_cliente.php`:
+ *  - $clienteUsername, $clienteEmail: datos del usuario
+ *  - $view: sub-vista a renderizar ('menu','perfil','upload','archivos')
+ *  - $archivos: listado de archivos cuando $view === 'archivos'
+ */
+
 // SEGURIDAD / AUTORIZACIÓN
 require __DIR__ . '/../php/auth.php';
 require_once __DIR__ . '/../php/helpers.php';
@@ -45,6 +56,8 @@ if (!in_array($view, $allowed, true)) $view = 'menu';
 
 $archivos = [];
 if ($view === 'archivos') {
+  // Obtenemos los últimos archivos subidos por este cliente. La consulta
+  // devuelve los campos que la vista necesita para listar descargas/archivos.
   $stmt = db()->prepare("
     SELECT id, nombre_original, subido_en
     FROM archivo

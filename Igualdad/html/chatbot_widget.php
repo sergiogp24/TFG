@@ -24,10 +24,10 @@ $jsPath = $basePath . '/assets/js/chatbot.js';
         </div>
         <button id="chat-close-btn" class="chat-close-btn">&times;</button>
     </div>
-    
+
     <div class="chat-messages" id="chat-messages">
         <!-- Los mensajes se insertarán aquí dinámicamente -->
-        
+
         <!-- Indicador de escribiendo (oculto por defecto) -->
         <div class="chat-typing" id="chat-typing">
             <div class="dot"></div>
@@ -35,7 +35,7 @@ $jsPath = $basePath . '/assets/js/chatbot.js';
             <div class="dot"></div>
         </div>
     </div>
-    
+
     <div class="chat-input-area">
         <input type="text" id="chat-input" class="chat-input" placeholder="Escribe tu mensaje aquí..." autocomplete="off">
         <button id="chat-send-btn" class="chat-send-btn" data-csrf="<?= csrf_token() ?>" data-api="<?= h(app_path('/php/api_chat.php')) ?>">

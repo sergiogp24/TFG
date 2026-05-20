@@ -243,9 +243,9 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
           }
 
           if (!data || typeof data !== 'object') {
-            const msg = response.status === 401 || response.status === 403
-              ? 'Sesion expirada o acceso denegado. Recarga la pagina e inicia sesion de nuevo.'
-              : 'El servidor devolvio una respuesta no valida. Revisa el log del procesador.';
+            const msg = response.status === 401 || response.status === 403 ?
+              'Sesion expirada o acceso denegado. Recarga la pagina e inicia sesion de nuevo.' :
+              'El servidor devolvio una respuesta no valida. Revisa el log del procesador.';
             msgRegenerarWord.innerHTML = '<div class="alert alert-danger py-2 mb-0">❌ ' + msg + '</div>';
             btnRegenerarWord.textContent = '🔄 Actualizar Word';
             btnRegenerarWord.disabled = false;
@@ -255,7 +255,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
           if (response.ok && data.exito) {
             msgRegenerarWord.innerHTML = '<div class="alert alert-success py-2 mb-0">✅ ' + data.mensaje + '</div>';
             btnRegenerarWord.textContent = '🔄 Actualizar Word';
-            
+
             // Reload after 2 seconds
             setTimeout(() => {
               window.location.reload();

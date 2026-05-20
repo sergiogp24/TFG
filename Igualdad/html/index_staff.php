@@ -7,6 +7,14 @@ require_login();
 require_once __DIR__ . '/../php/helpers.php';
 require __DIR__ . '/../config/config.php';
 
+/*
+ * Plantilla: Área Staff
+ * ---------------------
+ * Vista para personal STAFF (ADMINISTRADOR, TECNICO).
+ * Permite subir registros retributivos y abrir formularios complementarios.
+ * Usuarios no STAFF son redirigidos a `index_cliente.php`.
+ */
+
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? 'CLIENTE'));
 $esStaff = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true);
 $esTecnico = ($rol === 'TECNICO');
@@ -15,7 +23,14 @@ if (!$esStaff) {
     header('Location: index_cliente.php');
     exit;
 }
+// Variables de contexto: usuario y empresa seleccionada. Se usan en formularios
+// y para habilitar/deshabilitar acciones según permisos y asignaciones.
 
+/**
+ * Comprueba si la empresa tiene un Registro Retributivo subido.
+ * Busca primero archivos relacionados con medidas y, si no hay resultados,
+ * busca archivos enlazados directamente por `id_empresa`.
+ */
 function empresa_tiene_registro_retributivo(int $idEmpresa): bool
 {
     if ($idEmpresa <= 0) {
@@ -185,6 +200,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
     <div class="container-fluid py-4">
         <div class="row g-3">
 
+            <!-- Barra lateral: navegación específica para staff (técnicos/admin) -->
             <aside class="col-12 col-lg-3 col-xl-2">
                 <div class="card shadow-sm border-0 sidebar">
                     <div class="card-body">
@@ -318,6 +334,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                         <div class="alert alert-info py-2"><?= h($msg) ?></div>
                     <?php endif; ?>
 
+                    <!-- Formulario de subida de registro retributivo. Envía a procesar_registro_retributivo.php -->
                     <form action="../php/procesar_registro_retributivo.php" method="POST" enctype="multipart/form-data">
                         <?= csrf_input() ?>
                         <label for="nombre_empresa_staff">Empresa / Referencia:</label>
@@ -379,6 +396,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                             <?php endif; ?>
 
                             <div class="d-flex flex-wrap gap-2">
+                                <!-- Botones que abren el modal con `complemento_formularios.php` embebido -->
                                 <button
                                     type="button"
                                     class="btn btn-outline-primary btn-open-complemento"

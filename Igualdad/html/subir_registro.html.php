@@ -67,6 +67,13 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
     return $ok;
 }
 
+/**
+ * Nota: `empresa_tiene_registro_retributivo` revisa si existe ya un registro
+ * retributivo para la empresa, buscando tanto en archivos ligados a medidas
+ * (`cliente_medida`) como en registros guardados directamente con `id_empresa`.
+ * Esto se usa para habilitar/deshabilitar secciones dependientes del registro.
+ */
+
 $msg = (string)($_GET['msg'] ?? '');
 $sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
@@ -76,6 +83,12 @@ $empresaFijada = false;
 $empresasDisponibles = [];
 
 if ($rol === 'ADMINISTRADOR') {
+    /**
+     * Carga de empresas para el selector del formulario.
+     * - Si el usuario es ADMINISTRADOR se listan todas las empresas (o la concreta si se pasó id_empresa).
+     * - Si es un usuario asociado se listan sólo las empresas vinculadas a su cuenta.
+     * Estas filas se usan para poblar el `<select>` que aparece más abajo en el formulario.
+     */
     if ($idEmpresaSeleccionada > 0) {
         $stmtEmpresas = db()->prepare(
             'SELECT id_empresa, razon_social
@@ -147,7 +160,6 @@ if ($idEmpresaSeleccionada > 0 && !empty($empresasDisponibles)) {
 }
 
 $vistaEmpresaEspecifica = ($idEmpresaSeleccionada > 0 && $empresaFijada);
-
 $idEmpresaFormulario = 0;
 $nombreEmpresaFormulario = '';
 if (!empty($empresasDisponibles)) {
@@ -168,10 +180,22 @@ if (!empty($empresasDisponibles)) {
 }
 
 $sinEmpresaFormulario = ($idEmpresaFormulario <= 0);
+// Indicador que controla si se deben mostrar/activar los complementos.
+// - true si no existe empresa seleccionada para el formulario.
 $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo($idEmpresaFormulario));
 ?>
 <!doctype html>
 <html lang="es">
+<!--
+    Plantilla: Subir Registro Retributivo
+    ------------------------------------
+    Interfaz para que personal técnico/administrador suba el Registro Retributivo
+    de una empresa y, una vez subido, acceda a los formularios complementarios
+    (datos cuantitativos / cuestionarios cualitativos / medidas).
+    - Los formularios POST apuntan a `php/procesar_registro_retributivo.php`.
+    - La vista espera que el controlador prepare variables como `$empresasDisponibles`,
+        `$idEmpresaFormulario`, `$registroSubido`, `$vistaEmpresaEspecifica`.
+-->
 
 <head>
     <meta charset="UTF-8">
@@ -320,6 +344,11 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                         <div class="alert alert-info py-2"><?= h($msg) ?></div>
                     <?php endif; ?>
 
+                    <!-- Formulario: Subir registro retributivo
+                         - Envía uno o varios archivos usando `excel[]`.
+                         - `csrf_input()` asegura protección CSRF.
+                         - El select de empresa se desactiva si no hay empresas asignadas.
+                    -->
                     <form action="../php/procesar_registro_retributivo.php" method="POST" enctype="multipart/form-data">
                         <?= csrf_input() ?>
                         <label for="nombre_empresa_staff">Empresa / Referencia:</label>
@@ -348,6 +377,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                             <?php endif; ?>
                         </select>
 
+                        <!-- Input de archivos: permite múltiples archivos (tomas/registro) -->
                         <input type="file"
                             name="excel[]"
                             class="form-control mb-3"
@@ -357,6 +387,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
 
                         <button class="btn btn-primary" type="submit" <?= $sinEmpresaFormulario ? 'disabled' : '' ?>>Subir documentacion</button>
 
+                        <!-- Enlaces de ayuda: plantillas y tomada de datos descargables -->
                         <div class="mt-3 d-flex flex-wrap gap-2">
                             <div>
                                 <label class="form-label d-block">Descargar plantilla (si no tienes un formato):</label>
@@ -371,15 +402,17 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                                 </a>
                             </div>
                         </div>
-                        <div class="mt-4">
+                            <div class="mt-4">
                             <label class="form-label d-block">Datos Cuantitativos / Cuestionarios Cualitativos / Medidas Seleccionadas:</label>
                             <?php if (!$registroSubido): ?>
+                                <!-- Aviso: hasta que no exista un Registro Retributivo los formularios complementarios permanecen bloqueados -->
                                 <div class="alert alert-warning py-2">
                                     Debes subir primero el Registro Retributivo para desbloquear los Datos Cuantitativos / Cuestionarios Cualitativos / Medidas Seleccionadas.
                                 </div>
                             <?php else: ?>
                             <?php endif; ?>
 
+                            <!-- Botones para abrir el modal embebido con formularios/medidas -->
                             <div class="d-flex flex-wrap gap-2">
                                 <button
                                     type="button"
@@ -402,6 +435,7 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
                         </div>
                     </form>
 
+                    <!-- Opcional: si ya existe registro, permitir regenerar el Word consolidado -->
                     <?php if ($registroSubido): ?>
                         <div class="mt-2">
                             <form action="../php/regenerar_word.php" method="POST">
@@ -417,7 +451,11 @@ $registroSubido = (!$sinEmpresaFormulario && empresa_tiene_registro_retributivo(
         </div>
     </div>
 
-    <div class="modal fade" id="modalComplementoFormularios" tabindex="-1" aria-labelledby="modalComplementoFormulariosLabel" aria-hidden="true">
+        <!-- Modal embebido: complementos (datos cuantitativos, cuestionarios, medidas)
+                 - Carga `complemento_formularios.php?embed=1` en un iframe para evitar tocar
+                     las rutas del servidor y mantener la demo no destructiva.
+        -->
+        <div class="modal fade" id="modalComplementoFormularios" tabindex="-1" aria-labelledby="modalComplementoFormulariosLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">

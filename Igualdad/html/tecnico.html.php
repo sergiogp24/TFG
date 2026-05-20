@@ -1,5 +1,16 @@
 <!doctype html>
 <html lang="es">
+<!--
+    Plantilla: Panel Técnico
+    ------------------------
+    Panel de control para usuarios con rol TÉCNICO. Contiene:
+    - Vista `menu` con métricas y accesos rápidos.
+    - Formularios para `contacto_empresa`, `perfil` y `reuniones`.
+    - Scripts para calendario (FullCalendar) y manejo de UI.
+    Esta plantilla asume que el controlador prepara variables como
+    `$tecnicoUsername`, `$tecnicoStats`, `$tecnicoEmpresas`, `$tecnicoReuniones`,
+    y otras listas necesarias para cada vista.
+-->
 
 <head>
     <meta charset="utf-8" />
@@ -12,7 +23,10 @@
 </head>
 
 <body class="bg-light">
-    <?php $view = $view ?? 'menu'; ?>
+    <?php
+    // Determina qué sub-vista renderizar. Por defecto mostramos el 'menu' del técnico.
+    $view = $view ?? 'menu';
+    ?>
     <div class="container-fluid py-4">
         <div class="row g-3">
 
@@ -37,6 +51,8 @@
                         <?php endif; ?>
 
                         <?php if ($view === 'menu'): ?>
+
+                            <!-- Sección: Menú principal del técnico (métricas, avisos y acciones rápidas) -->
 
                             <!-- NOTIFICACIONES -->
                             <?php if (!empty($avisosTecnico)): ?>
@@ -120,6 +136,8 @@
 
                         <?php elseif ($view === 'contacto_empresa'): ?>
 
+                            <!-- Sección: Contacto con empresa — formulario para enviar emails a empresas asignadas -->
+
                             <div class="profile-container">
                                 <div class="profile-card">
                                     <h3>📧 Contactar con Empresa</h3>
@@ -172,6 +190,8 @@
                             </div>
                         //Mi perfil tecnico
                         <?php elseif ($view === 'perfil'): ?>
+
+                            <!-- Sección: Perfil técnico — formulario para editar datos personales y contraseña -->
 
                             <div class="profile-container">
                                 <div class="profile-card">
@@ -237,6 +257,8 @@
                             </div>
 
                         <?php elseif ($view === 'reuniones'): ?>
+
+                            <!-- Sección: Reuniones — crear, listar y calendario de reuniones del técnico -->
 
                             <div class="reuniones-container">
                                 <div class="reuniones-header">
@@ -466,27 +488,36 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.global.min.js"></script>
+    <!-- Script: toggles para mostrar/ocultar contraseñas en formularios -->
     <script>
         (function() {
+            // Selecciona todos los botones que controlan visibilidad de contraseña
             const toggleButtons = document.querySelectorAll('[data-password-toggle]');
             if (!toggleButtons.length) {
+                // No hay botones en esta página, salir
                 return;
             }
 
+            // Para cada botón añadimos el handler de click que alterna el tipo del input
             toggleButtons.forEach(function(button) {
                 button.addEventListener('click', function() {
+                    // Obtener el id del input objetivo desde el atributo data-target
                     const targetId = button.getAttribute('data-target');
                     if (!targetId) {
-                        return;
+                        return; // atributo mal formado
                     }
 
+                    // Localizar el input y validar
                     const input = document.getElementById(targetId);
                     if (!input) {
-                        return;
+                        return; // input no encontrado
                     }
 
+                    // Alternar entre 'password' y 'text'
                     const isPassword = input.type === 'password';
                     input.type = isPassword ? 'text' : 'password';
+
+                    // Actualizar texto del botón y etiqueta accesible
                     button.textContent = isPassword ? 'Ocultar' : 'Mostrar';
                     button.setAttribute('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
                 });
@@ -494,14 +525,20 @@
         })();
     </script>
     <?php if ($view === 'reuniones'): ?>
+        <!-- Scripts específicos para la vista 'reuniones': inicialización de calendario y carga de clientes por empresa -->
         <script>
             (function() {
+                // Inicialización del calendario de reuniones usando FullCalendar
                 const calendarEl = document.getElementById('tecnicoReunionesCalendar');
+                // Salir si no existe el contenedor o la librería no está cargada
                 if (!calendarEl || typeof FullCalendar === 'undefined') {
                     return;
                 }
 
+                // Eventos serializados desde PHP
                 const events = <?= json_encode($tecnicoCalendarEvents ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+                // Elementos del modal donde mostraremos el detalle al clicar un evento
                 const detalleFecha = document.getElementById('tecnicoDetalleFecha');
                 const detalleHora = document.getElementById('tecnicoDetalleHora');
                 const detalleObjetivo = document.getElementById('tecnicoDetalleObjetivo');
@@ -510,6 +547,7 @@
                 const detalleModal = (modalEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(modalEl) : null;
                 const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
 
+                // Crear instancia del calendario con opciones básicas
                 const calendar = new FullCalendar.Calendar(calendarEl, {
                     locale: 'es',
                     initialView: 'dayGridMonth',
@@ -520,51 +558,63 @@
                         minute: '2-digit',
                         hour12: false
                     },
+                    // Al hacer click en un evento mostramos un modal con detalles
                     eventClick: function(info) {
                         const ev = info.event;
                         const props = ev.extendedProps || {};
 
                         if (detalleModal) {
+                            // Rellenar campos del modal desde extendedProps
                             detalleFecha.textContent = props.fecha || '-';
                             detalleHora.textContent = props.hora || '-';
                             detalleObjetivo.textContent = (props.objetivo && props.objetivo.trim() !== '') ? props.objetivo : 'Sin objetivo';
                             if (detalleParticipantes) {
                                 detalleParticipantes.textContent = (props.participantes && props.participantes.trim() !== '') ? props.participantes : 'Sin participantes';
                             }
+                            // Mostrar modal (Bootstrap)
                             detalleModal.show();
                         }
                     }
                 });
 
+                // Render del calendario
                 calendar.render();
             })();
         </script>
 
         <script>
             (function() {
+                // Gestiona el select de clientes dependiendo de la empresa seleccionada
                 const selectEmpresa = document.getElementById('tecnicoSelectEmpresa');
                 const selectCliente = document.getElementById('tecnicoSelectCliente');
                 if (!selectEmpresa || !selectCliente) {
-                    return;
+                    return; // elementos no presentes
                 }
 
+                // Datos de clientes por empresa serializados desde PHP
                 const clientes = <?= json_encode($tecnicoClientesEmpresa ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
+                // Rellena el select de clientes según la id de empresa indicada
                 function renderClientes(idEmpresa) {
+                    // Limpiar opciones previas
                     selectCliente.innerHTML = '';
 
+                    // Opción por defecto: 'Solo para mí'
                     const optionSolo = document.createElement('option');
                     optionSolo.value = '0';
                     optionSolo.textContent = 'Solo para mí';
                     selectCliente.appendChild(optionSolo);
 
+                    // Si no hay empresa seleccionada, mantenemos deshabilitado
                     if (!idEmpresa || idEmpresa === '0') {
                         selectCliente.disabled = true;
                         return;
                     }
 
+                    // Filtrar clientes que pertenezcan a la empresa seleccionada
                     const filtrados = clientes.filter(c => String(c.id_empresa) === String(idEmpresa));
 
+                    // Añadir una opción por cada cliente encontrado
                     filtrados.forEach(c => {
                         const option = document.createElement('option');
                         option.value = String(c.id_usuario);
@@ -578,13 +628,16 @@
                         selectCliente.appendChild(option);
                     });
 
+                    // Habilitar el select ahora que tiene opciones válidas
                     selectCliente.disabled = false;
                 }
 
+                // Cuando la empresa cambia, re-renderizamos la lista de clientes
                 selectEmpresa.addEventListener('change', function() {
                     renderClientes(this.value);
                 });
 
+                // Inicializar con el valor actual (útil al cargar la página con un valor por defecto)
                 renderClientes(selectEmpresa.value);
             })();
         </script>

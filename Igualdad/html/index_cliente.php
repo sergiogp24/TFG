@@ -9,9 +9,25 @@ require_once __DIR__ . '/../php/helpers.php';
 require_once __DIR__ . '/../php/mails.php';
 require __DIR__ . '/../config/config.php';
 
+/**
+ * Página: Área Cliente
+ * --------------------
+ * Esta plantilla muestra el panel del cliente con vistas para:
+ * - gestión de empresas asignadas
+ * - subida de registro retributivo
+ * - creación/gestión de reuniones
+ * - acceso al demo de mantenimiento (iframe)
+ *
+ * Requiere que el usuario esté autenticado con rol `CLIENTE`.
+ */
+
 
 function formatear_fecha_resumen(string $fecha): string
 {
+    /**
+     * Formatea una fecha YYYY-MM-DD a un resumen corto para mostrar en tarjetas,
+     * p.ej. "5 may" o "12 ene". Devuelve cadena vacía en caso de error.
+     */
     $timestamp = strtotime($fecha);
     if ($timestamp === false) {
         return '';
@@ -40,6 +56,11 @@ function formatear_fecha_resumen(string $fecha): string
 
 function empresa_tiene_registro_retributivo(int $idEmpresa): bool
 {
+    /**
+     * Comprueba si una empresa tiene ya subido un registro retributivo.
+     * Busca tanto archivos asociados a `cliente_medida` como archivos
+     * directamente ligados a la empresa.
+     */
     if ($idEmpresa <= 0) {
         return false;
     }
@@ -81,6 +102,10 @@ function empresa_tiene_registro_retributivo(int $idEmpresa): bool
 
 function empresa_tiene_datos_cuantitativos(int $idEmpresa): bool
 {
+    /**
+     * Comprueba si la empresa tiene al menos un registro en tablas de datos
+     * cuantitativos (bajas, formaciones, excedencias, permisos).
+     */
     if ($idEmpresa <= 0) return false;
     $db = db();
     $sql = "SELECT 1 FROM bajas WHERE id_empresa = ? UNION SELECT 1 FROM area_formaciones WHERE id_empresa = ? UNION SELECT 1 FROM area_excedencias WHERE id_empresa = ? UNION SELECT 1 FROM area_Permisos_retribuidos WHERE id_empresa = ? LIMIT 1";
@@ -95,6 +120,10 @@ function empresa_tiene_datos_cuantitativos(int $idEmpresa): bool
 
 function empresa_tiene_cuestionario_cualitativo(int $idEmpresa): bool
 {
+    /**
+     * Comprueba existencia de al menos un registro en los cuestionarios
+     * cualitativos más relevantes usados en la UI.
+     */
     if ($idEmpresa <= 0) return false;
     $db = db();
     $sql = "SELECT 1 FROM cuestionario_seleccion_personal WHERE id_empresa = ? UNION SELECT 1 FROM cuestionario_promocion_profesional WHERE id_empresa = ? UNION SELECT 1 FROM cuestionario_formacion WHERE id_empresa = ? LIMIT 1";
@@ -109,6 +138,9 @@ function empresa_tiene_cuestionario_cualitativo(int $idEmpresa): bool
 
 function empresa_tiene_documentacion(int $idEmpresa): bool
 {
+    /**
+     * Comprueba si la empresa tiene documentación cargada con tipo 'DOCUMENTACION'.
+     */
     if ($idEmpresa <= 0) return false;
     $db = db();
     $sql = "SELECT 1 FROM archivos WHERE id_empresa = ? AND UPPER(TRIM(tipo)) = 'DOCUMENTACION' LIMIT 1";
@@ -122,7 +154,9 @@ function empresa_tiene_documentacion(int $idEmpresa): bool
 }
 
 $view = (string)($_GET['view'] ?? 'empresas');
-if (!in_array($view, ['menu', 'mi_espacio', 'privada', 'perfil', 'reuniones', 'empresas'], true)) {
+// $view: determina qué sección mostrar. Valores: menu, mi_espacio, privada,
+// perfil, reuniones, empresas, mantenimiento, plan.
+if (!in_array($view, ['menu', 'mi_espacio', 'privada', 'perfil', 'reuniones', 'empresas', 'mantenimiento', 'plan'], true)) {
     $view = 'empresas';
 }
 
@@ -173,6 +207,8 @@ if ($usuarioId > 0) {
         }
         $stmtEmpresas->close();
     }
+
+    // Cargar perfil del usuario (cliente) para mostrar/editarlos en la vista 'perfil'
 
     $stmtPerfil = db()->prepare(
         'SELECT id_usuario, nombre_usuario, apellidos, email, telefono, direccion, localidad
@@ -293,8 +329,8 @@ if ($usuarioId > 0) {
         $clienteTecnicosEmpresa = array_values($tecnicosEmpresaMap);
     }
 
-        $stmtProximaReunion = db()->prepare(
-                'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion
+    $stmtProximaReunion = db()->prepare(
+        'SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion
                          FROM reuniones r
                          INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
                          WHERE ur.id_usuario = ?
@@ -302,7 +338,7 @@ if ($usuarioId > 0) {
                              AND STR_TO_DATE(CONCAT(r.fecha_reunion, " ", r.hora_reunion), "%Y-%m-%d %H:%i") >= NOW()
                          ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC
                          LIMIT 1'
-        );
+    );
     if ($stmtProximaReunion) {
         $stmtProximaReunion->bind_param('i', $usuarioId);
         $stmtProximaReunion->execute();
@@ -339,6 +375,23 @@ if (!empty($empresasDisponibles)) {
 $sinEmpresaAsignada = ($empresaAsignada === null);
 $idEmpresaAsignada = (int)($empresaAsignada['id_empresa'] ?? 0);
 
+$empresaTipoContrato = strtoupper(trim((string)($empresaAsignada['tipo_contrato'] ?? '')));
+$empresaTienePlan = ($empresaTipoContrato !== '' && strpos($empresaTipoContrato, 'PLAN IGUALDAD') !== false);
+$empresaTieneMantenimiento = ($empresaTipoContrato !== '' && strpos($empresaTipoContrato, 'MANTENIMIENTO') !== false);
+
+// Contar mantenimientos en curso para la empresa asignada
+$mantenimientosEnCursoCount = 0;
+if ($idEmpresaAsignada > 0) {
+    $stmtMant = db()->prepare("SELECT COUNT(1) AS c FROM contrato_empresa ce WHERE ce.id_empresa = ? AND UPPER(TRIM(ce.tipo_contrato)) = 'MANTENIMIENTO' AND STR_TO_DATE(CONCAT(ce.fin_contratacion, ' 23:59:59'), '%Y-%m-%d %H:%i:%s') >= NOW()");
+    if ($stmtMant) {
+        $stmtMant->bind_param('i', $idEmpresaAsignada);
+        $stmtMant->execute();
+        $row = $stmtMant->get_result()->fetch_assoc();
+        $mantenimientosEnCursoCount = (int)($row['c'] ?? 0);
+        $stmtMant->close();
+    }
+}
+
 $registroSubido = (!$sinEmpresaAsignada && empresa_tiene_registro_retributivo($idEmpresaAsignada));
 $datosCuantitativosSubidos = (!$sinEmpresaAsignada && empresa_tiene_datos_cuantitativos($idEmpresaAsignada));
 $datosCualitativosSubidos = (!$sinEmpresaAsignada && empresa_tiene_cuestionario_cualitativo($idEmpresaAsignada));
@@ -366,6 +419,16 @@ if (!empty($empresasDisponibles)) {
         }
     }
 }
+$mantenimientosTotalesCount = 0;
+if (!empty($empresasDisponibles)) {
+    foreach (($empresasDisponibles ?? []) as $empItem) {
+        $tipo = strtoupper(trim((string)($empItem['tipo_contrato'] ?? '')));
+        if ($tipo !== '' && strpos($tipo, 'MANTENIMIENTO') !== false) {
+            $mantenimientosTotalesCount++;
+        }
+    }
+}
+
 $globalCssVersion = @filemtime(__DIR__ . '/../css/global.css') ?: time();
 $adminCssVersion = @filemtime(__DIR__ . '/../css/admin.css') ?: time();
 $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
@@ -392,10 +455,11 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
 
             <!-- SIDEBAR -->
             <!-- SIDEBAR -->
+            <!-- Fragmento: barra lateral con navegación del usuario (perfil, empresas, logout) -->
             <?php include __DIR__ . '/../php/fragments/sidebar.php'; ?>
 
             <main class="col-12 col-md-9 col-xl-10">
-                <div class="card panel <?= in_array($view, ['menu', 'mi_espacio', 'reuniones'], true) ? 'panel-wide' : '' ?> shadow-sm border-0">
+                <div class="card panel <?= in_array($view, ['menu', 'mi_espacio', 'reuniones', 'plan'], true) ? 'panel-wide' : '' ?> shadow-sm border-0">
                     <div class="card-body p-4">
                         <!-- HEADER DENTRO DE LA TARJETA -->
                         <div class="mb-4">
@@ -406,10 +470,30 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 <h2 class="fw-bold mb-1">Mi Espacio</h2>
                                 <p class="text-muted small mb-0">Resumen de actividad y estado de tareas</p>
                             <?php else: ?>
-                                <h2 class="fw-bold mb-1">Registro Retributivo</h2>
-                                <p class="text-muted small mb-0">Subida y gestión de documentos del registro</p>
+                                <h2 class="fw-bold mb-1">Mi Espacio</h2>
+                                <p class="text-muted small mb-0">Acceso rápido a tus gestiones</p>
                             <?php endif; ?>
                             <hr class="mt-3 mb-0 opacity-10">
+                            <?php
+                            $empresaParamNav = ((int)($idEmpresaAsignada ?? 0) > 0) ? '&id_empresa=' . (int)$idEmpresaAsignada : '';
+                            // If a company is selected, show prominent switches between Plan and Mantenimiento
+                            if ((int)($idEmpresaAsignada ?? 0) > 0 && in_array($view, ['mi_espacio', 'plan', 'mantenimiento'], true)): ?>
+                                <div class="d-flex justify-content-between align-items-center mt-3 mb-0">
+                                    <div></div>
+                                    <div class="text-center">
+                                        <a class="btn <?= ($view === 'plan') ? 'btn-primary' : 'btn-outline-primary' ?> btn-lg px-4" href="index_cliente.php?view=plan<?= h($empresaParamNav) ?>">Plan de Igualdad</a>
+                                        <a class="btn <?= ($view === 'mantenimiento') ? 'btn-dark' : 'btn-outline-dark' ?> btn-lg px-4" href="index_cliente.php?view=mantenimiento<?= h($empresaParamNav) ?>">Mantenimiento</a>
+                                    </div>
+                                    <div class="text-end">
+                                        <a href="index_cliente.php?view=empresas<?= h($empresaParamNav) ?>" class="btn btn-outline-secondary btn-sm">Volver a empresas</a>
+                                    </div>
+                                </div>
+                            <?php elseif ($view !== 'mi_espacio' && $view !== 'empresas'): ?>
+                                <?php $volverHref = 'index_cliente.php?view=mi_espacio' . $empresaParamNav; ?>
+                                <div class="d-flex justify-content-end mt-2">
+                                    <a href="<?= h($volverHref) ?>" class="btn btn-outline-secondary btn-sm">Volver</a>
+                                </div>
+                            <?php endif; ?>
                         </div>
 
                         <?php if ($msg !== ''): ?>
@@ -421,6 +505,35 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 <h3 class="fw-bold">Mis Empresas</h3>
                                 <p class="text-muted">Selecciona una empresa para gestionar su registro y documentación</p>
                             </div>
+
+                            <div class="row g-3 mb-4 justify-content-center">
+                                <div class="col-12 col-md-5 col-lg-4">
+                                    <div class="space-stat-card h-100">
+                                        <div class="space-stat-label">Empresas con Registro retributivo pendiente de subida</div>
+                                        <div class="space-stat-value"><?= (int)$pendientesEspacio ?></div>
+                                        <div class="space-stat-icon" <?= $pendientesEspacio > 0 ? 'style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes" title="Ver empresas pendientes"' : '' ?>>▣</div>
+                                        <?php if ($pendientesEspacio > 0): ?>
+                                            <div class="mt-2 text-end">
+                                                <button class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes">Ver detalles</button>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-md-5 col-lg-4">
+                                    <div class="space-stat-card h-100">
+                                        <div class="space-stat-label">Mantenimientos en curso</div>
+                                        <div class="space-stat-value"><?= (int)$mantenimientosTotalesCount ?></div>
+                                        <div class="space-stat-icon">🔧</div>
+                                        <?php if ($mantenimientosTotalesCount > 0): ?>
+                                            <div class="mt-2 text-end">
+                                                <a href="index_cliente.php?view=mantenimiento" class="btn btn-sm btn-link p-0">Ver mantenimientos</a>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="row g-4 justify-content-center">
                                 <?php if (empty($empresasDisponibles)): ?>
                                     <div class="col-12 text-center">
@@ -447,7 +560,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                             <style>
                                 .company-card:hover {
                                     transform: translateY(-5px);
-                                    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+                                    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
                                 }
                             </style>
                         <?php elseif ($view === 'privada'): ?>
@@ -647,41 +760,26 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                     </div>
                                 </div>
                             </div>
-                        <?php elseif ($view === 'mi_espacio'): ?>
+                        <?php elseif ($view === 'plan'): ?>
                             <div class="space-shell mb-8">
                                 <div class="text-center mb-5">
-                                    <div class="space-kicker">MI ESPACIO</div>
-                                    <h3 class="mb-1 fw-bold">Resumen rápido de trabajo</h3>
-                                    <div class="text-muted">Acceso directo a lo importante de tu día a día.</div>
+                                    <div class="space-kicker">PLAN DE IGUALDAD</div>
+                                    <h3 class="mb-1 fw-bold">Qué tengo que hacer ahora</h3>
+                                    <div class="text-muted small">Guía paso a paso para ir completando la info que necesitamos para tu Plan de Igualdad.</div>
                                 </div>
-
-                                <div class="row g-3 mb-5 justify-content-center">
-                                    <div class="col-12 col-md-5 col-lg-4">
-                                        <div class="space-stat-card h-100">
-                                            <div class="space-stat-label">Fecha Límite Subida Registro Retributivo</div>
-                                            <div class="space-stat-value">
-                                                <?php if (!empty($proximaReunion)): ?>
-                                                    <?php
-                                                    $fechaResumen = formatear_fecha_resumen((string)($proximaReunion['fecha_reunion'] ?? ''));
-                                                    $horaResumen = substr((string)($proximaReunion['hora_reunion'] ?? ''), 0, 5);
-                                                    echo h(trim($fechaResumen . ' · ' . $horaResumen, " ·"));
-                                                    ?>
-                                                <?php else: ?>
-                                                    Ya has subido el registro retributivo
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="space-stat-icon">◔</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-5 col-lg-4">
-                                        <div class="space-stat-card h-100">
-                                            <div class="space-stat-label">Tus Empresas con Registro retributivo pendiente</div>
-                                            <div class="space-stat-value"><?= (int)$pendientesEspacio ?></div>
-                                            <div class="space-stat-icon" <?= $pendientesEspacio > 0 ? 'style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes" title="Ver empresas pendientes"' : '' ?>>▣</div>
-                                            <?php if ($pendientesEspacio > 0): ?>
-                                                <div class="mt-2 text-end">
-                                                    <button class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#modalEmpresasPendientes">Ver detalles</button>
-                                                </div>
+                                <div class="d-flex justify-content-center mb-4">
+                                    <div class="card border-0 shadow-sm" style="max-width:540px; width:100%;">
+                                        <div class="card-body text-center py-3">
+                                            <div class="small text-muted">🔔Fecha Límite Subida Registro Retributivo</div>
+                                            <?php if (!empty($proximaReunion)): ?>
+                                                <?php
+                                                $fechaRes = formatear_fecha_resumen((string)($proximaReunion['fecha_reunion'] ?? ''));
+                                                $horaRes = substr((string)($proximaReunion['hora_reunion'] ?? ''), 0, 5);
+                                                ?>
+                                                <h5 class="fw-bold mb-1"><?= h($proximaReunion['objetivo'] ?: 'Reunión fecha límite') ?></h5>
+                                                <div class="text-muted"><?= h($fechaRes) ?><?= $horaRes !== '' ? ' · ' . h($horaRes) : '' ?></div>
+                                            <?php else: ?>
+                                                <div class="text-muted">Ya has subido el registro retributivo.</div>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -690,9 +788,6 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 <div class="row g-4 mb-4">
                                     <div class="col-12 col-lg-10 col-xl-8 mx-auto">
                                         <div class="space-panel h-100">
-                                            <h4 class="mb-1">Qué tengo que hacer ahora</h4>
-                                            <div class="text-muted small mb-3">Guía paso a paso para ir completando la info que necesitamos para tu Plan de Igualdad.</div>
-
                                             <div class="space-task-list d-grid gap-3">
                                                 <p>Lo primero que tenemos que hacer es subir el registro retributivo si ya disponen de él, en caso contrario descargar la plantilla y completarla, sigue los pasos indicados.</p>
                                                 <!-- Paso 1: Registro Retributivo -->
@@ -753,13 +848,38 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                     </div>
                                 </div>
                             </div>
+                        <?php elseif ($view === 'mi_espacio'): ?>
+                            <div class="space-shell mb-8">
+                                <div class="text-center mb-5">
+                                    <div class="space-kicker">MI ESPACIO</div>
+                                    <h3 class="mb-1 fw-bold">Acceso rápido a tus gestiones</h3>
+                                    <div class="text-muted">Selecciona una opción para continuar.</div>
+                                </div>
+                            </div>
+                        <?php elseif ($view === 'mantenimiento'): ?>
+                            <div class="space-shell mb-8">
+                                <div class="text-center mb-4">
+                                    <div class="space-kicker">MANTENIMIENTO</div>
+                                    <h3 class="mb-1 fw-bold">Mantenimiento - <?= h($empresaAsignada['razon_social'] ?? '') ?></h3>
+                                    <div class="text-muted">Área de mantenimiento para la empresa seleccionada. (En desarrollo)</div>
+                                </div>
+
+                                <div class="row g-3 justify-content-center">
+                                    <div class="col-12">
+                                        <div class="card border-0 shadow-sm p-0">
+                                            <!-- Iframe con demo estático de mantenimiento (sin funcionalidades) -->
+                                            <iframe src="mantenimiento_demo.php" title="Mantenimiento demo" style="width:100%;height:760px;border:0;border-radius:8px;display:block;"></iframe>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         <?php else: ?>
                             <div class="registro-shell">
                                 <div class="d-flex align-items-end justify-content-between flex-wrap gap-3 mb-4">
                                     <div>
                                         <div class="space-kicker">Registro retributivo</div>
                                         <h3 class="mb-1">Subir Documento del Registro Retributivo</h3>
-                                        <div class="text-muted">Si ya existe, se sube. Si no, se descarga la plantilla, se rellena y se vuelve a subir.</div>
+                                        <div class="text-muted">Si ya tiene el formato del ministerio subalo. Si no, se descargue la plantilla del ministerio y rellenala, si le parece muy complicado puede preguntar o descargar Toma de datos</div>
                                     </div>
                                 </div>
 
@@ -771,6 +891,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                 <div class="upload-action-icon">⇪</div>
                                                 <h5 class="mb-1">Subir registro retributivo</h5>
                                                 <div class="upload-action-text mb-3">Completa los datos mínimos y envía el archivo del registro.</div>
+                                                <!-- Formulario de subida: permite múltiples tipos de archivo y acepta plantillas ministerio o registros propios -->
 
                                                 <?php if (!$sinEmpresaAsignada): ?>
                                                     <div class="mb-3">
@@ -851,11 +972,11 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                         Descargar toma de datos
                                                     </a>
                                                 </div>
-                                            
+
 
                                                 <div class="mt-4">
                                                     <label class="form-label d-block mb-2">Datos Cuantitativos / Cuestionarios Cualitativos</label>
-                                                    
+
                                                     <?php if (!$registroSubido): ?>
                                                         <div class="alert alert-warning py-2 mb-0">
                                                             Debes subir primero el Registro Retributivo para desbloquear los Datos Cuantitativos / Cuestionarios Cualitativos.
@@ -868,16 +989,16 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                                 </div>
                                             </div>
 
-                                            </div>
                                         </div>
                                     </div>
-                                </form>
                             </div>
-                        <?php endif; ?>
+                            </form>
                     </div>
+                <?php endif; ?>
                 </div>
-            </main>
         </div>
+        </main>
+    </div>
     </div>
 
     <div class="modal fade" id="modalComplementoFormularios" tabindex="-1" aria-labelledby="modalComplementoFormulariosLabel" aria-hidden="true">
@@ -894,7 +1015,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
         </div>
     </div>
 
-    <?php if ($view === 'mi_espacio' && $pendientesEspacio > 0): ?>
+    <?php if ($pendientesEspacio > 0): ?>
         <div class="modal fade" id="modalEmpresasPendientes" tabindex="-1" aria-labelledby="modalEmpresasPendientesLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
@@ -922,6 +1043,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.global.min.js"></script>
     <script>
+        // Script global: toggles (mostrar/ocultar) contraseñas y comportamientos sencillos
         (function() {
             const toggleButtons = document.querySelectorAll('[data-password-toggle]');
             if (!toggleButtons.length) {
@@ -1051,9 +1173,9 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                 }
 
                 const syncTipoRegistro = () => {
-                    tipoInput.value = (modoSelect.value === 'PROPIO')
-                        ? 'REGISTRO_PROPIO_CLIENTE'
-                        : 'REGISTRO_RETRIBUTIVO';
+                    tipoInput.value = (modoSelect.value === 'PROPIO') ?
+                        'REGISTRO_PROPIO_CLIENTE' :
+                        'REGISTRO_RETRIBUTIVO';
                 };
 
                 syncTipoRegistro();
@@ -1128,7 +1250,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
     </script>
 
 
-<?php include_once __DIR__ . '/chatbot_widget.php'; ?>
+    <?php include_once __DIR__ . '/chatbot_widget.php'; ?>
 </body>
 
 </html>

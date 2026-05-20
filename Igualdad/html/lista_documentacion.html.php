@@ -2,10 +2,22 @@
 
 declare(strict_types=1);
 
+/**
+ * Plantilla: Documentación Final
+ * -----------------------------
+ * Muestra los ficheros considerados como documentación final por empresa.
+ * - Acceso: ADMINISTRADOR, TECNICO, CLIENTE.
+ * - Presenta listado con descarga y permite filtrar por empresa mediante GET.
+ */
+
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
+
+// Flags de rol usados en la vista para mostrar/ocultar acciones
 $esAdmin = ($rol === 'ADMINISTRADOR');
 $esCliente = ($rol === 'CLIENTE');
 $esTecnico = ($rol === 'TECNICO');
+
+// Selección de hoja de estilos por tipo de usuario para mantener consistencia
 $panelCss = $esTecnico ? '../css/tecnico.css' : ($esCliente ? '../css/empresa.css' : '../css/admin.css');
 $sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
@@ -31,6 +43,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
 <body class="bg-light">
   <div class="container-fluid py-4">
     <div class="row g-3">
+      <!-- Barra lateral: navegación contextual según rol -->
       <aside class="col-12 col-lg-3 col-xl-2">
         <div class="card shadow-sm border-0 sidebar">
           <div class="card-body">
@@ -110,6 +123,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
             <?php endif; ?>
 
             <?php if (empty($archivosListado)): ?>
+              <!-- No se han encontrado documentos para los criterios actuales -->
               <div class="alert alert-warning mb-0">No hay documentación final disponible aún.</div>
             <?php else: ?>
               <div class="table-responsive">
@@ -153,6 +167,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
       </main>
     </div>
   </div>
+  <!-- Carga de dependencias JS: Bootstrap bundle para componentes (modals, tooltips, etc.) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 

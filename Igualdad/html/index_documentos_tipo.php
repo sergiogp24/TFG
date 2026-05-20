@@ -6,11 +6,23 @@ require __DIR__ . '/../php/auth.php';
 require_login();
 require __DIR__ . '/../config/config.php';
 
+/**
+ * Página: Subida de Documentos por Tipo
+ * -----------------------------------
+ * Plantilla que permite a usuarios STAFF (ADMINISTRADOR, TECNICO) y CLIENTES
+ * subir documentos categorizados por tipo. Las secciones se adaptan según
+ * el rol del usuario (panel staff vs panel cliente).
+ */
+
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? 'CLIENTE'));
 $esStaff = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true);
 
 function h($s): string
 {
+    /**
+     * Escape simple para salidas en HTML. Wrapper ligero alrededor de
+     * `htmlspecialchars` para mantener consistencia en las plantillas.
+     */
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 }
 
@@ -24,6 +36,8 @@ $panelCss = ($rol === 'TECNICO')
 $empresaSesion = '';
 
 if (!$esStaff && $usuarioId > 0) {
+    // Si el usuario no es STAFF se intenta cargar una empresa asociada para
+    // mostrarla en el formulario (campo readonly con referencia).
     $stmtEmpresa = db()->prepare(
         'SELECT e.razon_social
          FROM usuario_empresa ue
@@ -154,6 +168,7 @@ if (!$esStaff && $usuarioId > 0) {
                             <div class="alert alert-info py-2"><?= h($msg) ?></div>
                         <?php endif; ?>
 
+                        <!-- Formulario para staff: permite subir un documento indicando asunto y tipo -->
                         <form action="../php/procesar_documento_tipo.php"
                             method="POST"
                             enctype="multipart/form-data">
@@ -171,6 +186,7 @@ if (!$esStaff && $usuarioId > 0) {
                                 <option value="TOMA DE DATOS">TOMA DE DATOS</option>
                             </select>
 
+                            <!-- Archivo requerido: tipos permitidos listados en accept -->
                             <input type="file"
                                 name="archivo"
                                 class="form-control mb-3"
@@ -236,6 +252,7 @@ if (!$esStaff && $usuarioId > 0) {
                             <div class="alert alert-info py-2"><?= h($msg) ?></div>
                         <?php endif; ?>
 
+                        <!-- Formulario para clientes: referencia a la empresa (readonly) y subida -->
                         <form action="../php/procesar_documento_tipo.php"
                             method="POST"
                             enctype="multipart/form-data">
@@ -278,6 +295,7 @@ if (!$esStaff && $usuarioId > 0) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Script: actualiza el campo de referencia al cambiar el tipo seleccionado
         (function() {
             const referenciaInput = document.getElementById('referencia_empresa_cliente');
             const tipoSelect = document.getElementById('tipo_cliente');

@@ -7,6 +7,18 @@ require_once __DIR__ . '/../php/helpers.php';
 require_login();
 require __DIR__ . '/../config/config.php';
 
+/**
+ * Ayudante de redirección para los formularios del complemento (mantenimiento).
+ *
+ * Construye una URL segura de redirección a la página de formularios del
+ * complemento preservando la pestaña seleccionada, un mensaje y el flag de
+ * embebido. Si hay un `id_empresa` en POST/GET se conserva para mantener el
+ * contexto de la empresa actual.
+ *
+ * @param string $tab   Identificador de la pestaña destino que muestra la UI
+ * @param string $msg   Mensaje a mostrar tras la redirección (se codifica)
+ * @param bool   $embed Si es true, añade `embed=1` a la querystring
+ */
 function complemento_redirect(string $tab, string $msg, bool $embed): void
 {
   $to = app_path('/html/complemento_formularios.php?tab=') . urlencode($tab) . '&msg=' . urlencode($msg);
@@ -15,6 +27,8 @@ function complemento_redirect(string $tab, string $msg, bool $embed): void
     $to .= '&embed=1';
   }
 
+  // Preserva el contexto de empresa si está disponible para que el usuario
+  // vuelva a la misma vista de empresa después de la operación.
   $idEmpresaContexto = (int)($_POST['id_empresa'] ?? $_GET['id_empresa'] ?? 0);
   if ($idEmpresaContexto > 0) {
     $to .= '&id_empresa=' . urlencode((string)$idEmpresaContexto);
@@ -24,6 +38,12 @@ function complemento_redirect(string $tab, string $msg, bool $embed): void
   exit;
 }
 
+/**
+ * Redirección usada cuando la validación CSRF falla.
+ *
+ * Garantiza que la pestaña destino sea una de las conocidas para evitar
+ * redirecciones abiertas y envía un mensaje indicando al usuario que recargue.
+ */
 function complemento_redirect_csrf(bool $embed): void
 {
   $tab = (string)($_POST['tab'] ?? $_GET['tab'] ?? 'bajas');
@@ -48,6 +68,12 @@ function complemento_redirect_csrf(bool $embed): void
   complemento_redirect($tab, 'La sesion ha expirado. Recarga la pagina e intentalo de nuevo.', $embed);
 }
 
+/**
+ * Registrador ligero de errores para el controlador de complemento.
+ *
+ * Escribe excepciones en el log de PHP incluyendo una etiqueta de contexto
+ * para facilitar su localización durante la depuración.
+ */
 function complemento_log_error(string $context, Throwable $e): void
 {
   error_log(sprintf(
@@ -59,18 +85,30 @@ function complemento_log_error(string $context, Throwable $e): void
   ));
 }
 
+/**
+ * Comprueba si un usuario pertenece a (o puede acceder a) una empresa.
+ *
+ * Los administradores pueden acceder a cualquier empresa. Para usuarios no
+ * administradores la función comprueba dos ubicaciones: la tabla de unión
+ * `usuario_empresa` (asignación explícita) y como fallback el campo
+ * `id_usuario` de la tabla `empresa`.
+ *
+ * @return bool True si el usuario puede actuar sobre la empresa indicada
+ */
 function complemento_usuario_tiene_empresa(int $idEmpresa, int $idUsuario, string $rol): bool
 {
   if ($idEmpresa <= 0 || $idUsuario <= 0) {
     return false;
   }
 
+  // Un administrador global evita las comprobaciones de pertenencia
   if ($rol === 'ADMINISTRADOR') {
     return true;
   }
 
   $db = db();
 
+  // Primero comprueba la asignación explícita en `usuario_empresa`
   $stmt = $db->prepare('SELECT 1 FROM usuario_empresa WHERE id_empresa = ? AND id_usuario = ? LIMIT 1');
   $stmt->bind_param('ii', $idEmpresa, $idUsuario);
   $stmt->execute();
@@ -81,6 +119,7 @@ function complemento_usuario_tiene_empresa(int $idEmpresa, int $idUsuario, strin
     return true;
   }
 
+  // Fallback: comprueba si el usuario es el propietario/creador en la fila de `empresa`
   $stmt = $db->prepare('SELECT 1 FROM empresa WHERE id_empresa = ? AND id_usuario = ? LIMIT 1');
   $stmt->bind_param('ii', $idEmpresa, $idUsuario);
   $stmt->execute();
@@ -90,6 +129,10 @@ function complemento_usuario_tiene_empresa(int $idEmpresa, int $idUsuario, strin
   return $ok;
 }
 
+/**
+ * Determina si una tabla tiene una columna específica (con cache simple).
+ * Útil para migraciones opcionales que añaden columnas cuando faltan.
+ */
 function complemento_table_has_column(string $table, string $column): bool
 {
   static $cache = [];
@@ -111,6 +154,13 @@ function complemento_table_has_column(string $table, string $column): bool
   return $ok;
 }
 
+/**
+ * Resuelve el nombre de la columna llave primaria de una tabla.
+ *
+ * Devuelve la primera columna que participa en la clave PRIMARY o null si
+ * no se encuentra. El resultado se cachea para evitar consultas SHOW
+ * repetidas.
+ */
 function complemento_primary_key(string $table): ?string
 {
   static $cache = [];
@@ -142,6 +192,11 @@ function complemento_primary_key(string $table): ?string
   return $cache[$table];
 }
 
+/**
+ * Valida que el id de empresa solicitado esté presente y que el usuario
+ * actual tenga permisos para actuar sobre esa empresa. En caso de fallo se
+ * redirige al usuario con un mensaje apropiado.
+ */
 function complemento_validar_empresa(int $idEmpresa, int $idUsuario, string $rol, string $tab, bool $embed): void
 {
   if ($idEmpresa <= 0) {
@@ -153,6 +208,13 @@ function complemento_validar_empresa(int $idEmpresa, int $idUsuario, string $rol
   }
 }
 
+/**
+ * Comprueba si la empresa ha subido un documento 'Registro Retributivo'.
+ *
+ * La función busca primero documentos adjuntos a medidas de cliente y sus
+ * áreas contratadas; si no encuentra ninguno hace fallback a documentos
+ * vinculados directamente a la empresa. Devuelve booleano.
+ */
 function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
 {
   if ($idEmpresa <= 0) {
@@ -181,6 +243,7 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
     return true;
   }
 
+  // Fallback: documentos vinculados directamente a la empresa
   $sqlDirecto = '
     SELECT 1
     FROM archivos a
@@ -200,6 +263,10 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
   return $ok;
 }
 
+/**
+ * Fuerza la precondición de que la empresa debe tener subido el Registro
+ * Retributivo antes de permitir editar ciertos formularios complementarios.
+ */
 function complemento_validar_requisito_registro(int $idEmpresa, string $tab, bool $embed): void
 {
   if (!complemento_empresa_tiene_registro_retributivo($idEmpresa)) {
@@ -207,6 +274,11 @@ function complemento_validar_requisito_registro(int $idEmpresa, string $tab, boo
   }
 }
 
+/**
+ * Devuelve el `id_ano_datos` más reciente asociado a una empresa (contrato).
+ * Devuelve 0 cuando no se encuentra una fila de año de datos. Este id se
+ * usa al insertar registros contextuales que deben pertenecer a un año.
+ */
 function complemento_resolver_id_ano_datos_empresa(int $idEmpresa): int
 {
   if ($idEmpresa <= 0) {
@@ -235,6 +307,11 @@ function complemento_resolver_id_ano_datos_empresa(int $idEmpresa): int
   return (int)($row['id_ano_datos'] ?? 0);
 }
 
+/**
+ * Asegura la migración: añade `id_empresa` a la tabla `bajas` si falta.
+ * Permite actualizar esquemas antiguos sin herramienta de migración
+ * separada. La función es idempotente gracias a la verificación previa.
+ */
 function complemento_asegurar_columna_empresa_bajas(): void
 {
   if (complemento_table_has_column('bajas', 'id_empresa')) {
@@ -246,6 +323,10 @@ function complemento_asegurar_columna_empresa_bajas(): void
   $db->query('ALTER TABLE bajas ADD INDEX idx_bajas_id_empresa (id_empresa)');
 }
 
+/**
+ * Verifica que un registro de `bajas` pertenezca a la empresa indicada.
+ * Se usa para evitar actualizaciones/eliminaciones entre empresas.
+ */
 function complemento_bajas_pertenece_a_empresa(int $idBajas, int $idEmpresa): bool
 {
   if ($idBajas <= 0 || $idEmpresa <= 0) {
@@ -263,6 +344,11 @@ function complemento_bajas_pertenece_a_empresa(int $idBajas, int $idEmpresa): bo
   return $ok;
 }
 
+/**
+ * Lee los valores de un enum para una columna desde el esquema y los devuelve
+ * como array. El resultado se cachea durante la petición. Si la columna no
+ * es enum o no existe se devuelve un array vacío.
+ */
 function complemento_enum_values(string $table, string $column): array
 {
   static $cache = [];
@@ -303,6 +389,11 @@ function complemento_enum_values(string $table, string $column): array
   return $vals;
 }
 
+/**
+ * Mapea la etiqueta de tipo de baja definitiva visible por el usuario al
+ * valor canónico del enum en la base de datos. Algunos esquemas pueden tener
+ * variantes ortográficas, por ello este helper intenta fallbacks comunes.
+ */
 function complemento_tipo_definitiva_ui_a_db(string $tipoUi): ?string
 {
   $map = [
@@ -320,6 +411,8 @@ function complemento_tipo_definitiva_ui_a_db(string $tipoUi): ?string
 
   $enumValues = complemento_enum_values('baja_definitivas', 'tipo');
   if ($enumValues === []) {
+    // If the schema does not expose enum values, return the canonical form
+    // and let later validation decide if it is acceptable.
     return $tipoCanonical;
   }
 

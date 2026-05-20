@@ -61,6 +61,11 @@ function tecnico_tiene_empresa(int $idEmpresa, int $idUsuario): bool
   return $ok;
 }
 
+/**
+ * Comprueba si un técnico o usuario está relacionado con una empresa.
+ * Devuelve true si el usuario está en `usuario_empresa` o es propietario en `empresa`.
+ */
+
 function redirect_mantenimiento(string $view, int $idEmpresa, string $msg = ''): void
 {
   $to = app_path('/model/mantenimiento.php?view=') . urlencode($view) . '&id_empresa=' . $idEmpresa;
@@ -70,6 +75,11 @@ function redirect_mantenimiento(string $view, int $idEmpresa, string $msg = ''):
   header("Location: $to");
   exit;
 }
+
+/**
+ * Redirige a la vista de mantenimiento indicada para una empresa concreta.
+ * Construye la querystring con `view`, `id_empresa` y `msg` opcional.
+ */
 
 function log_internal_error_mantenimiento(string $context, Throwable $e): void
 {
@@ -82,9 +92,19 @@ function log_internal_error_mantenimiento(string $context, Throwable $e): void
   ));
 }
 
+/**
+ * Registra errores internos (excepciones) relacionados con mantenimiento
+ * en el log de PHP, incluyendo contexto y ubicación.
+ */
+
 $idEmpresa = (int)($_POST['id_empresa'] ?? 0);
 $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
+/**
+ * Acción: Añadir formación vinculada a una medida de Formación.
+ * Valida campos obligatorios, fechas y límites numéricos, y guarda en
+ * `area_formacion` vinculada a la medida resuelta para la empresa.
+ */
 if ($accion === 'add_formacion') {
   $nombre = trim((string)($_POST['nombre'] ?? ''));
   $fechaInicio = trim((string)($_POST['fecha_inicio'] ?? ''));
@@ -189,6 +209,10 @@ if ($accion === 'add_formacion') {
   }
 }
 
+/**
+ * Acción: Añadir registro de ejercicio (solicita/concede) para una medida
+ * de ejercicio. Valida números y la existencia de la medida asociada.
+ */
 if ($accion === 'add_ejercicio') {
   $medida = trim((string)($_POST['medida'] ?? ''));
   $solicitaMujeres = (int)($_POST['solicita_mujeres'] ?? 0);
@@ -251,6 +275,10 @@ if ($accion === 'add_ejercicio') {
   }
 }
 
+/**
+ * Acción: Registrar infrarrepresentación femenina (plantilla mujeres/hombres)
+ * y guardarla en `area_infra` asociada a la medida correspondiente.
+ */
 if ($accion === 'add_infra') {
   $plantillaMujeres = (int)($_POST['plantilla_mujeres'] ?? 0);
   $plantillaHombres = (int)($_POST['plantilla_hombres'] ?? 0);
@@ -308,6 +336,10 @@ if ($accion === 'add_infra') {
   }
 }
 
+/**
+ * Acción: Registrar un incidente de acoso. Se valida fecha y campos
+ * obligatorios, y se inserta en `area_acoso`.
+ */
 if ($accion === 'add_acoso') {
   $incidente = trim((string)($_POST['incidente'] ?? ''));
   $fechaAlta = trim((string)($_POST['fecha_alta'] ?? ''));
@@ -374,6 +406,10 @@ if ($accion === 'add_acoso') {
   }
 }
 
+/**
+ * Acción: Registrar caso de violencia de género. Valida fecha y campos
+ * numéricos, y lo inserta en `area_violencia`.
+ */
 if ($accion === 'add_violencia') {
   $acciones = trim((string)($_POST['acciones'] ?? ''));
   $observaciones = trim((string)($_POST['observaciones'] ?? ''));
@@ -442,6 +478,10 @@ if ($accion === 'add_violencia') {
   }
 }
 
+/**
+ * Acción: Registrar información de retribuciones/permisos en
+ * `area_retribuciones`.
+ */
 if ($accion === 'add_retribuciones') {
   $permisos = trim((string)($_POST['permisos'] ?? ''));
   $numMujeres = (int)($_POST['num_mujeres'] ?? 0);
@@ -504,6 +544,10 @@ if ($accion === 'add_retribuciones') {
   }
 }
 
+/**
+ * Acción: Registrar condiciones de trabajo (conversiones, jornadas,
+ * evaluaciones) en `area_condiciones_trabajo`.
+ */
 if ($accion === 'add_condiciones') {
   $nConversionesContrato = trim((string)($_POST['n_conversiones_contrato'] ?? ''));
   $nJornadasAmpliadas = trim((string)($_POST['n_jornadas_ampliadas'] ?? ''));
@@ -567,6 +611,9 @@ if ($accion === 'add_condiciones') {
   }
 }
 
+/**
+ * Acción: Registrar un registro de salud laboral en `area_salud`.
+ */
 if ($accion === 'add_salud') {
   $nombre = trim((string)($_POST['nombre'] ?? ''));
   $procedencia = trim((string)($_POST['procedencia'] ?? ''));
@@ -625,6 +672,10 @@ if ($accion === 'add_salud') {
   }
 }
 
+/**
+ * Acción: Añadir responsable de igualdad para el área correspondiente.
+ * Valida email y vincula al área de `area_responsable_igualdad`.
+ */
 if ($accion === 'add_responsable_igualdad') {
   $nombre = trim((string)($_POST['nombre'] ?? ''));
   $email = trim((string)($_POST['email'] ?? ''));
@@ -685,6 +736,10 @@ if ($accion === 'add_responsable_igualdad') {
   }
 }
 
+/**
+ * Acción: Registrar datos del proceso de selección y contratación
+ * en `area_seleccion` (puesto, fecha, responsables, números por género).
+ */
 if ($accion === 'add_seleccion') {
   $puestoActual = trim((string)($_POST['puesto_actual'] ?? ''));
   $fechaAlta = trim((string)($_POST['fecha_alta'] ?? ''));
@@ -769,6 +824,10 @@ if ($accion === 'add_seleccion') {
   }
 }
 
+/**
+ * Acción: Registrar promoción y ascenso profesional en
+ * `area_promocion_ascenso_personal` tras validar campos y rangos.
+ */
 if ($accion === 'add_promocion') {
   $puestoOrigen = trim((string)($_POST['puesto_origen'] ?? ''));
   $puestoDestino = trim((string)($_POST['puesto_destino'] ?? ''));

@@ -1,5 +1,16 @@
 <!doctype html>
 <html lang="es">
+<!--
+    Plantilla: Mantenimiento
+    ------------------------
+    Vista que centraliza la gestión de medidas por área (formación, infrarrepresentación,
+    acoso, violencia de género, retribuciones, promoción, etc.).
+    - Usa la variable `$view` para alternar secciones y renderizar tablas y modales.
+    - Los formularios dentro de los modales envían a `../controller/mantenimiento_controller.php`.
+    - Esta plantilla asume que las variables de contexto (por ejemplo `$maintenanceEmpresa`,
+        `$maintenanceMedidas`, `$maintenanceRows`, `$totalRows`, `$currentPage`) han sido
+        preparadas por el controlador que incluye esta vista.
+-->
 
 <head>
     <meta charset="utf-8" />
@@ -13,11 +24,15 @@
 
 <body class="bg-light">
     <?php
+    // Contexto de la vista y rol del usuario
+    // `$view` controla qué sección se renderiza; por defecto mostramos 'ver_formacion'.
+    // `$rol` puede usarse para ajustar permisos en la IU si es necesario.
     $view = $view ?? 'ver_formacion';
     $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
     ?>
     <div class="container-fluid py-4">
         <div class="row g-3">
+            <!-- Sidebar: navegación entre sub-secciones de mantenimiento para la empresa seleccionada -->
             <aside class="col-12 col-lg-3 col-xl-2">
                 <div class="card shadow-sm border-0 sidebar">
                     <div class="card-body">
@@ -53,9 +68,15 @@
                             <div class="alert alert-info py-2"><?= h($_GET['msg']) ?></div>
                         <?php endif; ?>
 
+                        <!-- Selector de vista: se renderiza la sección indicada por `$view` -->
                         <?php if ($maintenanceEmpresa === null): ?>
                             <div class="alert alert-warning">No se encontró la empresa seleccionada.</div>
-                        <?php elseif ($view === 'ver_formacion'): ?>
+                                                <?php elseif ($view === 'ver_formacion'): ?>
+                                                        <!-- Sección: Formación
+                                                                 - Lista las formaciones registradas para la empresa.
+                                                                 - Botón 'Agregar Formación' abre un modal cuyo POST lo procesa
+                                                                     `mantenimiento_controller.php` con accion=add_formacion.
+                                                        -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Formación</h6>
                                 <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$maintenanceEmpresa['id_empresa'] ?>">Volver a empresa</a>
@@ -239,6 +260,10 @@
                                 </div>
                             <?php endif; ?>
                         <?php elseif ($view === 'ver_infra'): ?>
+                            <!-- Sección: Infrarrepresentación femenina
+                                 - Permite registrar plantilla por género y revisar registros.
+                                 - Formulario modal envía accion=add_infra.
+                            -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Infrarrepresentación femenina</h6>
                                 <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$maintenanceEmpresa['id_empresa'] ?>">Volver a empresa</a>
@@ -360,6 +385,10 @@
                                 </div>
                             <?php endif; ?>
                         <?php elseif ($view === 'ver_acoso'): ?>
+                            <!-- Sección: Acoso
+                                 - Gestión de incidentes relacionados con acoso.
+                                 - Modal para agregar registros con accion=add_acoso.
+                            -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Acoso</h6>
                                 <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$maintenanceEmpresa['id_empresa'] ?>">Volver a empresa</a>
@@ -498,7 +527,11 @@
                                     </nav>
                                 </div>
                             <?php endif; ?>
-                        <?php elseif ($view === 'ver_violencia'): ?>
+                                                <?php elseif ($view === 'ver_violencia'): ?>
+                                                        <!-- Sección: Violencia de género
+                                                                 - Similar a otras secciones: lista, búsqueda, paginación y modal
+                                                                     con accion=add_violencia.
+                                                        -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Violencia de género</h6>
                                 <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$maintenanceEmpresa['id_empresa'] ?>">Volver a empresa</a>
@@ -632,6 +665,9 @@
                                 </div>
                             <?php endif; ?>
                         <?php elseif ($view === 'ver_retribuciones'): ?>
+                            <!-- Sección: Retribuciones
+                                 - Registro de permisos y conteos por género; modal con accion=add_retribuciones.
+                            -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Retribuciones</h6>
                                 <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$maintenanceEmpresa['id_empresa'] ?>">Volver a empresa</a>
@@ -759,6 +795,9 @@
                                 </div>
                             <?php endif; ?>
                         <?php elseif ($view === 'ver_promocion'): ?>
+                            <!-- Sección: Promoción y ascenso profesional
+                                 - Formularios extensos para capturar origen/destino, responsables y género.
+                            -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0">Promoción y ascenso profesional</h6>
                                 <a class="btn btn-outline-secondary btn-sm" href="../model/empresa.php?view=ver_empresa&id_empresa=<?= (int)$maintenanceEmpresa['id_empresa'] ?>">Volver a empresa</a>

@@ -7,6 +7,8 @@ require __DIR__ . '/../config/config.php';
 
 require_login();
 
+// Determinar rol del usuario actual y permisos (administrador o técnico)
+
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
 $esAdministrador = ($rol === 'ADMINISTRADOR');
 $esTecnico = ($rol === 'TECNICO');
@@ -21,6 +23,8 @@ $allowed = ['ver_formacion', 'ver_ejercicio', 'ver_infra', 'ver_acoso', 'ver_vio
 if (!in_array($view, $allowed, true)) {
   $view = 'ver_formacion';
 }
+
+// Selección de la vista a mostrar (según la sección de mantenimiento seleccionada)
 
 $sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
@@ -44,7 +48,10 @@ $totalPages = 1;
 $idEmpresa = (int)($_GET['id_empresa'] ?? 0);
 $currentUserId = (int)($_SESSION['user']['id_usuario'] ?? 0);
 
+// Parámetros de búsqueda y paginación
+
 if ($idEmpresa > 0) {
+  // Cargar la empresa solicitada y, si es técnico, comprobar que está asignado a ella
   $stmtEmpresa = db()->prepare("SELECT id_empresa, razon_social FROM empresa WHERE id_empresa = ?" . ($esTecnico ? " AND EXISTS (SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = empresa.id_empresa AND ue.id_usuario = ?)" : "") . " LIMIT 1");
   if ($esTecnico) {
     $stmtEmpresa->bind_param('ii', $idEmpresa, $currentUserId);
@@ -56,6 +63,8 @@ if ($idEmpresa > 0) {
   $stmtEmpresa->close();
 }
 
+// Convierte el nombre de un área (texto) en un ítem de menú
+// Devuelve un array con `view` y `label` o null si no se reconoce
 function maintenance_area_to_menu_item(string $nombreArea): ?array
 {
   $nombre = mb_strtolower(trim($nombreArea), 'UTF-8');
@@ -100,6 +109,7 @@ function maintenance_area_to_menu_item(string $nombreArea): ?array
   return null;
 }
 
+// Construir elementos del sidebar según las áreas contratadas por la empresa
 if ($maintenanceEmpresa !== null) {
   $sqlAreasMenu = '
     SELECT DISTINCT ap.nombre
@@ -129,7 +139,8 @@ if ($maintenanceEmpresa !== null) {
   }
 }
 
-if ($maintenanceEmpresa !== null) {
+  // Lista y paginación de medidas de "Formación"
+  if ($maintenanceEmpresa !== null) {
   if ($view === 'ver_formacion') {
     $sqlMedidas = "
       SELECT cm.id_cliente_medida, m.descripcion AS medida_descripcion
@@ -196,6 +207,7 @@ if ($maintenanceEmpresa !== null) {
     $stmtData->close();
   }
 
+  // Lista de medidas relativas a "Infrarrepresentación" (infra)
   if ($view === 'ver_infra') {
     $where = "WHERE ac.id_empresa = ?";
     $params = [$idEmpresa];
@@ -259,6 +271,7 @@ if ($maintenanceEmpresa !== null) {
     $stmtMedidasInfra->close();
   }
 
+  // Lista de medidas relativas a "Ejercicio" (conciliación/ejercicio derecho)
   if ($view === 'ver_ejercicio') {
     $where = "WHERE ac.id_empresa = ?";
     $params = [$idEmpresa];
@@ -298,6 +311,7 @@ if ($maintenanceEmpresa !== null) {
     $stmtData->close();
   }
 
+  // Lista de incidentes/medidas relacionadas con "Acoso"
   if ($view === 'ver_acoso') {
     $where = "WHERE ac.id_empresa = ?";
     $params = [$idEmpresa];
@@ -363,6 +377,7 @@ if ($maintenanceEmpresa !== null) {
     $stmtMedidasAcoso->close();
   }
 
+  // Lista de medidas/acciones relacionadas con "Violencia de género"
   if ($view === 'ver_violencia') {
     $where = "WHERE ac.id_empresa = ?";
     $params = [$idEmpresa];

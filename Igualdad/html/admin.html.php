@@ -1,3 +1,10 @@
+<!--
+    Plantilla: Panel de Administración
+    Archivo: html/admin.html.php
+    Propósito: Vista principal del panel de administrador. Contiene múltiples
+    sub-vistas controladas por la variable `$view` enviada desde el controlador.
+    Comentarios en español añadidos para facilitar navegación y mantenimiento.
+-->
 <!doctype html>
 <html lang="es">
 
@@ -16,14 +23,14 @@
     <div class="container-fluid py-4">
         <div class="row g-3">
 
-            <!-- SIDEBAR -->
+            <!-- SIDEBAR: fragmento reutilizable con navegación lateral -->
             <?php include __DIR__ . '/../php/fragments/sidebar.php'; ?>
 
-            <!-- MAIN CONTENT -->
+            <!-- MAIN CONTENT: Contenedor principal donde se renderizan las vistas -->
             <main class="col-12 col-md-9 col-xl-10">
                 <div class="card panel shadow-sm border-0 <?= in_array($view, ['menu', 'ver_usuarios'], true) ? 'panel-wide' : '' ?> <?= ($view === 'seguimiento_tecnicos') ? 'panel-followup' : '' ?> <?= ($view === 'reuniones') ? 'panel-reuniones' : '' ?>">
                     <div class="card-body p-4">
-                        <!-- HEADER DENTRO DE LA TARJETA -->
+                        <!-- CABECERA DENTRO DE LA TARJETA: título y breve descripción -->
                         <div class="mb-4">
                             <h2 class="fw-bold mb-1">Panel de Administrador</h2>
                             <p class="text-muted small mb-0">Vista global y gestión del sistema</p>
@@ -34,6 +41,8 @@
                             <div class="alert alert-info py-2"><?= h($_GET['msg']) ?></div>
                         <?php endif; ?>
 
+                        <?php // Vista: 'menu' - resumen y KPIs del sistema 
+                        ?>
                         <?php if ($view === 'menu'): ?>
                             <div class="admin-kpi-grid">
                                 <div>
@@ -98,6 +107,8 @@
                                 <?php endif; ?>
                             </section>
 
+                            <?php // Vista: 'ver_usuarios' - listado y gestión de usuarios 
+                            ?>
                         <?php elseif ($view === 'ver_usuarios'): ?>
 
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -107,7 +118,13 @@
 
                             <!-- Barra superior: Mostrar + Buscar -->
                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-                                <div class="text-muted small">Mostrando 10 entradas</div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span>Mostrar</span>
+                                    <select class="form-select form-select-sm" style="width: 90px;" disabled>
+                                        <option selected>10</option>
+                                    </select>
+                                    <span>Entradas</span>
+                                </div>
 
                                 <form method="get" action="admin.php" class="d-flex align-items-center gap-2">
                                     <input type="hidden" name="view" value="ver_usuarios">
@@ -209,6 +226,8 @@
                                 </nav>
                             </div>
 
+                            <?php // Vista: 'seguimiento_tecnicos' - seguimiento por técnico y empresas asignadas 
+                            ?>
                         <?php elseif ($view === 'seguimiento_tecnicos'): ?>
 
                             <div class="seguimiento-wrap">
@@ -265,6 +284,8 @@
                                 <?php endif; ?>
                             </div>
 
+                            <?php // Vista: 'add' - formulario para crear un nuevo usuario 
+                            ?>
                         <?php elseif ($view === 'add'): ?>
 
                             <h6 class="text-center mb-3">Agregar usuario</h6>
@@ -362,6 +383,8 @@
                                 </div>
                             </form>
 
+                            <?php // Vista: 'edit' - formulario para editar un usuario existente 
+                            ?>
                         <?php elseif ($view === 'edit'): ?>
 
                             <?php
@@ -475,273 +498,281 @@
                                 </form>
                             <?php endif; ?>
 
+                            <?php // Vista: 'delete' - listado con formularios para eliminar usuarios 
+                            ?>
                         <?php elseif ($view === 'delete'): ?>
 
-                                        <h6 class="text-center mb-3">Eliminar usuarios</h6>
+                            <h6 class="text-center mb-3">Eliminar usuarios</h6>
 
-                                        <div class="vstack gap-2">
-                                            <?php foreach (($usuarios ?? []) as $u): ?>
-                                                <form method="post" action="../controller/admin_controller.php"
-                                                    class="border rounded bg-light p-2"
-                                                    onsubmit="return confirm('¿Seguro que quieres eliminar el usuario <?= h($u['nombre_usuario'] ?? '') ?>?');">
-                                                    <?= csrf_input() ?>
+                            <div class="vstack gap-2">
+                                <?php foreach (($usuarios ?? []) as $u): ?>
+                                    <form method="post" action="../controller/admin_controller.php"
+                                        class="border rounded bg-light p-2"
+                                        onsubmit="return confirm('¿Seguro que quieres eliminar el usuario <?= h($u['nombre_usuario'] ?? '') ?>?');">
+                                        <?= csrf_input() ?>
 
-                                                    <input type="hidden" name="accion" value="eliminar">
-                                                    <input type="hidden" name="id_usuario" value="<?= (int)($u['id_usuario'] ?? 0) ?>">
+                                        <input type="hidden" name="accion" value="eliminar">
+                                        <input type="hidden" name="id_usuario" value="<?= (int)($u['id_usuario'] ?? 0) ?>">
 
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <div>
-                                                            <div><strong><?= h($u['nombre_usuario'] ?? '') ?></strong></div>
-                                                            <div class="text-muted small"><?= h($u['rol'] ?? '') ?></div>
-                                                            <div class="text-muted small"><?= h($u['email'] ?? '') ?></div>
-                                                        </div>
-                                                        <button class="btn btn-danger" type="submit">Eliminar</button>
-                                                    </div>
-                                                </form>
-                                            <?php endforeach; ?>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <div><strong><?= h($u['nombre_usuario'] ?? '') ?></strong></div>
+                                                <div class="text-muted small"><?= h($u['rol'] ?? '') ?></div>
+                                                <div class="text-muted small"><?= h($u['email'] ?? '') ?></div>
+                                            </div>
+                                            <button class="btn btn-danger" type="submit">Eliminar</button>
                                         </div>
+                                    </form>
+                                <?php endforeach; ?>
+                            </div>
 
-                                        <div class="mt-3">
-                                            <a class="btn btn-outline-secondary w-100" href="admin.php?view=ver_usuarios">Volver</a>
-                                        </div>
+                            <div class="mt-3">
+                                <a class="btn btn-outline-secondary w-100" href="admin.php?view=ver_usuarios">Volver</a>
+                            </div>
 
-                                    <?php elseif ($view === 'privada'): ?>
+                            <?php // Vista: 'privada' - área privada, opción mínima informativa 
+                            ?>
+                        <?php elseif ($view === 'privada'): ?>
 
-                                        <div class="alert alert-light border mb-0">
-                                            Selecciona una opcion de Area Privada: <strong>Mi cuenta</strong> o <strong>Mis reuniones</strong>.
-                                        </div>
+                            <div class="alert alert-light border mb-0">
+                                Selecciona una opcion de Area Privada: <strong>Mi cuenta</strong> o <strong>Mis reuniones</strong>.
+                            </div>
 
-                                    <?php elseif ($view === 'perfil'): ?>
+                            <?php // Vista: 'perfil' - formulario de edición del propio administrador 
+                            ?>
+                        <?php elseif ($view === 'perfil'): ?>
 
-                                        <div class="d-flex justify-content-center">
-                                            <div class="card shadow-sm border-0" style="max-width: 520px; width: 100%;">
-                                                <div class="card-body p-4">
-                                                    <h3 class="text-center mb-4">Mi Cuenta</h3>
+                            <div class="d-flex justify-content-center">
+                                <div class="card shadow-sm border-0" style="max-width: 520px; width: 100%;">
+                                    <div class="card-body p-4">
+                                        <h3 class="text-center mb-4">Mi Cuenta</h3>
 
-                                                    <?php if (!empty($adminPerfil)): ?>
-                                                        <form method="post" action="../controller/admin_controller.php" class="vstack gap-3">
-                                                            <?= csrf_input() ?>
-                                                            <input type="hidden" name="accion" value="editar_perfil">
-                                                            <input type="hidden" name="id" value="<?= (int)($adminPerfil['id_usuario'] ?? 0) ?>">
+                                        <?php if (!empty($adminPerfil)): ?>
+                                            <form method="post" action="../controller/admin_controller.php" class="vstack gap-3">
+                                                <?= csrf_input() ?>
+                                                <input type="hidden" name="accion" value="editar_perfil">
+                                                <input type="hidden" name="id" value="<?= (int)($adminPerfil['id_usuario'] ?? 0) ?>">
 
-                                                            <input class="form-control" name="nombre_usuario"
-                                                                value="<?= h($adminPerfil['nombre_usuario'] ?? '') ?>" placeholder="Nombre" required>
+                                                <input class="form-control" name="nombre_usuario"
+                                                    value="<?= h($adminPerfil['nombre_usuario'] ?? '') ?>" placeholder="Nombre" required>
 
-                                                            <input class="form-control" name="apellidos"
-                                                                value="<?= h($adminPerfil['apellidos'] ?? '') ?>" placeholder="Apellidos">
+                                                <input class="form-control" name="apellidos"
+                                                    value="<?= h($adminPerfil['apellidos'] ?? '') ?>" placeholder="Apellidos">
 
-                                                            <input class="form-control" name="email" type="email"
-                                                                value="<?= h($adminPerfil['email'] ?? '') ?>" placeholder="Email" required>
+                                                <input class="form-control" name="email" type="email"
+                                                    value="<?= h($adminPerfil['email'] ?? '') ?>" placeholder="Email" required>
 
-                                                            <input class="form-control" name="telefono"
-                                                                value="<?= h($adminPerfil['telefono'] ?? '') ?>" placeholder="Teléfono">
+                                                <input class="form-control" name="telefono"
+                                                    value="<?= h($adminPerfil['telefono'] ?? '') ?>" placeholder="Teléfono">
 
-                                                            <input class="form-control" name="direccion"
-                                                                value="<?= h($adminPerfil['direccion'] ?? '') ?>" placeholder="Dirección">
+                                                <input class="form-control" name="direccion"
+                                                    value="<?= h($adminPerfil['direccion'] ?? '') ?>" placeholder="Dirección">
 
-                                                            <input class="form-control" name="localidad"
-                                                                value="<?= h($adminPerfil['localidad'] ?? '') ?>" placeholder="Localidad">
+                                                <input class="form-control" name="localidad"
+                                                    value="<?= h($adminPerfil['localidad'] ?? '') ?>" placeholder="Localidad">
 
-                                                            <div class="input-group">
-                                                                <input id="adminPerfilPassword" class="form-control" name="password" type="password" placeholder="" autocomplete="new-password" minlength="6">
-                                                                <button class="btn btn-outline-secondary" type="button" data-password-toggle data-target="adminPerfilPassword" aria-label="Mostrar contraseña">Mostrar</button>
-                                                            </div>
-
-                                                            <div class="d-flex justify-content-center pt-2">
-                                                                <button class="btn btn-dark px-5" type="submit">Actualizar</button>
-                                                            </div>
-                                                        </form>
-                                                    <?php endif; ?>
-
+                                                <div class="input-group">
+                                                    <input id="adminPerfilPassword" class="form-control" name="password" type="password" placeholder="" autocomplete="new-password" minlength="6">
+                                                    <button class="btn btn-outline-secondary" type="button" data-password-toggle data-target="adminPerfilPassword" aria-label="Mostrar contraseña">Mostrar</button>
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                    <?php elseif ($view === 'reuniones'): ?>
-
-                                        <?php
-                                        $adminCalendarEvents = [];
-                                        foreach (($adminTodasReuniones ?? []) as $reunion) {
-                                            $idReunion = (int)($reunion['id_reunion'] ?? 0);
-                                            $objetivoReunion = trim((string)($reunion['objetivo'] ?? ''));
-                                            $fechaReunion = (string)($reunion['fecha_reunion'] ?? '');
-                                            $horaReunion = (string)($reunion['hora_reunion'] ?? '');
-                                            $participantesReunion = trim((string)($reunion['participantes'] ?? ''));
-                                            $titulo = ($objetivoReunion !== '' ? $objetivoReunion : 'Reunion');
-                                            $adminCalendarEvents[] = [
-                                                'id' => (string)$idReunion,
-                                                'title' => $titulo,
-                                                'start' => $fechaReunion . 'T' . $horaReunion,
-                                                'allDay' => false,
-                                                'extendedProps' => [
-                                                    'objetivo' => $objetivoReunion,
-                                                    'fecha' => $fechaReunion,
-                                                    'hora' => $horaReunion,
-                                                    'participantes' => $participantesReunion,
-                                                ],
-                                            ];
-                                        }
-                                        ?>
-
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6 class="mb-0">📅 Reuniones</h6>
-                                        </div>
-
-                                        <div class="card border-0 shadow-sm mb-3">
-                                            <div class="card-body">
-                                                <h6 class="mb-3">Crear Nueva Reunión</h6>
-                                                <form method="post" action="../controller/admin_controller.php" class="row g-2 align-items-end">
-                                                    <?= csrf_input() ?>
-                                                    <input type="hidden" name="accion" value="crear_reunion">
-                                                    <div class="col-12 col-md-3">
-                                                        <label class="form-label">📅 Fecha</label>
-                                                        <input class="form-control" type="date" name="fecha_reunion" required>
-                                                    </div>
-                                                    <div class="col-12 col-md-2">
-                                                        <label class="form-label">🕐 Hora</label>
-                                                        <input class="form-control" type="time" name="hora_reunion" required>
-                                                    </div>
-                                                    <div class="col-12 col-md-4">
-                                                        <label class="form-label">👤 Asignar a Cliente</label>
-                                                        <select class="form-select" name="id_cliente_reunion">
-                                                            <option value="0">Sin asignar a cliente</option>
-                                                            <?php if (empty($adminClientesReunion)): ?>
-                                                                <option value="0" disabled>Sin clientes disponibles</option>
-                                                            <?php else: ?>
-                                                                <?php foreach (($adminClientesReunion ?? []) as $clienteReunion): ?>
-                                                                    <?php
-                                                                    $idClienteReunion = (int)($clienteReunion['id_usuario'] ?? 0);
-                                                                    $nombreClienteReunion = trim((string)($clienteReunion['nombre_usuario'] ?? ''));
-                                                                    $apellidosClienteReunion = trim((string)($clienteReunion['apellidos'] ?? ''));
-                                                                    $emailClienteReunion = trim((string)($clienteReunion['email'] ?? ''));
-                                                                    $empresaClienteReunion = trim((string)($clienteReunion['razon_social'] ?? ''));
-                                                                    $labelClienteReunion = trim($nombreClienteReunion . ' ' . $apellidosClienteReunion);
-                                                                    if ($labelClienteReunion === '') {
-                                                                        $labelClienteReunion = 'Cliente #' . $idClienteReunion;
-                                                                    }
-                                                                    if ($empresaClienteReunion !== '') {
-                                                                        $labelClienteReunion .= ' - ' . $empresaClienteReunion;
-                                                                    }
-                                                                    if ($emailClienteReunion !== '') {
-                                                                        $labelClienteReunion .= ' (' . $emailClienteReunion . ')';
-                                                                    }
-                                                                    ?>
-                                                                    <option value="<?= $idClienteReunion ?>"><?= h($labelClienteReunion) ?></option>
-                                                                <?php endforeach; ?>
-                                                            <?php endif; ?>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-12 col-md-3">
-                                                        <label class="form-label">📝 Asunto</label>
-                                                        <input class="form-control" type="text" name="objetivo" maxlength="1000" placeholder="(opcional)">
-                                                    </div>
-                                                    <div class="col-12 d-flex justify-content-end">
-                                                        <button class="btn btn-primary" type="submit">➕ Agregar Reunión</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-
-                                        <div class="card border-0 shadow-sm mb-3">
-                                            <div class="card-body">
-                                                <h6 class="mb-3">📆 Calendario de todas las reuniones</h6>
-                                                <div id="adminReunionesCalendar" class="border rounded p-3 bg-white reuniones-calendar-wrap"></div>
-                                            </div>
-                                        </div>
-
-                                        <div class="card border-0 shadow-sm mt-3">
-                                            <div class="card-body">
-                                                <h6 class="mb-3">📅 Todas Tus Reuniones</h6>
-                                                <?php if (empty($adminReuniones)): ?>
-                                                    <div class="alert alert-light border mb-0">El calendario se muestra aunque no tengas reuniones asignadas.</div>
-                                                <?php else: ?>
-                                                    <div class="vstack gap-3">
-                                                        <?php foreach (($adminReuniones ?? []) as $reunionLista): ?>
-                                                            <?php
-                                                            $idReunionLista = (int)($reunionLista['id_reunion'] ?? 0);
-                                                            $objetivoLista = trim((string)($reunionLista['objetivo'] ?? ''));
-                                                            $fechaListaRaw = (string)($reunionLista['fecha_reunion'] ?? '');
-                                                            $horaListaRaw = (string)($reunionLista['hora_reunion'] ?? '');
-                                                            $horaLista = substr($horaListaRaw, 0, 5);
-                                                            $resumenFecha = trim($fechaListaRaw . ' · ' . $horaLista, ' ·');
-                                                            ?>
-                                                            <div class="cita-item d-flex justify-content-between align-items-start flex-wrap gap-2">
-                                                                <div class="me-auto">
-                                                                    <div class="cita-item-title">📄 <?= h($objetivoLista !== '' ? $objetivoLista : 'Reunión') ?></div>
-                                                                    <div class="cita-item-subtitle">Cita programada</div>
-                                                                </div>
-                                                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                                    <span class="cita-pill">Reunión</span>
-                                                                    <span class="cita-pill"><?= h($resumenFecha !== '' ? $resumenFecha : 'Sin fecha') ?></span>
-                                                                    <details>
-                                                                        <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
-                                                                        <form method="post" action="../controller/admin_controller.php" class="mt-2 row g-2 align-items-end" style="min-width: 320px;">
-                                                                            <?= csrf_input() ?>
-                                                                            <input type="hidden" name="accion" value="editar_reunion">
-                                                                            <input type="hidden" name="id_reunion" value="<?= $idReunionLista ?>">
-                                                                            <div class="col-12 col-md-4">
-                                                                                <label class="form-label mb-1">Fecha</label>
-                                                                                <input class="form-control form-control-sm" type="date" name="fecha_reunion" value="<?= h($fechaListaRaw) ?>" required>
-                                                                            </div>
-                                                                            <div class="col-12 col-md-3">
-                                                                                <label class="form-label mb-1">Hora</label>
-                                                                                <input class="form-control form-control-sm" type="time" name="hora_reunion" value="<?= h($horaLista) ?>" required>
-                                                                            </div>
-                                                                            <div class="col-12 col-md-5">
-                                                                                <label class="form-label mb-1">Objetivo</label>
-                                                                                <input class="form-control form-control-sm" type="text" name="objetivo" maxlength="1000" value="<?= h($objetivoLista) ?>" placeholder="Objetivo (opcional)">
-                                                                            </div>
-                                                                            <div class="col-12 d-flex justify-content-end">
-                                                                                <button class="btn btn-success btn-sm" type="submit">Guardar</button>
-                                                                            </div>
-                                                                        </form>
-                                                                    </details>
-                                                                    <form method="post" action="../controller/admin_controller.php" onsubmit="return confirm('¿Eliminar esta reunión?');">
-                                                                        <?= csrf_input() ?>
-                                                                        <input type="hidden" name="accion" value="eliminar_reunion">
-                                                                        <input type="hidden" name="id_reunion" value="<?= $idReunionLista ?>">
-                                                                        <button class="btn btn-outline-danger btn-sm" type="submit">Eliminar</button>
-                                                                    </form>
-                                                                </div>
-                                                            </div>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            </div>
+                                                <div class="d-flex justify-content-center pt-2">
+                                                    <button class="btn btn-dark px-5" type="submit">Actualizar</button>
+                                                </div>
+                                            </form>
                                         <?php endif; ?>
-                                        </div>
-                                </div>
 
-                                <div class="card border-0 shadow-sm mt-3">
-                                    <div class="card-body">
-                                        <h6 class="mb-3">🌐 Todas las reuniones del sistema</h6>
-                                        <?php if (empty($adminTodasReuniones)): ?>
-                                            <div class="alert alert-light border mb-0">No hay reuniones registradas.</div>
-                                        <?php else: ?>
-                                            <div class="vstack gap-3">
-                                                <?php foreach (($adminTodasReuniones ?? []) as $reunionGlobal): ?>
-                                                    <?php
-                                                    $objetivoGlobal = trim((string)($reunionGlobal['objetivo'] ?? ''));
-                                                    $fechaGlobalRaw = (string)($reunionGlobal['fecha_reunion'] ?? '');
-                                                    $horaGlobalRaw = (string)($reunionGlobal['hora_reunion'] ?? '');
-                                                    $horaGlobal = substr($horaGlobalRaw, 0, 5);
-                                                    $participantesGlobal = trim((string)($reunionGlobal['participantes'] ?? ''));
-                                                    $resumenGlobal = trim($fechaGlobalRaw . ' · ' . $horaGlobal, ' ·');
-                                                    ?>
-                                                    <div class="cita-item d-flex justify-content-between align-items-start flex-wrap gap-2">
-                                                        <div class="me-auto">
-                                                            <div class="cita-item-title">📄 <?= h($objetivoGlobal !== '' ? $objetivoGlobal : 'Reunión') ?></div>
-                                                            <div class="cita-item-subtitle">Participantes: <?= h($participantesGlobal !== '' ? $participantesGlobal : 'Sin participantes') ?></div>
-                                                        </div>
-                                                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                            <span class="cita-pill">Reunión</span>
-                                                            <span class="cita-pill"><?= h($resumenGlobal !== '' ? $resumenGlobal : 'Sin fecha') ?></span>
-                                                        </div>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        <?php endif; ?>
                                     </div>
                                 </div>
+                            </div>
+
+                            <?php // Vista: 'reuniones' - calendario y gestión de reuniones del administrador 
+                            ?>
+                        <?php elseif ($view === 'reuniones'): ?>
+
+                            <?php
+                            $adminCalendarEvents = [];
+                            foreach (($adminTodasReuniones ?? []) as $reunion) {
+                                $idReunion = (int)($reunion['id_reunion'] ?? 0);
+                                $objetivoReunion = trim((string)($reunion['objetivo'] ?? ''));
+                                $fechaReunion = (string)($reunion['fecha_reunion'] ?? '');
+                                $horaReunion = (string)($reunion['hora_reunion'] ?? '');
+                                $participantesReunion = trim((string)($reunion['participantes'] ?? ''));
+                                $titulo = ($objetivoReunion !== '' ? $objetivoReunion : 'Reunion');
+                                $adminCalendarEvents[] = [
+                                    'id' => (string)$idReunion,
+                                    'title' => $titulo,
+                                    'start' => $fechaReunion . 'T' . $horaReunion,
+                                    'allDay' => false,
+                                    'extendedProps' => [
+                                        'objetivo' => $objetivoReunion,
+                                        'fecha' => $fechaReunion,
+                                        'hora' => $horaReunion,
+                                        'participantes' => $participantesReunion,
+                                    ],
+                                ];
+                            }
+                            ?>
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">📅 Reuniones</h6>
+                            </div>
+
+                            <div class="card border-0 shadow-sm mb-3">
+                                <div class="card-body">
+                                    <h6 class="mb-3">Crear Nueva Reunión</h6>
+                                    <form method="post" action="../controller/admin_controller.php" class="row g-2 align-items-end">
+                                        <?= csrf_input() ?>
+                                        <input type="hidden" name="accion" value="crear_reunion">
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label">📅 Fecha</label>
+                                            <input class="form-control" type="date" name="fecha_reunion" required>
+                                        </div>
+                                        <div class="col-12 col-md-2">
+                                            <label class="form-label">🕐 Hora</label>
+                                            <input class="form-control" type="time" name="hora_reunion" required>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label">👤 Asignar a Cliente</label>
+                                            <select class="form-select" name="id_cliente_reunion">
+                                                <option value="0">Sin asignar a cliente</option>
+                                                <?php if (empty($adminClientesReunion)): ?>
+                                                    <option value="0" disabled>Sin clientes disponibles</option>
+                                                <?php else: ?>
+                                                    <?php foreach (($adminClientesReunion ?? []) as $clienteReunion): ?>
+                                                        <?php
+                                                        $idClienteReunion = (int)($clienteReunion['id_usuario'] ?? 0);
+                                                        $nombreClienteReunion = trim((string)($clienteReunion['nombre_usuario'] ?? ''));
+                                                        $apellidosClienteReunion = trim((string)($clienteReunion['apellidos'] ?? ''));
+                                                        $emailClienteReunion = trim((string)($clienteReunion['email'] ?? ''));
+                                                        $empresaClienteReunion = trim((string)($clienteReunion['razon_social'] ?? ''));
+                                                        $labelClienteReunion = trim($nombreClienteReunion . ' ' . $apellidosClienteReunion);
+                                                        if ($labelClienteReunion === '') {
+                                                            $labelClienteReunion = 'Cliente #' . $idClienteReunion;
+                                                        }
+                                                        if ($empresaClienteReunion !== '') {
+                                                            $labelClienteReunion .= ' - ' . $empresaClienteReunion;
+                                                        }
+                                                        if ($emailClienteReunion !== '') {
+                                                            $labelClienteReunion .= ' (' . $emailClienteReunion . ')';
+                                                        }
+                                                        ?>
+                                                        <option value="<?= $idClienteReunion ?>"><?= h($labelClienteReunion) ?></option>
+                                                    <?php endforeach; ?>
+                                                <?php endif; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label">📝 Asunto</label>
+                                            <input class="form-control" type="text" name="objetivo" maxlength="1000" placeholder="(opcional)">
+                                        </div>
+                                        <div class="col-12 d-flex justify-content-end">
+                                            <button class="btn btn-primary" type="submit">➕ Agregar Reunión</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div class="card border-0 shadow-sm mb-3">
+                                <div class="card-body">
+                                    <h6 class="mb-3">📆 Calendario de todas las reuniones</h6>
+                                    <div id="adminReunionesCalendar" class="border rounded p-3 bg-white reuniones-calendar-wrap"></div>
+                                </div>
+                            </div>
+
+                            <div class="card border-0 shadow-sm mt-3">
+                                <div class="card-body">
+                                    <h6 class="mb-3">📅 Todas Tus Reuniones</h6>
+                                    <?php if (empty($adminReuniones)): ?>
+                                        <div class="alert alert-light border mb-0">El calendario se muestra aunque no tengas reuniones asignadas.</div>
+                                    <?php else: ?>
+                                        <div class="vstack gap-3">
+                                            <?php foreach (($adminReuniones ?? []) as $reunionLista): ?>
+                                                <?php
+                                                $idReunionLista = (int)($reunionLista['id_reunion'] ?? 0);
+                                                $objetivoLista = trim((string)($reunionLista['objetivo'] ?? ''));
+                                                $fechaListaRaw = (string)($reunionLista['fecha_reunion'] ?? '');
+                                                $horaListaRaw = (string)($reunionLista['hora_reunion'] ?? '');
+                                                $horaLista = substr($horaListaRaw, 0, 5);
+                                                $resumenFecha = trim($fechaListaRaw . ' · ' . $horaLista, ' ·');
+                                                ?>
+                                                <div class="cita-item d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                                    <div class="me-auto">
+                                                        <div class="cita-item-title">📄 <?= h($objetivoLista !== '' ? $objetivoLista : 'Reunión') ?></div>
+                                                        <div class="cita-item-subtitle">Cita programada</div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                        <span class="cita-pill">Reunión</span>
+                                                        <span class="cita-pill"><?= h($resumenFecha !== '' ? $resumenFecha : 'Sin fecha') ?></span>
+                                                        <details>
+                                                            <summary class="btn btn-outline-secondary btn-sm">Editar</summary>
+                                                            <form method="post" action="../controller/admin_controller.php" class="mt-2 row g-2 align-items-end" style="min-width: 320px;">
+                                                                <?= csrf_input() ?>
+                                                                <input type="hidden" name="accion" value="editar_reunion">
+                                                                <input type="hidden" name="id_reunion" value="<?= $idReunionLista ?>">
+                                                                <div class="col-12 col-md-4">
+                                                                    <label class="form-label mb-1">Fecha</label>
+                                                                    <input class="form-control form-control-sm" type="date" name="fecha_reunion" value="<?= h($fechaListaRaw) ?>" required>
+                                                                </div>
+                                                                <div class="col-12 col-md-3">
+                                                                    <label class="form-label mb-1">Hora</label>
+                                                                    <input class="form-control form-control-sm" type="time" name="hora_reunion" value="<?= h($horaLista) ?>" required>
+                                                                </div>
+                                                                <div class="col-12 col-md-5">
+                                                                    <label class="form-label mb-1">Objetivo</label>
+                                                                    <input class="form-control form-control-sm" type="text" name="objetivo" maxlength="1000" value="<?= h($objetivoLista) ?>" placeholder="Objetivo (opcional)">
+                                                                </div>
+                                                                <div class="col-12 d-flex justify-content-end">
+                                                                    <button class="btn btn-success btn-sm" type="submit">Guardar</button>
+                                                                </div>
+                                                            </form>
+                                                        </details>
+                                                        <form method="post" action="../controller/admin_controller.php" onsubmit="return confirm('¿Eliminar esta reunión?');">
+                                                            <?= csrf_input() ?>
+                                                            <input type="hidden" name="accion" value="eliminar_reunion">
+                                                            <input type="hidden" name="id_reunion" value="<?= $idReunionLista ?>">
+                                                            <button class="btn btn-outline-danger btn-sm" type="submit">Eliminar</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                            </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mt-3">
+                        <div class="card-body">
+                            <h6 class="mb-3">🌐 Todas las reuniones del sistema</h6>
+                            <?php if (empty($adminTodasReuniones)): ?>
+                                <div class="alert alert-light border mb-0">No hay reuniones registradas.</div>
+                            <?php else: ?>
+                                <div class="vstack gap-3">
+                                    <?php foreach (($adminTodasReuniones ?? []) as $reunionGlobal): ?>
+                                        <?php
+                                        $objetivoGlobal = trim((string)($reunionGlobal['objetivo'] ?? ''));
+                                        $fechaGlobalRaw = (string)($reunionGlobal['fecha_reunion'] ?? '');
+                                        $horaGlobalRaw = (string)($reunionGlobal['hora_reunion'] ?? '');
+                                        $horaGlobal = substr($horaGlobalRaw, 0, 5);
+                                        $participantesGlobal = trim((string)($reunionGlobal['participantes'] ?? ''));
+                                        $resumenGlobal = trim($fechaGlobalRaw . ' · ' . $horaGlobal, ' ·');
+                                        ?>
+                                        <div class="cita-item d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                            <div class="me-auto">
+                                                <div class="cita-item-title">📄 <?= h($objetivoGlobal !== '' ? $objetivoGlobal : 'Reunión') ?></div>
+                                                <div class="cita-item-subtitle">Participantes: <?= h($participantesGlobal !== '' ? $participantesGlobal : 'Sin participantes') ?></div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <span class="cita-pill">Reunión</span>
+                                                <span class="cita-pill"><?= h($resumenGlobal !== '' ? $resumenGlobal : 'Sin fecha') ?></span>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
 
                     <div class="card border-0 shadow-sm mt-3">
                         <div class="card-body">

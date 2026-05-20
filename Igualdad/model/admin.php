@@ -15,9 +15,19 @@ $view = (string)($_GET['view'] ?? 'ver_usuarios');
 $allowed = ['menu', 'add', 'edit', 'delete', 'privada', 'perfil', 'reuniones', 'ver_usuarios', 'seguimiento_tecnicos'];
 if (!in_array($view, $allowed, true)) $view = 'ver_usuarios';
 
+/**
+ * Controlador: Panel de administración
+ * -----------------------------------
+ * Maneja la preparación de datos para las vistas de administración (lista
+ * de usuarios, perfil del admin, reuniones y seguimiento de técnicos). No
+ * procesa formularios aquí: es una capa de lectura/consulta para las vistas.
+ */
+
 // Datos de sesión
 $adminUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'admin');
 $adminId = (int)($_SESSION['user']['id_usuario'] ?? 0);
+
+// Email del administrador (se usa en interfaces o remitentess)
 
 // Email admin
 $adminEmail = '';
@@ -34,6 +44,8 @@ if ($adminId > 0) {
 $roles = [];
 $res = db()->query("SELECT id, nombre FROM rol ORDER BY nombre");
 while ($r = $res->fetch_assoc()) $roles[] = $r;
+
+// Lista de empresas disponible para asignación a usuarios (vista admin)
 
 // Empresas (para asignar a usuarios)
 $empresas = [];
@@ -78,6 +90,8 @@ if ($resMantenimientos) {
 }
 
 $adminOperationalSummary = [];
+
+// Resumen operativo por empresa: estado del flujo (registro, toma datos, word, etc.)
 
 $sqlDescargaWordTecnico = "EXISTS (\n      SELECT 1\n      FROM archivo_descarga_log dl\n      INNER JOIN usuario u3 ON u3.id_usuario = dl.id_usuario\n      INNER JOIN rol r3 ON r3.id = u3.rol_id\n      WHERE dl.id_empresa = e.id_empresa\n        AND UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'\n        AND UPPER(r3.nombre) LIKE 'TECNICO%'\n      LIMIT 1\n    )";
 
@@ -137,6 +151,9 @@ $seguimientoTecnicos = [];
 $seguimientoTecnicoSeleccionadoId = (int)($_GET['id_tecnico'] ?? 0);
 $seguimientoTecnicoSeleccionado = null;
 $seguimientoTecnicoEmpresas = [];
+
+// Si se solicita la vista de seguimiento de técnicos, construimos listas
+// de técnicos y las empresas asociadas para mostrar progreso por empresa.
 
 if ($view === 'seguimiento_tecnicos') {
   $resTecnicosSeg = db()->query("\n    SELECT\n      u.id_usuario,\n      u.nombre_usuario,\n      COUNT(DISTINCT ue.id_empresa) AS total_empresas\n    FROM usuario u\n    INNER JOIN rol r ON r.id = u.rol_id\n    LEFT JOIN usuario_empresa ue ON ue.id_usuario = u.id_usuario\n    WHERE UPPER(r.nombre) LIKE 'TECNICO%'\n    GROUP BY u.id_usuario, u.nombre_usuario\n    ORDER BY u.nombre_usuario ASC\n  ");
@@ -374,6 +391,8 @@ unset($_SESSION['add_user_old'], $_SESSION['add_user_error']);
 // PERFIL (Área Privada)
 // =========================
 $adminPerfil = null;
+
+// Cargar datos del perfil del administrador si se solicita la vista `perfil`
 
 if ($view === 'perfil' && $adminId > 0) {
   $stmt = db()->prepare("

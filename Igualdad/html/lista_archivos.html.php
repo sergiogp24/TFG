@@ -2,10 +2,23 @@
 
 declare(strict_types=1);
 
+/**
+ * Plantilla: Lista de Archivos
+ * --------------------------
+ * Muestra documentos subidos por/para empresas. Permite filtrado por empresa,
+ * subida de nuevos archivos (modal) y acciones de descarga/ eliminación
+ * condicionadas por roles (ADMINISTRADOR / TECNICO / CLIENTE).
+ */
+
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
+
+// Indicadores de rol usados para ajustar botones y permisos en la vista.
 $esAdmin = ($rol === 'ADMINISTRADOR');
 $esCliente = ($rol === 'CLIENTE');
 $esTecnico = ($rol === 'TECNICO');
+
+// Selección de hoja de estilos según tipo de usuario para mantener la
+// apariencia consistente con el panel correspondiente.
 $panelCss = $esTecnico ? '../css/tecnico.css' : ($esCliente ? '../css/empresa.css' : '../css/admin.css');
 $sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
@@ -54,6 +67,11 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
             </div>
 
             <!-- Modal Subir Archivo -->
+            <!--
+              Modal: Subir Archivo
+              - Envía a `php/ver_archivos.php` con accion=subir_archivo.
+              - Incluye `csrf_input()` y permite elegir empresa si no se filtra.
+            -->
             <div class="modal fade" id="modalSubirArchivo" tabindex="-1" aria-labelledby="modalSubirArchivoLabel" aria-hidden="true">
               <div class="modal-dialog">
                 <div class="modal-content">
@@ -114,6 +132,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
             <?php endif; ?>
 
             <?php if (empty($archivosListado)): ?>
+              <!-- No hay archivos en la consulta actual -->
               <div class="alert alert-warning mb-0">No hay archivos para mostrar.</div>
             <?php else: ?>
               <div class="table-responsive">
@@ -176,6 +195,7 @@ if (!$esAdmin && !$esCliente && !$esTecnico) {
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Script: Gestión asíncrona para 'Regenerar Word' desde la lista de archivos -->
   <script>
     (function() {
       const formRegenerarWord = document.getElementById('formRegenerarWordArchivos');

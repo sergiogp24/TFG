@@ -10,6 +10,17 @@ require __DIR__ . '/../config/config.php';
 $rol = strtoupper((string)($_SESSION['user']['rol'] ?? 'CLIENTE'));
 $esStaff = in_array($rol, ['ADMINISTRADOR', 'TECNICO'], true);
 
+/**
+ * Plantilla: Subir documento por tipo
+ * ---------------------------------
+ * Permite subir documentos clasificados por un campo `tipo` (IGUALDAD, SELECCION, SALUD, ...).
+ * - Si el usuario es STAFF (ADMINISTRADOR/TECNICO) muestra un selector de empresas y un formulario
+ *   que envía a `php/procesar_documento_tipo.php` vía POST con `archivo`, `tipo`, `asunto` y `id_empresa`.
+ * - Si el usuario es CLIENTE muestra un formulario con `referencia_empresa` (readonly) que también
+ *   envía a `php/procesar_documento_tipo.php`.
+ * - Los archivos permitidos se limitan por el atributo `accept` en el input file.
+ */
+
 $msg = (string)($_GET['msg'] ?? '');
 $sessionUsername = (string)($_SESSION['user']['nombre_usuario'] ?? 'usuario');
 $sessionEmail = (string)($_SESSION['user']['email'] ?? '');
@@ -80,6 +91,7 @@ $idEmpresaPreseleccionada = (int)($_GET['id_empresa'] ?? 0);
 <body class="bg-light">
 
     <?php if ($esStaff): ?>
+        <!-- Vista para STAFF: permite seleccionar la empresa destino del documento -->
         <div class="container-fluid py-4">
             <div class="row g-3">
 
@@ -183,6 +195,7 @@ $idEmpresaPreseleccionada = (int)($_GET['id_empresa'] ?? 0);
                             <div class="alert alert-info py-2"><?= h($msg) ?></div>
                         <?php endif; ?>
 
+                        <!-- Formulario STAFF: envía archivo, tipo y asunto junto con id_empresa -->
                         <form action="../php/procesar_documento_tipo.php"
                             method="POST"
                             enctype="multipart/form-data">
@@ -284,9 +297,11 @@ $idEmpresaPreseleccionada = (int)($_GET['id_empresa'] ?? 0);
                             <div class="alert alert-info py-2"><?= h($msg) ?></div>
                         <?php endif; ?>
 
+                        <!-- Formulario CLIENTE: referencia de empresa readonly y selección de tipo -->
                         <form action="../php/procesar_documento_tipo.php"
                             method="POST"
                             enctype="multipart/form-data">
+                            <?= csrf_input() ?>
                             <label for="referencia_empresa_cliente">Empresa / Referencia:</label>
                             <input type="text"
                                 id="referencia_empresa_cliente"
@@ -326,6 +341,8 @@ $idEmpresaPreseleccionada = (int)($_GET['id_empresa'] ?? 0);
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Script: actualiza el campo de referencia para clientes según el tipo seleccionado.
+        // Mejora UX, pero el servidor debe validar/normalizar la referencia en el procesamiento.
         (function() {
             const referenciaInput = document.getElementById('referencia_empresa_cliente');
             const tipoSelect = document.getElementById('tipo_cliente');

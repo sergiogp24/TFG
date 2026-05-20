@@ -3,13 +3,23 @@
 declare(strict_types=1);
 
 
+// Carga de utilidades y control de acceso
+// - `auth.php` gestiona la sesión y la autenticación
 require __DIR__ . '/../php/auth.php';
 
+// Helpers y verificación de rol: este controller acepta solo usuarios CLIENTE
 require_once __DIR__ . '/../php/helpers.php';
 require_role('CLIENTE');
 
+// Configuración general y helpers (db(), env(), app_path(), etc.)
 require __DIR__ . '/../config/config.php';
 
+/**
+ * Redirige a una vista del frontend de cliente (`html/index_cliente.php`).
+ *
+ * @param string $view Vista objetivo (ej. 'menu', 'perfil', 'reuniones')
+ * @param string $msg  Mensaje opcional que se pasará por querystring
+ */
 function redirect_cliente(string $view = 'menu', string $msg = ''): void
 {
   $to = app_path('/html/index_cliente.php?view=') . urlencode($view);
@@ -20,6 +30,10 @@ function redirect_cliente(string $view = 'menu', string $msg = ''): void
   exit;
 }
 
+/**
+ * Registra errores internos relacionados con acciones de cliente.
+ * El $context ayuda a identificar el origen (ej. 'cliente.crear_reunion').
+ */
 function log_internal_error_cliente(string $context, Throwable $e): void
 {
   error_log(sprintf(
@@ -33,6 +47,12 @@ function log_internal_error_cliente(string $context, Throwable $e): void
 
 
 
+/*
+ * Validación inicial de la petición:
+ * - Solo se aceptan POST
+ * - Validación CSRF
+ * - Lectura del parámetro `accion` que determina la operación a realizar
+ */
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
   http_response_code(405);
   exit('Metodo no permitido');
@@ -44,7 +64,16 @@ if (!csrf_validate((string)($_POST['_csrf_token'] ?? ''))) {
 
 $accion = (string)($_POST['accion'] ?? '');
 
+// ---------- Accion: editar_perfil ----------
+// Permite al cliente editar su propio perfil. Valida datos y actualiza la tabla `usuario`.
 if ($accion === 'editar_perfil') {
+  // --- Flujo: editar_perfil
+  // Pasos:
+  // 1) Leer campos del formulario y normalizarlos
+  // 2) Comprobar que el usuario solo edita su propia cuenta
+  // 3) Validar cada campo (longitudes, formatos)
+  // 4) Preparar y ejecutar el UPDATE en la tabla `usuario`
+  // 5) Regenerar sesión si se cambió la contraseña y actualizar datos en sesión
   $id = (int)($_POST['id'] ?? 0);
   $username = trim((string)($_POST['nombre_usuario'] ?? ''));
   $apellidos = trim((string)($_POST['apellidos'] ?? ''));
@@ -59,6 +88,7 @@ if ($accion === 'editar_perfil') {
     redirect_cliente('perfil', 'No tienes permiso para editar esta cuenta');
   }
 
+  // Validaciones básicas de presencia y formato
   if ($username === '') {
     redirect_cliente('perfil', 'Faltan datos obligatorios');
   }
@@ -86,6 +116,7 @@ if ($accion === 'editar_perfil') {
   $direccion = ($direccion === '') ? null : $direccion;
   $localidad = ($localidad === '') ? null : $localidad;
 
+  // Intentar persistir cambios en BD
   try {
     if ($password !== '') {
       $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -99,10 +130,12 @@ if ($accion === 'editar_perfil') {
     $stmt->execute();
     $stmt->close();
 
+    // Si se actualizó la contraseña, regeneramos la sesión por seguridad
     if ($password !== '') {
       session_regenerate_id(true);
     }
 
+    // Reflejar cambios en la sesión actual
     $_SESSION['user']['nombre_usuario'] = $username;
     $_SESSION['user']['email'] = $email;
 
@@ -119,6 +152,9 @@ if ($accion === 'editar_perfil') {
   }
 }
 
+// ---------- Accion: crear_reunion ----------
+// Crea una reunión para una empresa asociada al cliente y (opcionalmente)
+// asigna un técnico. Realiza validaciones de fecha/hora y pertenencia a empresa.
 if ($accion === 'crear_reunion') {
   $clienteId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idEmpresaReunion = (int)($_POST['id_empresa_reunion'] ?? 0);
@@ -127,6 +163,7 @@ if ($accion === 'crear_reunion') {
   $hora = trim((string)($_POST['hora_reunion'] ?? ''));
   $fecha = trim((string)($_POST['fecha_reunion'] ?? ''));
 
+  // Validaciones iniciales de entrada (presencia/formatos)
   if ($clienteId <= 0) {
     redirect_cliente('reuniones', 'Sesion invalida');
   }
@@ -145,6 +182,7 @@ if ($accion === 'crear_reunion') {
     redirect_cliente('reuniones', 'Fecha de reunion invalida');
   }
 
+  // Validar que la empresa pertenece al usuario (como propietario o asignada)
   $db = db();
 
   $stmtEmpresaValida = $db->prepare('
@@ -172,9 +210,11 @@ if ($accion === 'crear_reunion') {
   $stmtEmpresaValida->close();
 
   if (!$empresaValida) {
+    // Empresa no asociada al cliente
     redirect_cliente('reuniones', 'La empresa seleccionada no es valida para tu usuario');
   }
 
+  // Si se seleccionó un técnico, comprobar que exista, sea técnico y esté vinculado
   if ($idTecnicoReunion > 0) {
     $stmtTecnicoValido = $db->prepare('
       SELECT 1
@@ -211,21 +251,25 @@ if ($accion === 'crear_reunion') {
     }
   }
 
+  // Insertar reunión y enlaces dentro de una transacción para atomicidad
   try {
     $db->begin_transaction();
 
     $objetivoDb = ($objetivo === '') ? null : $objetivo;
-    $stmt = $db->prepare('INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion, id_empresa) VALUES (?, ?, ?, ?)');
-    $stmt->bind_param('sssi', $objetivoDb, $hora, $fecha, $idEmpresaReunion);
+    $tipoReunion = 'CreadaUsu';
+    $stmt = $db->prepare('INSERT INTO reuniones (objetivo, hora_reunion, fecha_reunion, id_empresa, tipo) VALUES (?, ?, ?, ?, ?)');
+    $stmt->bind_param('sssis', $objetivoDb, $hora, $fecha, $idEmpresaReunion, $tipoReunion);
     $stmt->execute();
     $idReunion = (int)$stmt->insert_id;
     $stmt->close();
 
+    // Asociar al cliente creador
     $stmt2 = $db->prepare('INSERT INTO usuario_reunion (id_usuario, id_reunion) VALUES (?, ?)');
     $stmt2->bind_param('ii', $clienteId, $idReunion);
     $stmt2->execute();
     $stmt2->close();
 
+    // Asociar al técnico si se indicó
     if ($idTecnicoReunion > 0 && $idTecnicoReunion !== $clienteId) {
       $stmt3 = $db->prepare('INSERT INTO usuario_reunion (id_usuario, id_reunion) VALUES (?, ?)');
       $stmt3->bind_param('ii', $idTecnicoReunion, $idReunion);
@@ -245,6 +289,9 @@ if ($accion === 'crear_reunion') {
   }
 }
 
+// ---------- Accion: editar_reunion ----------
+// Edita los datos de una reunión si el usuario está asociado a la misma.
+// Editar reunion: validar pertenencia y actualizar campos
 if ($accion === 'editar_reunion') {
   $clienteId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idReunion = (int)($_POST['id_reunion'] ?? 0);
@@ -292,6 +339,9 @@ if ($accion === 'editar_reunion') {
   }
 }
 
+// ---------- Accion: eliminar_reunion ----------
+// Elimina una reunión si el usuario tiene permiso (está registrado en `usuario_reunion`).
+// Eliminar reunion: comprobar permiso y borrar fila en `reuniones`
 if ($accion === 'eliminar_reunion') {
   $clienteId = (int)($_SESSION['user']['id_usuario'] ?? 0);
   $idReunion = (int)($_POST['id_reunion'] ?? 0);

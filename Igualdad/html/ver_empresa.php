@@ -1,6 +1,20 @@
 <!doctype html>
 <html lang="es">
 <head>
+  <!--
+    Plantilla: Ver/Asignar Empresas
+    --------------------------------
+    Esta vista muestra un botón para abrir un modal donde el administrador
+    puede asignar empresas a un usuario. Está pensada para ser incluida desde
+    `admin.php?view=edit&id_usuario=...` y espera las siguientes variables
+    preparadas por el controlador:
+      - $usuario: array con datos del usuario (id_usuario, nombre_usuario, email)
+      - $empresas: lista de empresas (cada item con id_empresa y razon_social)
+      - $checked: array de ids de empresas ya asignadas (opcional)
+      - $ok / $error: mensajes de feedback tras guardar
+    El formulario envía mediante POST un `id_usuario` y `empresas[]` al mismo
+    endpoint (gestión por POST en el controlador de `admin`).
+  -->
   <!-- Codificación y responsive -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -63,7 +77,9 @@
           <div class="alert alert-danger"><?= h($error) ?></div>
         <?php endif; ?>
 
-        <!--Formulario POST:Envía el id del usuario + el array empresas[] con los ids marcados.-->
+           <!-- Formulario POST: Envía el id del usuario + array `empresas[]` con los ids marcados.
+             Uso: el controlador procesa el POST y retorna $ok/$error para feedback.
+           -->
         <form method="post">
           <?= csrf_input() ?>
           <!-- ID del usuario al que se le asignan empresas -->
@@ -83,16 +99,19 @@
             </div>
           </div>
 
-          <!--Listado de empresas:
-            - Cada empresa es un label clickable (mejora la UX).
-            - data-name guarda el nombre en minúsculas para filtrar con JS.
-            - checkbox name="empresas[]" => se envía como array al POST.
-            - Si el id está en $checked, la empresa aparece marcada (checked).-->
+          <!-- Listado de empresas:
+            - Cada empresa es un <label> clickable para mejorar la UX (click en label marca el checkbox).
+            - `data-name` almacena la razón social en minúsculas (normalizada con mb_strtolower)
+              para un filtrado rápido y sin dependencia de acentos o mayúsculas en JS.
+            - Los checkboxes usan `name="empresas[]"` para enviarse como array en POST.
+            - El array PHP `$checked` controla qué checkboxes aparecen marcados al cargar.
+          -->
           <div class="empresa-list border rounded" id="list">
             <?php $checked = $checked ?? []; ?>
             <?php foreach (($empresas ?? []) as $e): ?>
               <?php $eid = (int)$e['id_empresa']; ?>
 
+              <!-- Elemento empresa: label + checkbox + nombre visible -->
               <label class="empresa-item d-flex align-items-center gap-2 px-3 py-2 border-bottom"
                      data-name="<?= h(mb_strtolower((string)$e['razon_social'])) ?>">
 
@@ -141,19 +160,25 @@
       // Para cada fila (label) que tenga data-name:
       // si el nombre incluye el texto buscado => se muestra; si no => se oculta.
       list.querySelectorAll('[data-name]').forEach(row => {
-        row.style.display = (row.getAttribute('data-name') || '').includes(q) ? '' : 'none';
+        // Usamos data-name para evitar manipular el DOM con innerText
+        // y para mejorar el rendimiento en listas grandes.
+        const name = (row.getAttribute('data-name') || '');
+        row.style.display = name.includes(q) ? '' : 'none';
       });
     });
   }
 
   // Si hay feedback del servidor tras enviar el formulario, abrimos el modal automáticamente.
   document.addEventListener('DOMContentLoaded', () => {
+    // Si tras enviar el formulario el servidor devuelve $ok o $error,
+    // abrimos automáticamente el modal para que el usuario vea el feedback.
     const shouldOpenModal = <?= (!empty($ok) || !empty($error)) ? 'true' : 'false' ?>;
     if (!shouldOpenModal || typeof bootstrap === 'undefined') return;
 
     const modalEl = document.getElementById('asignarEmpresasModal');
     if (!modalEl) return;
 
+    // Crear instancia de Bootstrap Modal y mostrarla
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
   });
