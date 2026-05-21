@@ -60,29 +60,28 @@ $totalTecnicos = 0;
 $totalPlanesIgualdad = 0;
 $totalMantenimientos = 0;
 
-$resClientes = db()->query("\n  SELECT COUNT(*) AS total\n  FROM usuario u\n  INNER JOIN rol r ON r.id = u.rol_id\n  WHERE UPPER(r.nombre) = 'CLIENTE'\n");
+$resClientes = db()->query("SELECT COUNT(*) AS total FROM usuario u INNER JOIN rol r ON r.id = u.rol_id WHERE UPPER(r.nombre) = 'CLIENTE'");
 if ($resClientes) {
   $row = $resClientes->fetch_assoc();
   $totalClientes = (int)($row['total'] ?? 0);
   $resClientes->close();
 }
 
-$resTecnicos = db()->query("\n  SELECT COUNT(*) AS total\n  FROM usuario u\n  INNER JOIN rol r ON r.id = u.rol_id\n  WHERE UPPER(r.nombre) LIKE 'TECNICO%'
-");
+$resTecnicos = db()->query("SELECT COUNT(*) AS total FROM usuario u INNER JOIN rol r ON r.id = u.rol_id WHERE UPPER(r.nombre) LIKE 'TECNICO%'");
 if ($resTecnicos) {
   $row = $resTecnicos->fetch_assoc();
   $totalTecnicos = (int)($row['total'] ?? 0);
   $resTecnicos->close();
 }
 
-$resPlanesIgualdad = db()->query("\n  SELECT COUNT(DISTINCT c.id_empresa) AS total\n  FROM contrato_empresa c\n  WHERE UPPER(TRIM(c.tipo_contrato)) = 'PLAN IGUALDAD'\n");
+$resPlanesIgualdad = db()->query("SELECT COUNT(DISTINCT c.id_empresa) AS total FROM contrato_empresa c WHERE UPPER(TRIM(c.tipo_contrato)) = 'PLAN IGUALDAD'");
 if ($resPlanesIgualdad) {
   $row = $resPlanesIgualdad->fetch_assoc();
   $totalPlanesIgualdad = (int)($row['total'] ?? 0);
   $resPlanesIgualdad->close();
 }
 
-$resMantenimientos = db()->query("\n  SELECT COUNT(DISTINCT c.id_empresa) AS total\n  FROM contrato_empresa c\n  WHERE UPPER(TRIM(c.tipo_contrato)) LIKE 'MANTENIMIENTO%'\n");
+$resMantenimientos = db()->query("SELECT COUNT(DISTINCT c.id_empresa) AS total FROM contrato_empresa c WHERE UPPER(TRIM(c.tipo_contrato)) LIKE 'MANTENIMIENTO%'");
 if ($resMantenimientos) {
   $row = $resMantenimientos->fetch_assoc();
   $totalMantenimientos = (int)($row['total'] ?? 0);
@@ -93,9 +92,9 @@ $adminOperationalSummary = [];
 
 // Resumen operativo por empresa: estado del flujo (registro, toma datos, word, etc.)
 
-$sqlDescargaWordTecnico = "EXISTS (\n      SELECT 1\n      FROM archivo_descarga_log dl\n      INNER JOIN usuario u3 ON u3.id_usuario = dl.id_usuario\n      INNER JOIN rol r3 ON r3.id = u3.rol_id\n      WHERE dl.id_empresa = e.id_empresa\n        AND UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'\n        AND UPPER(r3.nombre) LIKE 'TECNICO%'\n      LIMIT 1\n    )";
+$sqlDescargaWordTecnico = "EXISTS (SELECT 1 FROM archivo_descarga_log dl INNER JOIN usuario u3 ON u3.id_usuario = dl.id_usuario  INNER JOIN rol r3 ON r3.id = u3.rol_id\n      WHERE dl.id_empresa = e.id_empresa\n        AND UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'\n        AND UPPER(r3.nombre) LIKE 'TECNICO%'\n      LIMIT 1\n    )";
 
-$resOperational = db()->query("\n  SELECT\n    e.id_empresa,\n    e.razon_social,\n    COALESCE((\n      SELECT ce.tipo_contrato\n      FROM contrato_empresa ce\n      WHERE ce.id_empresa = e.id_empresa\n      ORDER BY ce.id_contrato_empresa DESC\n      LIMIT 1\n    ), 'SIN CONTRATO') AS tipo_contrato,\n    COALESCE((\n      SELECT u.nombre_usuario\n      FROM usuario_empresa ue\n      INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n      INNER JOIN rol r ON r.id = u.rol_id\n      WHERE ue.id_empresa = e.id_empresa\n        AND UPPER(r.nombre) LIKE 'TECNICO%'\n      ORDER BY ue.id_usuario ASC\n      LIMIT 1\n    ), 'Sin tecnico asignado') AS tecnico_nombre,\n    EXISTS (\n      SELECT 1 FROM archivos a1\n      WHERE a1.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a1.tipo)) = 'REGISTRO_RETRIBUTIVO'\n      LIMIT 1\n    ) AS tiene_registro,\n    EXISTS (\n      SELECT 1 FROM archivos a2\n      WHERE a2.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a2.tipo)) = 'TOMA DE DATOS'\n      LIMIT 1\n    ) AS tiene_toma_datos,\n    EXISTS (\n      SELECT 1 FROM archivos a3\n      WHERE a3.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a3.asunto, ''))) = 'GENERADO WORD'\n      LIMIT 1\n    ) AS tiene_word,\n    EXISTS (\n      SELECT 1 FROM archivos a4\n      WHERE a4.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a4.asunto, ''))) = 'GENERADO PORCENTAJES'\n      LIMIT 1\n    ) AS tiene_porcentajes,\n    EXISTS (\n      SELECT 1 FROM archivos a5\n      WHERE a5.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a5.tipo)) = 'PLAN_IGUALDAD_DEFINITIVO'\n      LIMIT 1\n    ) AS tiene_word_final,\n    {$sqlDescargaWordTecnico} AS tiene_descarga_word_tecnico\n  FROM empresa e\n  WHERE EXISTS (\n      SELECT 1\n      FROM usuario_empresa ue2\n      INNER JOIN usuario u2 ON u2.id_usuario = ue2.id_usuario\n      INNER JOIN rol r2 ON r2.id = u2.rol_id\n      WHERE ue2.id_empresa = e.id_empresa\n        AND UPPER(r2.nombre) LIKE 'TECNICO%'\n    )\n  ORDER BY e.razon_social ASC\n");
+$resOperational = db()->query("SELECT e.id_empresa,e.razon_social, COALESCE(( SELECT ce.tipo_contrato  FROM contrato_empresa ce  WHERE ce.id_empresa = e.id_empresa\n      ORDER BY ce.id_contrato_empresa DESC\n      LIMIT 1\n    ), 'SIN CONTRATO') AS tipo_contrato,\n    COALESCE((\n      SELECT u.nombre_usuario\n      FROM usuario_empresa ue\n      INNER JOIN usuario u ON u.id_usuario = ue.id_usuario\n      INNER JOIN rol r ON r.id = u.rol_id\n      WHERE ue.id_empresa = e.id_empresa\n        AND UPPER(r.nombre) LIKE 'TECNICO%'\n      ORDER BY ue.id_usuario ASC\n      LIMIT 1\n    ), 'Sin tecnico asignado') AS tecnico_nombre,\n    EXISTS (\n      SELECT 1 FROM archivos a1\n      WHERE a1.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a1.tipo)) = 'REGISTRO_RETRIBUTIVO'\n      LIMIT 1\n    ) AS tiene_registro,\n    EXISTS (\n      SELECT 1 FROM archivos a2\n      WHERE a2.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a2.tipo)) = 'TOMA DE DATOS'\n      LIMIT 1\n    ) AS tiene_toma_datos,\n    EXISTS (\n      SELECT 1 FROM archivos a3\n      WHERE a3.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a3.asunto, ''))) = 'GENERADO WORD'\n      LIMIT 1\n    ) AS tiene_word,\n    EXISTS (\n      SELECT 1 FROM archivos a4\n      WHERE a4.id_empresa = e.id_empresa\n        AND UPPER(TRIM(COALESCE(a4.asunto, ''))) = 'GENERADO PORCENTAJES'\n      LIMIT 1\n    ) AS tiene_porcentajes,\n    EXISTS (\n      SELECT 1 FROM archivos a5\n      WHERE a5.id_empresa = e.id_empresa\n        AND UPPER(TRIM(a5.tipo)) = 'PLAN_IGUALDAD_DEFINITIVO'\n      LIMIT 1\n    ) AS tiene_word_final,\n    {$sqlDescargaWordTecnico} AS tiene_descarga_word_tecnico\n  FROM empresa e\n  WHERE EXISTS (\n      SELECT 1\n      FROM usuario_empresa ue2\n      INNER JOIN usuario u2 ON u2.id_usuario = ue2.id_usuario\n      INNER JOIN rol r2 ON r2.id = u2.rol_id\n      WHERE ue2.id_empresa = e.id_empresa\n        AND UPPER(r2.nombre) LIKE 'TECNICO%'\n    )\n  ORDER BY e.razon_social ASC\n");
 
 if ($resOperational) {
   while ($op = $resOperational->fetch_assoc()) {
@@ -156,7 +155,7 @@ $seguimientoTecnicoEmpresas = [];
 // de técnicos y las empresas asociadas para mostrar progreso por empresa.
 
 if ($view === 'seguimiento_tecnicos') {
-  $resTecnicosSeg = db()->query("\n    SELECT\n      u.id_usuario,\n      u.nombre_usuario,\n      COUNT(DISTINCT ue.id_empresa) AS total_empresas\n    FROM usuario u\n    INNER JOIN rol r ON r.id = u.rol_id\n    LEFT JOIN usuario_empresa ue ON ue.id_usuario = u.id_usuario\n    WHERE UPPER(r.nombre) LIKE 'TECNICO%'\n    GROUP BY u.id_usuario, u.nombre_usuario\n    ORDER BY u.nombre_usuario ASC\n  ");
+  $resTecnicosSeg = db()->query("SELECT u.id_usuario,u.nombre_usuario, COUNT(DISTINCT ue.id_empresa) AS total_empresas FROM usuario u INNER JOIN rol r ON r.id = u.rol_id\n    LEFT JOIN usuario_empresa ue ON ue.id_usuario = u.id_usuario\n    WHERE UPPER(r.nombre) LIKE 'TECNICO%'\n    GROUP BY u.id_usuario, u.nombre_usuario\n    ORDER BY u.nombre_usuario ASC\n  ");
 
   if ($resTecnicosSeg) {
     while ($rowTecnicoSeg = $resTecnicosSeg->fetch_assoc()) {
@@ -196,24 +195,15 @@ if ($view === 'seguimiento_tecnicos') {
         WHEN UPPER(TRIM(dl.tipo_descarga)) = 'WORD_GENERADO'
         AND UPPER(r.nombre) LIKE 'TECNICO%'
         THEN 1 ELSE 0 
-    END) AS tiene_descarga_word_tecnico
+    END) AS tiene_descarga_word_tecnico FROM empresa e INNER JOIN usuario_empresa ue  ON ue.id_empresa = e.id_empresa
 
-FROM empresa e
+LEFT JOIN archivos a  ON a.id_empresa = e.id_empresa
 
-INNER JOIN usuario_empresa ue 
-    ON ue.id_empresa = e.id_empresa
+LEFT JOIN archivo_descarga_log dl  ON dl.id_empresa = e.id_empresa
 
-LEFT JOIN archivos a 
-    ON a.id_empresa = e.id_empresa
+LEFT JOIN usuario u  ON u.id_usuario = dl.id_usuario
 
-LEFT JOIN archivo_descarga_log dl 
-    ON dl.id_empresa = e.id_empresa
-
-LEFT JOIN usuario u 
-    ON u.id_usuario = dl.id_usuario
-
-LEFT JOIN rol r 
-    ON r.id = u.rol_id
+LEFT JOIN rol r  ON r.id = u.rol_id
 
 LEFT JOIN (
     SELECT id_empresa, tipo_contrato
@@ -224,9 +214,7 @@ LEFT JOIN (
         GROUP BY id_empresa
     )
 ) ce 
-    ON ce.id_empresa = e.id_empresa
-
-WHERE ue.id_usuario = ?
+    ON ce.id_empresa = e.id_empresa WHERE ue.id_usuario = ?
 
 GROUP BY e.id_empresa, e.razon_social, ce.tipo_contrato
 
@@ -314,11 +302,7 @@ if ($searchQ !== '') {
 }
 
 // Total usuarios (para saber páginas)
-$sqlTotal = "
-  SELECT COUNT(DISTINCT u.id_usuario) AS total
-  FROM usuario u
-  JOIN rol r ON r.id = u.rol_id
-  LEFT JOIN usuario_empresa ue ON ue.id_usuario = u.id_usuario
+$sqlTotal = " SELECT COUNT(DISTINCT u.id_usuario) AS total FROM usuario u JOIN rol r ON r.id = u.rol_id LEFT JOIN usuario_empresa ue ON ue.id_usuario = u.id_usuario
   LEFT JOIN empresa e ON e.id_empresa = ue.id_empresa
   $where
 ";
@@ -340,18 +324,7 @@ if ($currentPage > $totalPages) {
 
 // Data: solo 10 usuarios de la página actual
 $usuarios = [];
-$sqlData = "
-  SELECT
-    u.id_usuario,
-    u.nombre_usuario,
-    u.apellidos,
-    u.email,
-    u.telefono,
-    u.firmacorreo,
-    u.direccion,
-    u.localidad,
-    u.rol_id,
-    r.nombre AS rol,
+$sqlData = "SELECT u.id_usuario, u.nombre_usuario, u.apellidos, u.email, u.telefono,u.firmacorreo, u.direccion, u.localidad, u.rol_id, r.nombre AS rol,
     COALESCE(GROUP_CONCAT(DISTINCT e.razon_social ORDER BY e.razon_social SEPARATOR ', '), '') AS razon_social
   FROM usuario u
   JOIN rol r ON r.id = u.rol_id
@@ -395,18 +368,7 @@ $adminPerfil = null;
 // Cargar datos del perfil del administrador si se solicita la vista `perfil`
 
 if ($view === 'perfil' && $adminId > 0) {
-  $stmt = db()->prepare("
-    SELECT
-      id_usuario,
-      nombre_usuario,
-      apellidos,
-      email,
-      telefono,
-      direccion,
-      localidad
-    FROM usuario
-    WHERE id_usuario = ?
-    LIMIT 1
+  $stmt = db()->prepare("SELECT id_usuario, nombre_usuario, apellidos, email,telefono,direccion,localidad FROM usuario WHERE id_usuario = ? LIMIT 1
   ");
   $stmt->bind_param('i', $adminId);
   $stmt->execute();
@@ -424,7 +386,7 @@ $adminClientesReunion = [];
 if (in_array($view, ['privada', 'reuniones'], true) && $adminId > 0) {
   correo_enviar_recordatorio_rr_reuniones_vencidas(db());
   db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
-  $stmt = db()->prepare("\n    SELECT\n      r.id_reunion,\n      r.objetivo,\n      r.hora_reunion,\n      r.fecha_reunion\n    FROM reuniones r\n    INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion\n    WHERE ur.id_usuario = ?\n    ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC\n  ");
+  $stmt = db()->prepare("SELECT r.id_reunion,r.objetivo, r.hora_reunion, r.fecha_reunion FROM reuniones r INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion\n    WHERE ur.id_usuario = ?\n    ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC\n  ");
   $stmt->bind_param('i', $adminId);
   $stmt->execute();
   $result = $stmt->get_result();
@@ -433,7 +395,7 @@ if (in_array($view, ['privada', 'reuniones'], true) && $adminId > 0) {
   }
   $stmt->close();
 
-  $stmtClientes = db()->prepare("\n    SELECT\n      u.id_usuario,\n      u.nombre_usuario,\n      u.apellidos,\n      u.email\n    FROM usuario u\n    INNER JOIN rol r ON r.id = u.rol_id\n    WHERE UPPER(r.nombre) = 'CLIENTE'\n    ORDER BY u.nombre_usuario ASC, u.apellidos ASC\n  ");
+  $stmtClientes = db()->prepare("SELECT u.id_usuario, u.nombre_usuario,  u.apellidos,  u.email FROM usuario u  INNER JOIN rol r ON r.id = u.rol_id\n    WHERE UPPER(r.nombre) = 'CLIENTE'\n    ORDER BY u.nombre_usuario ASC, u.apellidos ASC\n  ");
   if ($stmtClientes) {
     $stmtClientes->execute();
     $resClientesReunion = $stmtClientes->get_result();
@@ -444,7 +406,7 @@ if (in_array($view, ['privada', 'reuniones'], true) && $adminId > 0) {
   }
 
   // Cargar todas las reuniones del sistema
-  $stmtTodas = db()->prepare("\n    SELECT\n      r.id_reunion,\n      r.objetivo,\n      r.hora_reunion,\n      r.fecha_reunion,\n      GROUP_CONCAT(\n        CONCAT(\n          COALESCE(u.nombre_usuario, 'Admin'),\n          ' ',\n          COALESCE(TRIM(u.apellidos), ''),\n          ' [',\n          COALESCE(TRIM(ro.nombre), ''),\n          ']'\n        )\n        SEPARATOR ' | '\n      ) AS participantes\n    FROM reuniones r\n    LEFT JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion\n    LEFT JOIN usuario u ON u.id_usuario = ur.id_usuario\n    LEFT JOIN rol ro ON ro.id = u.rol_id\n    GROUP BY r.id_reunion\n    ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC\n  ");
+  $stmtTodas = db()->prepare("SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion, GROUP_CONCAT( CONCAT( COALESCE(u.nombre_usuario, 'Admin'),' ',COALESCE(TRIM(u.apellidos), ''),\n          ' [',\n          COALESCE(TRIM(ro.nombre), ''),\n          ']'\n        )\n        SEPARATOR ' | '\n      ) AS participantes\n    FROM reuniones r\n    LEFT JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion\n    LEFT JOIN usuario u ON u.id_usuario = ur.id_usuario\n    LEFT JOIN rol ro ON ro.id = u.rol_id\n    GROUP BY r.id_reunion\n    ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC\n  ");
   if ($stmtTodas) {
     $stmtTodas->execute();
     $resTodas = $stmtTodas->get_result();

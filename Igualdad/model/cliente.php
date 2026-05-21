@@ -58,12 +58,7 @@ $archivos = [];
 if ($view === 'archivos') {
   // Obtenemos los últimos archivos subidos por este cliente. La consulta
   // devuelve los campos que la vista necesita para listar descargas/archivos.
-  $stmt = db()->prepare("
-    SELECT id, nombre_original, subido_en
-    FROM archivo
-    WHERE usuario_id = ?
-    ORDER BY subido_en DESC
-    LIMIT 200
+  $stmt = db()->prepare("SELECT id, nombre_original, subido_en FROM archivo WHERE usuario_id = ? ORDER BY subido_en DESC LIMIT 200
   ");
   $stmt->bind_param('i', $clienteId);
   $stmt->execute();

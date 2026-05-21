@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           }
 
           // Obtener datos del técnico (aquí se reutiliza la misma consulta por compatibilidad)
-          $stmt = $db->prepare("\n    SELECT email, nombre_usuario\n    FROM usuario\n    WHERE id_usuario = ?\n    LIMIT 1\n");
+          $stmt = $db->prepare("SELECT email, nombre_usuario FROM usuario WHERE id_usuario = ? LIMIT 1");
           $stmt->bind_param("i", $userId);
           $stmt->execute();
           $tecnicoData = $stmt->get_result()->fetch_assoc();
