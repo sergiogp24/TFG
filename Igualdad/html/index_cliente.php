@@ -1243,6 +1243,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
             if (modalElement && iframe) {
                 modalElement.addEventListener('hidden.bs.modal', function() {
                     iframe.src = '';
+                    window.location.reload();
                 });
             }
 

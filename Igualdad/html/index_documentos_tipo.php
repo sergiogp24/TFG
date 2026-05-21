@@ -39,12 +39,8 @@ if (!$esStaff && $usuarioId > 0) {
     // Si el usuario no es STAFF se intenta cargar una empresa asociada para
     // mostrarla en el formulario (campo readonly con referencia).
     $stmtEmpresa = db()->prepare(
-        'SELECT e.razon_social
-         FROM usuario_empresa ue
-         INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
-         WHERE ue.id_usuario = ?
-         ORDER BY e.razon_social ASC
-         LIMIT 1'
+        'SELECT e.razon_social FROM usuario_empresa ue INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
+         WHERE ue.id_usuario = ? ORDER BY e.razon_social ASC LIMIT 1'
     );
 
     if ($stmtEmpresa) {

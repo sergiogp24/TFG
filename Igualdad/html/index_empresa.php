@@ -1,24 +1,23 @@
-$php_doc = <<<'DOC'
-    /*
-    * Plantilla: Gestión de Empresas
-    * --------------------------------
-    * Esta vista centraliza las diferentes sub-vistas relacionadas con empresas:
-    * - listado (`ver_empresas`)
-    * - detalle de empresa (`ver_empresa`)
-    * - añadir/editar/eliminar empresas
-    * - ver planes, contratos y medidas
-    *
-    * Variables esperadas (procedentes del controlador):
-    * - $view: sub-vista a mostrar
-    * - $empresas, $detalleEmpresa, $planes, $verMedidasPlan, etc.
-    * - $isAdmin, $isTecnico, $isCliente: flags de rol
-    *
-    * Comentarios: los formularios usan `controller/empresa_controller.php` para
-    * procesar acciones; los enlaces apuntan a `model/empresa.php` para vistas
-    * basadas en datos.
-    */
+<?php
 
-    <?php
+/*
+ * Plantilla: Gestión de Empresas
+ * --------------------------------
+ * Esta vista centraliza las diferentes sub-vistas relacionadas con empresas:
+ * - listado (`ver_empresas`)
+ * - detalle de empresa (`ver_empresa`)
+ * - añadir/editar/eliminar empresas
+ * - ver planes, contratos y medidas
+ *
+ * Variables esperadas (procedentes del controlador):
+ * - $view: sub-vista a mostrar
+ * - $empresas, $detalleEmpresa, $planes, $verMedidasPlan, etc.
+ * - $isAdmin, $isTecnico, $isCliente: flags de rol
+ *
+ * Comentarios: los formularios usan `controller/empresa_controller.php` para
+ * procesar acciones; los enlaces apuntan a `model/empresa.php` para vistas
+ * basadas en datos.
+ */
 
     $view = $view ?? 'ver_empresas';
     $rol = strtoupper((string)($_SESSION['user']['rol'] ?? ''));
