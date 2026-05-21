@@ -4,8 +4,24 @@ declare(strict_types=1);
 
 header("X-Frame-Options: SAMEORIGIN");
 header("X-Content-Type-Options: nosniff");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+header("Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+// HSTS: solo en HTTPS (no en localhost)
+if (!headers_sent() && is_https_request()) {
+    header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
+}
 // Content Security Policy
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net;");
+header("Content-Security-Policy: "
+    . "default-src 'self'; "
+    . "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+    . "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+    . "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+    . "img-src 'self' data:; "
+    . "connect-src 'self' https://cdn.jsdelivr.net; "
+    . "frame-ancestors 'self'; "
+    . "base-uri 'self'; "
+    . "form-action 'self';"
+);
 
 function is_https_request(): bool
 {
