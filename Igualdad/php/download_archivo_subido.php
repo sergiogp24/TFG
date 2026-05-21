@@ -238,7 +238,7 @@ if ($kind === 'empresa_word' && $rol === 'TECNICO' && $userId > 0 && $downloadEm
   try {
     $db = db();
     $tipoDescarga = 'WORD_GENERADO';
-    $archivoDescargado = (string)$filename;
+    $archivoDescargado = isset($filename) ? (string)$filename : '';
     $stmtLog = $db->prepare("\n INSERT INTO archivo_descarga_log (id_empresa, id_usuario, tipo_descarga, archivo)\n VALUES (?, ?, ?, ?)\n ");
     if ($stmtLog) {
       $stmtLog->bind_param('iiss', $downloadEmpresaId, $userId, $tipoDescarga, $archivoDescargado);
@@ -255,10 +255,12 @@ if (ob_get_level()) {
   @ob_end_clean();
 }
 
-$safeFilename = str_replace(["\r", "\n", '"', '\\'], '', $filename);
+$safeFilename = str_replace(["\r", "\n", '"', '\\'], '', isset($filename) ? (string)$filename : basename($fullPath));
 header('Content-Description: File Transfer');
 header('Content-Type: ' . $mime);
-header("Content-Disposition: attachment; filename=\"{$safeFilename}\"; filename*=UTF-8''" . rawurlencode($filename));
+// Ensure $filename is defined before use (fallback to basename of path)
+$_dispo_filename = isset($filename) ? (string)$filename : basename($fullPath);
+header("Content-Disposition: attachment; filename=\"{$safeFilename}\"; filename*=UTF-8''" . rawurlencode($_dispo_filename));
 header('Content-Length: ' . (string)$filesize);
 header('Cache-Control: no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');

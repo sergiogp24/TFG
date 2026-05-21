@@ -886,14 +886,17 @@ foreach ($names as $i => $originalName) {
             }
         }
 
-        // Confirmación al cliente
-        $clienteEmailRpc  = trim((string)($_SESSION['user']['email'] ?? ''));
         $clienteNombreRpc = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
-        if ($clienteEmailRpc !== '' && filter_var($clienteEmailRpc, FILTER_VALIDATE_EMAIL)) {
-            try {
-                correo_enviar_confirmacion_registro_retributivo($clienteEmailRpc, $clienteNombreRpc);
-            } catch (Throwable $e) {
-                registrarLogProcesarRegistroRetributivo('Error al enviar confirmación RPC al cliente: ' . $e->getMessage());
+
+        // Confirmación al cliente solo si quien sube es el propio cliente
+        if ($rol === 'CLIENTE') {
+            $clienteEmailRpc  = trim((string)($_SESSION['user']['email'] ?? ''));
+            if ($clienteEmailRpc !== '' && filter_var($clienteEmailRpc, FILTER_VALIDATE_EMAIL)) {
+                try {
+                    correo_enviar_confirmacion_registro_retributivo($clienteEmailRpc, $clienteNombreRpc);
+                } catch (Throwable $e) {
+                    registrarLogProcesarRegistroRetributivo('Error al enviar confirmación RPC al cliente: ' . $e->getMessage());
+                }
             }
         }
 
@@ -1700,22 +1703,32 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
         registrarLogProcesarRegistroRetributivo("Error al actualizar/eliminar reunión 'Subir R.R': " . $e->getMessage());
     }
 
-    // Enviar email de confirmación al cliente (siempre, independientemente de si hay reunión)
-    $clienteEmailConfirm  = trim((string)($_SESSION['user']['email'] ?? ''));
-    $clienteNombreConfirm = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
-    if ($clienteEmailConfirm !== '' && filter_var($clienteEmailConfirm, FILTER_VALIDATE_EMAIL)) {
-        try {
-            correo_enviar_confirmacion_registro_retributivo($clienteEmailConfirm, $clienteNombreConfirm);
-        } catch (\Throwable $mailError) {
-            registrarLogProcesarRegistroRetributivo('Error al enviar email de confirmación al cliente: ' . $mailError->getMessage());
+    // Enviar email de confirmación al cliente solo si quien sube es el propio cliente
+    if ($rol === 'CLIENTE') {
+        $clienteEmailConfirm  = trim((string)($_SESSION['user']['email'] ?? ''));
+        $clienteNombreConfirm = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
+        if ($clienteEmailConfirm !== '' && filter_var($clienteEmailConfirm, FILTER_VALIDATE_EMAIL)) {
+            try {
+                correo_enviar_confirmacion_registro_retributivo($clienteEmailConfirm, $clienteNombreConfirm);
+            } catch (\Throwable $mailError) {
+                registrarLogProcesarRegistroRetributivo('Error al enviar email de confirmación al cliente: ' . $mailError->getMessage());
+            }
         }
     }
 
-    // Notificar a los técnicos asignados a la empresa que el Registro Retributivo ha sido subido
-    if (isset($id_empresa) && $id_empresa > 0) {
-        $clienteNombreNotif  = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
-        $empresaNombreNotif  = $empresaNombreVista !== '' ? $empresaNombreVista : 'la empresa';
-        foreach (correo_obtener_tecnicos_empresa($db, $id_empresa) as $tecnicoNotif) {
+    redirigirMenuSubida($urlMenuSubida, 'Subido con Exito', 1, $idEmpresaContexto);
+}
+
+if ($tipo === 'TOMA DE DATOS' && $totalArchivosGuardados > 0 && $totalErroresGlobal === 0) {
+    redirigirMenuSubida($urlMenuSubida, 'Toma de Datos subida con Exito', 1, $idEmpresaContexto);
+}
+
+if ($totalArchivosGuardados > 0 && $totalErroresGlobal === 0) {
+    // Notificar al técnico para REGISTRO_RETRIBUTIVO siempre que el archivo se haya guardado
+    if ($tipo === 'REGISTRO_RETRIBUTIVO' && $idEmpresaContexto > 0) {
+        $clienteNombreNotif = trim((string)($_SESSION['user']['nombre_usuario'] ?? 'Cliente'));
+        $empresaNombreNotif = $empresaNombreVista !== '' ? $empresaNombreVista : 'la empresa';
+        foreach (correo_obtener_tecnicos_empresa($db, $idEmpresaContexto) as $tecnicoNotif) {
             try {
                 correo_enviar_confirmacion_registro_retributivo_tecnico(
                     (string)($tecnicoNotif['email'] ?? ''),
@@ -1729,14 +1742,6 @@ if ($totalInsertadasGlobal > 0 && $totalErroresGlobal === 0) {
         }
     }
 
-    redirigirMenuSubida($urlMenuSubida, 'Subido con Exito', 1, $idEmpresaContexto);
-}
-
-if ($tipo === 'TOMA DE DATOS' && $totalArchivosGuardados > 0 && $totalErroresGlobal === 0) {
-    redirigirMenuSubida($urlMenuSubida, 'Toma de Datos subida con Exito', 1, $idEmpresaContexto);
-}
-
-if ($totalArchivosGuardados > 0 && $totalErroresGlobal === 0) {
     redirigirMenuSubida($urlMenuSubida, 'Archivo procesado correctamente', 1, $idEmpresaContexto);
 }
 

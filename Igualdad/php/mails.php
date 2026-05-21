@@ -19,7 +19,7 @@ function correo_config(): array
 
 function correo_url_login(): string
 {
-    return app_path('/model/admin.php?view=menu');
+    return correo_url_base() . '/php/login.php';
 }
 
 function correo_url_base(): string
@@ -702,7 +702,7 @@ function correo_enviar_confirmacion_registro_retributivo_tecnico(
     correo_enviar_notificacion_tecnico_resumen(
         $emailTecnico,
         $nombreTecnico,
-        'Registro Retributivo subido',
+        'Registro Retributivo subido por cliente',
         'Archivo recibido',
         'El cliente ha subido el Registro Retributivo en la plataforma.',
         [
@@ -948,11 +948,11 @@ function correo_enviar_notificacion_tecnico_nueva_empresa(
         $tipoContrato  = htmlspecialchars($empresa['tipo_contrato'] ?? '', ENT_QUOTES, 'UTF-8');
         $empresasList .= "<li><strong>{$empresaNombre}</strong> ({$tipoContrato})</li>";
     }
-    $subject = "Nuevas empresas asignadas  $nombreUsuario";
+    $subject = "Nuevas empresas asignadas a $nombreUsuario";
     $body = '
         <html>
         <body>
-        <p>Se han asignado las siguientes nuevas empresas  <strong>' . htmlspecialchars($nombreUsuario, ENT_QUOTES, 'UTF-8') . '</strong>:</p>
+        <p>Se han asignado las siguientes nuevas empresas a <strong>' . htmlspecialchars($nombreUsuario, ENT_QUOTES, 'UTF-8') . '</strong>:</p>
         <ul>' . $empresasList . '</ul>
         </body>
         </html>';
@@ -1027,7 +1027,7 @@ function correo_enviar_nueva_empresa_asignada(
             <h2 style="color: #1f4aa2; margin-top: 0;">Nueva empresa asignada</h2>
             <p>Hola ' . $nombreHtml . ',</p>
             <p>Se te ha asignado <strong>' . htmlspecialchars($resumenEmpresas, ENT_QUOTES, 'UTF-8') . '</strong> para que gestiones sus servicios:</p>
-            <p><strong>Servicios que debes gestionar::</strong></p>
+            <p><strong>Servicios que debes gestionar:</strong></p>
             <ul>' . $listaEmpresasHtml . '</ul>
             <p>Ya puedes acceder para revisar la información y comenzar la gestión.</p>
             <p style="text-align: center; margin: 28px 0;">
@@ -1042,7 +1042,7 @@ function correo_enviar_nueva_empresa_asignada(
       </html>
     ';
 
-    $altBody = "Nueva empresa asignada\n\nSe te ha asignado {$resumenEmpresas} para que gestiones sus servicios.\n\nServicios que debes gestionar::\n";
+    $altBody = "Nueva empresa asignada\n\nSe te ha asignado {$resumenEmpresas} para que gestiones sus servicios.\n\nServicios que debes gestionar:\n";
     foreach ($empresasAsignadas as $empresaAsignada) {
         $nombreEmpresa = trim((string)($empresaAsignada['razon_social'] ?? ''));
         $servicioEmpresa = trim((string)($empresaAsignada['tipo_contrato'] ?? 'SIN CONTRATO'));

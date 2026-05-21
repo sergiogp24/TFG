@@ -195,11 +195,8 @@ function obtener_empresas_cliente(mysqli $db, int $usuarioId): array {
     }
 
     $stmtEmpresas = $db->prepare(
-        'SELECT DISTINCT e.id_empresa, e.razon_social
-         FROM empresa e
-         LEFT JOIN usuario_empresa ue ON e.id_empresa = ue.id_empresa
-         WHERE (e.id_usuario = ? OR ue.id_usuario = ?)
-         ORDER BY e.razon_social ASC'
+        'SELECT DISTINCT e.id_empresa, e.razon_social FROM empresa e LEFT JOIN usuario_empresa ue ON e.id_empresa = ue.id_empresa
+         WHERE (e.id_usuario = ? OR ue.id_usuario = ?) ORDER BY e.razon_social ASC'
     );
 
     if (!$stmtEmpresas) {
@@ -241,27 +238,16 @@ function obtener_empresas_pendientes_rr_cliente(mysqli $db, int $usuarioId): arr
         return $resultado;
     }
 
-    $sql = "SELECT e.razon_social
-            FROM empresa e
-            LEFT JOIN usuario_empresa ue ON e.id_empresa = ue.id_empresa
-            WHERE (e.id_usuario = ? OR ue.id_usuario = ?)
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM archivos a
+    $sql = "SELECT e.razon_social FROM empresa e LEFT JOIN usuario_empresa ue ON e.id_empresa = ue.id_empresa
+            WHERE (e.id_usuario = ? OR ue.id_usuario = ?) AND NOT EXISTS (SELECT 1 FROM archivos a
                   WHERE UPPER(TRIM(a.tipo)) = 'REGISTRO_RETRIBUTIVO'
                     AND a.id_empresa = e.id_empresa
-              )
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM archivos a
+              ) AND NOT EXISTS ( SELECT 1 FROM archivos a
                   INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
                   INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
                   WHERE UPPER(TRIM(a.tipo)) = 'REGISTRO_RETRIBUTIVO'
                     AND ac.id_empresa = e.id_empresa
-              )
-            GROUP BY e.id_empresa
-            ORDER BY e.razon_social ASC
-            LIMIT 15";
+              ) GROUP BY e.id_empresa ORDER BY e.razon_social ASC LIMIT 15";
 
     $stmt = $db->prepare($sql);
     if (!$stmt) {
