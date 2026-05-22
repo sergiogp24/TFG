@@ -1,13 +1,15 @@
 <?php
 declare(strict_types=1);
 
+// Load environment variables
+require_once __DIR__ . '/config.php';
 
 return [
-  'host' => 'smtp.ionos.es',
-  'port' => 465,
-  'secure' => 'ssl',
-  'username' => 'correo',
-  'password' => 'contraseña de correo',
-  'from_email' => 'correo',
-  'from_name' => 'nombre',
+  'host' => env('MAIL_HOST', ''),
+  'port' => (int)env('MAIL_PORT', ''),
+  'secure' => env('MAIL_SECURE', ''),
+  'username' => env('MAIL_USERNAME', ''),
+  'password' => env('MAIL_PASSWORD', ''),
+  'from_email' => env('MAIL_FROM', ''),
+  'from_name' => env('MAIL_FROM_NAME', ''),
 ];
