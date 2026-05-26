@@ -926,6 +926,11 @@
                                                 <?php if ($canEditPlanes): ?>
                                                     <td class="col-actions">
                                                         <div class="actions-nowrap">
+                                                            <?php if ((int)($p['total_medidas'] ?? 0) > 0): ?>
+                                                                <a class="btn btn-primary btn-sm shared-table-action-btn"
+                                                                    href="../model/empresa.php?view=ver_medidas&id_empresa=<?= (int)$p['id_empresa'] ?><?= $fromParam ?>"
+                                                                    title="Ver medidas">Ver medidas</a>
+                                                            <?php endif; ?>
                                                             <?php if (!empty($p['id_contrato_empresa'])): ?>
                                                                 <a class="btn btn-success btn-sm shared-table-action-btn"
                                                                     href="../model/empresa.php?view=edit_contratos&id_contrato=<?= (int)$p['id_contrato_empresa'] ?>&id_empresa=<?= (int)$p['id_empresa'] ?>&tipo_contrato=PLAN%20IGUALDAD"
