@@ -927,7 +927,11 @@ if ($view === 'ver_planes') {
   $sqlDataPlanes = "SELECT e.id_empresa, e.razon_social, COALESCE(MAX(TRIM(ce_plan.tipo_contrato)), 'PLAN IGUALDAD') AS tipo_contrato,
       MIN(ce_plan.inicio_contratacion) AS inicio_plan,
       MAX(ce_plan.fin_contratacion) AS fin_plan,
-      MAX(ce_plan.id_contrato_empresa) AS id_contrato_empresa FROM empresa e
+      MAX(ce_plan.id_contrato_empresa) AS id_contrato_empresa,
+      (SELECT COUNT(*) FROM cliente_medida cm
+       INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
+       WHERE ac.id_empresa = e.id_empresa AND cm.id_medida IS NOT NULL) AS total_medidas
+    FROM empresa e
     LEFT JOIN contrato_empresa ce_plan ON ce_plan.id_empresa = e.id_empresa AND UPPER(TRIM(ce_plan.tipo_contrato)) = 'PLAN IGUALDAD'
     $wherePlanes
     GROUP BY e.id_empresa, e.razon_social ORDER BY e.razon_social ASC LIMIT ? OFFSET ?
