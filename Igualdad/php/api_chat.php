@@ -52,6 +52,18 @@ function normalizar_texto_busqueda(string $texto): string {
     ]));
 }
 
+function es_consulta_empresas_pendientes_rr(string $texto): bool {
+    $texto = normalizar_texto_busqueda($texto);
+    return (bool)preg_match(
+        '/\b(que|cuales|cuantas)\b.{0,30}\b(empresas?)\b.{0,40}\b(faltan?|pendientes?|sin registro|no han subido|no tiene|les falta)\b'
+        . '|\b(empresas?)\b.{0,30}\b(faltan?|pendientes?|sin subir|sin rr|sin registro)\b'
+        . '|\b(faltan?|falta)\b.{0,30}\b(empresas?|subir|rr|registro)\b'
+        . '|\b(empresas? pendientes?)\b'
+        . '|\b(que empresas? (no|les?) (tienen?|han subido|han enviado|falta))\b/i',
+        $texto
+    );
+}
+
 function es_consulta_rr(string $texto): bool {
     $texto = normalizar_texto_busqueda($texto);
     return (bool)preg_match('/\b(rr|registro retributivo|registro|subir rr|subir el rr|cargar rr|subir registro retributivo|gestionar rr|como subir el rr|como subo el rr|como subir registro retributivo|subir el registro|donde subo el registro|donde esta registro retributivo)\b/i', $texto);
@@ -265,6 +277,25 @@ function obtener_empresas_pendientes_rr_cliente(mysqli $db, int $usuarioId): arr
     return $resultado;
 }
 
+function respuesta_empresas_pendientes_rr(mysqli $db, int $usuarioId): string {
+    $empresas = obtener_empresas_pendientes_rr_cliente($db, $usuarioId);
+
+    if (empty($empresas)) {
+        return "Todas tus empresas ya tienen el Registro Retributivo subido. No hay ninguna pendiente.";
+    }
+
+    $total = count($empresas);
+    $lista = implode("\n- ", $empresas);
+
+    if ($total === 1) {
+        return "Hay 1 empresa que todavía no tiene el Registro Retributivo subido:\n- " . $lista
+            . "\n\nPuedes subirlo desde 'Registro Retributivo' en el menú lateral, seleccionando esa empresa.";
+    }
+
+    return "Hay {$total} empresas que todavía no tienen el Registro Retributivo subido:\n- " . $lista
+        . "\n\nPuedes subirlo desde 'Registro Retributivo' en el menú lateral, seleccionando cada empresa.";
+}
+
 function construir_contexto_rr_pendiente(mysqli $db, int $usuarioId): string {
     $empresasFaltanRR = obtener_empresas_pendientes_rr_cliente($db, $usuarioId);
     if (empty($empresasFaltanRR)) {
@@ -287,6 +318,14 @@ if (!empty($userMessage) && es_consulta_cuantitativos_cualitativos($userMessage)
     responder_json([
         'ok' => true,
         'reply' => respuesta_cuantitativos_cualitativos()
+    ]);
+    exit;
+}
+
+if (!empty($userMessage) && es_consulta_empresas_pendientes_rr($userMessage)) {
+    responder_json([
+        'ok' => true,
+        'reply' => respuesta_empresas_pendientes_rr($db, $usuarioId)
     ]);
     exit;
 }

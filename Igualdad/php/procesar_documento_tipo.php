@@ -142,7 +142,7 @@ $empresaToken = mb_strtoupper($empresaToken !== '' ? $empresaToken : 'SIN_EMPRES
 $tipoToken = preg_replace('/\s+/', '_', $tipo);
 $tipoToken = mb_strtoupper((string)$tipoToken, 'UTF-8');
 
-$uniqueSuffix = substr(md5(uniqid('', true)), 0, 8);
+$uniqueSuffix = substr(md5(uniqid('', true)), 0, 8);-
 $nombreGuardadoBase = $empresaToken . '_' . $tipoToken . '_' . $uniqueSuffix;
 $nombreGuardado = $nombreGuardadoBase . '.' . $ext;
 $rutaDestino = $uploadDir . '/' . $nombreGuardado;

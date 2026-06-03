@@ -221,12 +221,8 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
     return false;
   }
 
-  $sql = '
-    SELECT 1
-    FROM archivos a
-    INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
-    INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas
-    WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND ac.id_empresa = ?
+  $sql = 'SELECT 1 FROM archivos a INNER JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida
+    INNER JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND ac.id_empresa = ?
     LIMIT 1';
 
   $stmt = db()->prepare($sql);
@@ -244,10 +240,7 @@ function complemento_empresa_tiene_registro_retributivo(int $idEmpresa): bool
   }
 
   // Fallback: documentos vinculados directamente a la empresa
-  $sqlDirecto = '
-    SELECT 1
-    FROM archivos a
-    WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND a.id_empresa = ?
+  $sqlDirecto = 'SELECT 1 FROM archivos a WHERE UPPER(TRIM(a.tipo)) IN ("REGISTRO_RETRIBUTIVO", "REGISTRO_PROPIO_CLIENTE") AND a.id_empresa = ?
     LIMIT 1';
 
   $stmtDirecto = db()->prepare($sqlDirecto);
@@ -286,13 +279,8 @@ function complemento_resolver_id_ano_datos_empresa(int $idEmpresa): int
   }
 
   $db = db();
-  $sql = '
-    SELECT ad.id_ano_datos
-    FROM ano_datos ad
-    INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
-    WHERE ce.id_empresa = ?
-    ORDER BY ad.id_ano_datos DESC
-    LIMIT 1';
+  $sql = 'SELECT ad.id_ano_datos FROM ano_datos ad INNER JOIN contrato_empresa ce ON ce.id_contrato_empresa = ad.id_contrato_empresa
+    WHERE ce.id_empresa = ? ORDER BY ad.id_ano_datos DESC LIMIT 1';
 
   $stmt = $db->prepare($sql);
   if (!$stmt) {
@@ -698,7 +686,7 @@ try {
     $db->begin_transaction();
 
     try {
-      $stmtBajas = $db->prepare('INSERT INTO bajas (tipo,id_ano_datos, id_empresa) VALUES (?, ?, ?)');
+      $stmtBajas = $db->prepare('INSERT INTO bajas (tipo, tipox, id_ano_datos, id_empresa) VALUES (?, \'PLAN\', ?, ?)');
       $stmtBajas->bind_param('sii', $tipoBase, $idAnoDatos, $idEmpresa);
       $stmtBajas->execute();
       $idBajas = (int)$db->insert_id;
@@ -883,7 +871,7 @@ try {
         complemento_redirect($tab, 'Caracter no valido.', $embed);
       }
 
-      $stmt = $db->prepare('INSERT INTO area_formaciones (tipo, n_mujeres, n_hombres, n_horas, modalidad, perfil_puesto, horario, caracter, id_ano_datos, id_empresa) VALUES (?, ?, ?, ?, NULLIF(?, \'\'), ?, NULLIF(?, \'\'), NULLIF(?, \'\'), ?, ?)');
+      $stmt = $db->prepare('INSERT INTO area_formaciones (tipo, tipox, n_mujeres, n_hombres, n_horas, modalidad, perfil_puesto, horario, caracter, id_ano_datos, id_empresa) VALUES (?, \'PLAN\', ?, ?, ?, NULLIF(?, \'\'), ?, NULLIF(?, \'\'), NULLIF(?, \'\'), ?, ?)');
       $stmt->bind_param('siiissssii', $tipo, $nMujeres, $nHombres, $nHoras, $modalidad, $perfilPuesto, $horario, $caracter, $idAnoDatos, $idEmpresa);
       $stmt->execute();
       $stmt->close();
@@ -964,7 +952,7 @@ try {
         complemento_redirect($tab, 'Completa los campos obligatorios.', $embed);
       }
 
-      $stmt = $db->prepare('INSERT INTO area_excedencias (motivo, tipo, n_mujeres, n_hombres, id_ano_datos, id_empresa) VALUES (?, ?, ?, ?, ?, ?)');
+      $stmt = $db->prepare('INSERT INTO area_excedencias (motivo, tipo, tipox, n_mujeres, n_hombres, id_ano_datos, id_empresa) VALUES (?, ?, \'PLAN\', ?, ?, ?, ?)');
       $stmt->bind_param('ssiiii', $motivo, $tipo, $nMujeres, $nHombres, $idAnoDatos, $idEmpresa);
       $stmt->execute();
       $stmt->close();

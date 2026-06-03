@@ -85,7 +85,7 @@ if ($kind === 'archivos') {
   }
 
   if (!$esAdmin) {
-    $stmt = $db->prepare("\n      SELECT 1\n      FROM archivos a\n      LEFT JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n      LEFT JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = COALESCE(ac.id_empresa, a.id_empresa)\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
+    $stmt = $db->prepare("\n  SELECT 1\n  FROM archivos a\n  LEFT JOIN cliente_medida cm ON cm.id_cliente_medida = a.id_cliente_medida\n  LEFT JOIN areas_contratadas ac ON ac.id_areas_contratadas = cm.id_areas_contratadas\n      JOIN usuario_empresa ue ON ue.id_empresa = COALESCE(ac.id_empresa, a.id_empresa)\n      WHERE a.id_archivo = ? AND ue.id_usuario = ?\n      LIMIT 1\n    ");
     $stmt->bind_param('ii', $id, $userId);
     $stmt->execute();
     $hasAccess = (bool)$stmt->get_result()->fetch_assoc();
@@ -121,8 +121,7 @@ if ($kind === 'archivos') {
   if (!$esAdmin) {
     $empresas = [];
     $stmt = db()->prepare(
-      "SELECT e.razon_social
-       FROM usuario_empresa ue
+      "SELECT e.razon_social FROM usuario_empresa ue
        INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
        WHERE ue.id_usuario = ?"
     );
@@ -201,10 +200,7 @@ if ($kind === 'archivos') {
   if (!$esAdmin) {
     $empresas = [];
     $stmt = db()->prepare(
-      "SELECT e.razon_social
-       FROM usuario_empresa ue
-       INNER JOIN empresa e ON e.id_empresa = ue.id_empresa
-       WHERE ue.id_usuario = ?"
+      "SELECT e.razon_social FROM usuario_empresa ue INNER JOIN empresa e ON e.id_empresa = ue.id_empresa WHERE ue.id_usuario = ?"
     );
     $stmt->bind_param('i', $userId);
     $stmt->execute();

@@ -114,10 +114,6 @@ function redirect_view_empresas(string $view, string $msg = '', int $idEmpresa =
   if ($idEmpresa > 0) {
     $to .= '&id_empresa=' . $idEmpresa;
   }
-  $tipoContrato = trim((string)($_POST['tipo_contrato_context'] ?? $_POST['tipo_contrato'] ?? $_GET['tipo_contrato'] ?? ''));
-  if ($tipoContrato !== '') {
-    $to .= '&tipo_contrato=' . urlencode($tipoContrato);
-  }
   $from = trim((string)($_POST['from'] ?? $_GET['from'] ?? ''));
   if ($from !== '') {
     $to .= '&from=' . urlencode($from);

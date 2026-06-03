@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
   KEY `idx_token` (`token`),
   KEY `idx_expires_at` (`expires_at`)
 ) ENGINE=InnoDB;
-
+SELECT * FROM password_reset_token;
 -- --------------------------------------------------------
 
 --
@@ -452,12 +452,13 @@ INDEX idx_area_formacion_plan (id_cliente_medida))ENGINE=InnoDB;
 --
 
 CREATE TABLE `area_promocion_ascenso_personal` (
-     `id_promocion` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    `id_promocion` INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    `tipox` ENUM ('PLAN','MANTE'),
     `puesto_origen` VARCHAR(100) NOT NULL,
     `puesto_destino` VARCHAR(100) NOT NULL,
     `aumento_economico` INT NOT NULL,
-   `n_candidaturas` INT NOT NULL,
-   `n_hombres` INT NOT NULL,
+    `n_candidaturas` INT NOT NULL,
+    `n_hombres` INT NOT NULL,
     `n_mujeres` INT NOT NULL,
     `responsable` VARCHAR(100) NOT NULL,
     `cargo_responsable` VARCHAR(100) NOT NULL,
@@ -527,6 +528,7 @@ CREATE TABLE `contrato`(
 CREATE TABLE `bajas`(
 `id_bajas`INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
 `tipo`ENUM('TEMPORALES' , 'DEFINITIVAS'),
+`tipox` ENUM ('PLAN','MANTE'),
 `id_ano_datos`INT NOT  NULL,
 `id_empresa` INT NOT NULL,
   CONSTRAINT Fk_ano_bajas FOREIGN KEY (id_ano_datos) REFERENCES ano_datos(iD_ano_datos) ON DELETE CASCADE,
@@ -597,6 +599,7 @@ CREATE TABLE `area_excedencias`(
 CREATE TABLE `area_formaciones`(
 `id_formaciones`INT AUTO_INCREMENT PRIMARY KEY,
 `tipo`VARCHAR(100) DEFAULT NULL,
+`tipox` ENUM ('PLAN','MANTE'),
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
 `n_horas`INT DEFAULT 0,
@@ -636,7 +639,8 @@ CREATE TABLE `area_Permisos_retribuidos`(
 
 CREATE TABLE `area_reducciones_jornada`(
 `id_permisos`INT AUTO_INCREMENT PRIMARY KEY,
-`reduccion_jornada`VARCHAR(100) NOT NULL,
+`tipox` ENUM ('PLAN','MANTE'),
+`reduccion_jornada` ENUM('Cuidado de menores','Cuidado de mayores','Estudios','Otros') NOT NULL,
 `n_mujeres`INT DEFAULT 0,
 `n_hombres`INT DEFAULT 0,
 `id_ano_datos`INT NOT NULL,
@@ -857,8 +861,10 @@ CREATE TABLE `cuestionario_comunicacion_identidad_corporativa`(
 
 CREATE TABLE `archivos`(
   `id_archivo` INT AUTO_INCREMENT PRIMARY KEY,
-  `tipo` ENUM('IGUALDAD','SELECCION','SALUD','REGISTRO_RETRIBUTIVO','COMUNICACION','LGTBI','TOMA DE DATOS','CUADRO PORCENTAJES',
-  'PLAN_IGUALDAD_DEFINITIVO','GENERADO WORD','REGISTRO_PROPIO_CLIENTE','DOCUMENTACION','FIRMACORREO') NOT NULL,
+  `tipo` ENUM('IGUALDAD','REGISTRO_RETRIBUTIVO','TOMA DE DATOS','CUADRO PORCENTAJES','PLAN_IGUALDAD_DEFINITIVO','GENERADO WORD','REGISTRO_PROPIO_CLIENTE',
+  'DOCUMENTACION','FIRMACORREO','COMUNICACION','LGTBI','SELECCION','SALUD','CLASIFICACION_PROFESIONAL','COMUNICACION_SENSIBILIZACION','CONDICIONES_TRABAJO',
+  'EJERCICIO_CORRESPONSABLE_VIDA_PERSONAL, FAMILIAR_Y_LABORAL','FORMACION','INFRARREPRESENTACION_FEMENINA','PREVENCION_ACOSO',
+  'PROMOCION_ASCENSO','RESPONSABLE_IGUALDAD','RETRIBUCIONES_AUDITORIA_SALARIAL','VIOLENCIA_GENERO') NOT NULL,
   `asunto` VARCHAR(255) DEFAULT NULL,
   `nombre_original` VARCHAR(255) NOT NULL,
   `nombre_guardado` VARCHAR(255) NOT NULL,
@@ -875,6 +881,34 @@ CREATE TABLE `archivos`(
   INDEX idx_archivos_cliente_medida_fecha (id_cliente_medida, subido_en)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `seguimiento_medida` (
+  `id_seguimiento`     INT AUTO_INCREMENT PRIMARY KEY,
+  `id_cliente_medida`    INT          NOT NULL,
+  `puesto_empresa`       VARCHAR(255) DEFAULT NULL,
+  `puesto_nuevo`         VARCHAR(255) DEFAULT NULL,
+  `fecha_publicacion`    DATE         DEFAULT NULL,
+  `archivo_oferta`       VARCHAR(500) DEFAULT NULL,
+  `candidatura_genero`   ENUM('MUJER','HOMBRE') DEFAULT NULL,
+  `candidatura_numero`   INT UNSIGNED DEFAULT NULL,
+  `criterio_seleccion`   ENUM('FORMACION','DISPONIBILIDAD','EXPERIENCIA','OTROS') DEFAULT NULL,
+  `criterio_otros`       VARCHAR(255) DEFAULT NULL,
+  `creado_en`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `actualizado_en`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_seguimiento_cliente_medida
+    FOREIGN KEY (id_cliente_medida)
+    REFERENCES cliente_medida(id_cliente_medida)
+    ON DELETE CASCADE,
+  INDEX idx_seguimiento_cliente_medida (id_cliente_medida)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS rate_limit_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  ip VARCHAR(45) NOT NULL,
+  action VARCHAR(40) NOT NULL,
+  attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_rate_limit (ip, action, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   id_descarga INT AUTO_INCREMENT PRIMARY KEY,
   id_empresa INT NOT NULL,
@@ -886,3 +920,13 @@ CREATE TABLE IF NOT EXISTS archivo_descarga_log (
   INDEX idx_descarga_usuario (id_usuario),
   INDEX idx_descarga_tipo (tipo_descarga)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE `area_excedencias`
+    ADD COLUMN `tipox` ENUM('PLAN','MANTE') DEFAULT NULL AFTER `id_empresa`,
+    ADD INDEX `idx_excedencias_empresa_id` (`id_empresa`);
+
+-- 2. Añadir id_empresa a area_reducciones_jornada (consistencia con otras tablas)
+ALTER TABLE `area_reducciones_jornada`
+    ADD COLUMN `id_empresa` INT NOT NULL AFTER `n_hombres`,
+    ADD CONSTRAINT `fk_reducciones_empresa_id`
+        FOREIGN KEY (`id_empresa`) REFERENCES `empresa`(`id_empresa`) ON DELETE CASCADE,
+    ADD INDEX `idx_reducciones_empresa_id` (`id_empresa`);

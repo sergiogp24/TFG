@@ -39,14 +39,9 @@ $tecnicoStats = [
 
 if ($tecnicoId > 0) {
   // Calcular estadísticas del técnico: empresas, planes, mantenimientos y reuniones
-  $scopeSql = "
-    SELECT DISTINCT ue.id_empresa AS id_empresa
-    FROM usuario_empresa ue
-    WHERE ue.id_usuario = ?
-    UNION
-    SELECT DISTINCT e.id_empresa AS id_empresa
-    FROM empresa e
-    WHERE e.id_usuario = ?
+  $scopeSql = "SELECT DISTINCT ue.id_empresa AS id_empresa FROM usuario_empresa ue
+    WHERE ue.id_usuario = ? UNION SELECT DISTINCT e.id_empresa AS id_empresa
+    FROM empresa e WHERE e.id_usuario = ?
   ";
 
   $sqlEmpresas = "SELECT COUNT(*) AS total FROM (" . $scopeSql . ") te";
@@ -59,11 +54,8 @@ if ($tecnicoId > 0) {
     $stmtEmpresas->close();
   }
 
-  $sqlPlanes = "
-    SELECT COUNT(DISTINCT c.id_contrato_empresa) AS total
-    FROM contrato_empresa c
-    INNER JOIN (" . $scopeSql . ") te ON te.id_empresa = c.id_empresa
-    WHERE UPPER(TRIM(c.tipo_contrato)) LIKE 'PLAN IGUALDAD%'
+  $sqlPlanes = " SELECT COUNT(DISTINCT c.id_contrato_empresa) AS total FROM contrato_empresa c
+    INNER JOIN (" . $scopeSql . ") te ON te.id_empresa = c.id_empresa WHERE UPPER(TRIM(c.tipo_contrato)) LIKE 'PLAN IGUALDAD%'
   ";
   $stmtPlanes = db()->prepare($sqlPlanes);
   if ($stmtPlanes) {
@@ -109,15 +101,7 @@ if ($tecnicoId > 0) {
 $tecnicoPerfil = null;
 if ($view === 'perfil' && $tecnicoId > 0) {
   // Cargar datos completos del perfil cuando se solicita la vista de perfil
-  $stmt = db()->prepare("
-    SELECT
-      id_usuario,
-      nombre_usuario,
-      apellidos,
-      email,
-      telefono,
-      direccion,
-      localidad
+  $stmt = db()->prepare("SELECT id_usuario, nombre_usuario, apellidos, email, telefono, direccion, localidad
     FROM usuario
     WHERE id_usuario = ?
     LIMIT 1
@@ -152,13 +136,7 @@ if (in_array($view, ['privada', 'reuniones'], true) && $tecnicoId > 0) {
   db()->query("DELETE FROM reuniones WHERE STR_TO_DATE(CONCAT(fecha_reunion, ' ', hora_reunion), '%Y-%m-%d %H:%i') <= NOW()");
   
   // Cargar reuniones asignadas al técnico
-  $stmt = db()->prepare("
-    SELECT
-      r.id_reunion,
-      r.objetivo,
-      r.hora_reunion,
-      r.fecha_reunion
-    FROM reuniones r
+  $stmt = db()->prepare("SELECT r.id_reunion, r.objetivo, r.hora_reunion, r.fecha_reunion FROM reuniones r
     INNER JOIN usuario_reunion ur ON ur.id_reunion = r.id_reunion
     WHERE ur.id_usuario = ?
     ORDER BY r.fecha_reunion ASC, r.hora_reunion ASC, r.id_reunion ASC
@@ -172,15 +150,9 @@ if (in_array($view, ['privada', 'reuniones'], true) && $tecnicoId > 0) {
   $stmt->close();
 
   // Empresas asignadas al técnico
-  $stmtEmpresas = db()->prepare("
-    SELECT DISTINCT
-      e.id_empresa,
-      e.razon_social
-    FROM empresa e
+  $stmtEmpresas = db()->prepare(" SELECT DISTINCT e.id_empresa, e.razon_social FROM empresa e
     WHERE EXISTS (
-      SELECT 1
-      FROM usuario_empresa ue
-      WHERE ue.id_empresa = e.id_empresa
+      SELECT 1 FROM usuario_empresa ue WHERE ue.id_empresa = e.id_empresa
         AND ue.id_usuario = ?
     ) OR e.id_usuario = ?
     ORDER BY e.razon_social ASC

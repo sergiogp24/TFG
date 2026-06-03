@@ -868,7 +868,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                     <div class="col-12">
                                         <div class="card border-0 shadow-sm p-0">
                                             <!-- Iframe con demo estático de mantenimiento (sin funcionalidades) -->
-                                            <iframe src="mantenimiento_demo.php" title="Mantenimiento demo" style="width:100%;height:760px;border:0;border-radius:8px;display:block;"></iframe>
+                                            <iframe src="mantenimiento_demo.php?id_empresa=<?= (int)$idEmpresaAsignada ?>" title="Mantenimiento demo" style="width:100%;height:760px;border:0;border-radius:8px;display:block;"></iframe>
                                         </div>
                                     </div>
                                 </div>
@@ -1246,6 +1246,13 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                     window.location.reload();
                 });
             }
+
+            // Permite que iframes hijos (mantenimiento_demo) abran este modal
+            window.addEventListener('message', function (e) {
+                if (e.data && e.data.type === 'abrirComplemento') {
+                    abrirComplementoFormularios(e.data.tab || 'bajas');
+                }
+            });
 
         })();
     </script>

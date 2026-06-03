@@ -31,10 +31,7 @@
     <div class="card-body text-center py-5">
       <h1 class="h2 mb-4">Empresas</h1>
 
-      <button type="button"
-              class="btn btn-primary"
-              data-bs-toggle="modal"
-              data-bs-target="#asignarEmpresasModal">
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#asignarEmpresasModal">
         Asignar empresas
       </button>
 

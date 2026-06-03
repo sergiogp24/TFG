@@ -135,7 +135,9 @@ function complemento_fetch_simple_rows(string $table, int $idEmpresa, array $fie
         $fieldSql[] = "`{$fEsc}`";
     }
 
-    $sql = "SELECT `{$pkEsc}` AS id_registro, " . implode(', ', $fieldSql) . " FROM `{$tableEsc}` WHERE id_empresa = ? ORDER BY `{$pkEsc}` DESC";
+    // Solo filas de Plan de Igualdad (tipox = PLAN) si la columna existe
+    $tipoxFiltro = complemento_has_column($table, 'tipox') ? " AND (tipox = 'PLAN' OR tipox IS NULL)" : '';
+    $sql = "SELECT `{$pkEsc}` AS id_registro, " . implode(', ', $fieldSql) . " FROM `{$tableEsc}` WHERE id_empresa = ?{$tipoxFiltro} ORDER BY `{$pkEsc}` DESC";
     $stmt = $db->prepare($sql);
     $stmt->bind_param('i', $idEmpresa);
     $stmt->execute();
@@ -175,6 +177,7 @@ function complemento_fetch_bajas_rows(int $idEmpresa): array
         LEFT JOIN baja_temporales bt ON bt.id_bajas = b.id_bajas
         LEFT JOIN baja_definitivas bd ON bd.id_bajas = b.id_bajas
         WHERE b.id_empresa = ?
+          AND (b.tipox = 'PLAN' OR b.tipox IS NULL)
     ";
 
     $sql .= ' ORDER BY b.`' . $pkEsc . '` DESC';

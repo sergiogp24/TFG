@@ -279,7 +279,6 @@ function correo_secciones_empresa_servicio(array $empresasAsignadas): array
 
     $companyNames = array_values(array_unique($companyNames));
     $serviceNames = array_values(array_unique($serviceNames));
-
     $companyLabel = correo_formatear_lista($companyNames);
     $serviceLabel = correo_formatear_lista($serviceNames);
 

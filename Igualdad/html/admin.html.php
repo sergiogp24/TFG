@@ -330,8 +330,12 @@
 
                                 <div id="addUserFirmaWrap" style="display:none;">
                                     <label class="form-label">Firma correo (imagen)</label>
-                                    <input class="form-control" name="firmacorreo" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif">
+                                    <input class="form-control" id="addFirmaInput" name="firmacorreo" type="file" accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif">
                                     <div class="form-text text-muted small mt-1">Necesario para el envio de correos electrónicos</div>
+                                    <div id="addFirmaPreview" style="display:none; margin-top:10px;">
+                                        <p class="form-text text-muted small mb-1">Vista previa de la firma:</p>
+                                        <img id="addFirmaPreviewImg" src="" alt="Vista previa firma" style="max-width:100%; max-height:120px; border:1px solid #dee2e6; border-radius:6px; padding:4px; background:#fff;">
+                                    </div>
                                 </div>
 
                                 <div>
@@ -895,6 +899,8 @@
                     addFirmaWrap.style.display = isTecnico ? '' : 'none';
                     if (!isTecnico && addFirmaInput) {
                         addFirmaInput.value = '';
+                        const preview = document.getElementById('addFirmaPreview');
+                        if (preview) preview.style.display = 'none';
                     }
                 }
 
@@ -940,6 +946,27 @@
             if (editRoleSelect) {
                 editRoleSelect.addEventListener('change', updateEditFirmaVisibility);
                 updateEditFirmaVisibility();
+            }
+
+            // Preview firma antes de enviar el formulario
+            const addFirmaFileInput = document.getElementById('addFirmaInput');
+            const addFirmaPreview   = document.getElementById('addFirmaPreview');
+            const addFirmaPreviewImg = document.getElementById('addFirmaPreviewImg');
+            if (addFirmaFileInput && addFirmaPreview && addFirmaPreviewImg) {
+                addFirmaFileInput.addEventListener('change', function () {
+                    const file = this.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            addFirmaPreviewImg.src = e.target.result;
+                            addFirmaPreview.style.display = '';
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        addFirmaPreviewImg.src = '';
+                        addFirmaPreview.style.display = 'none';
+                    }
+                });
             }
         })();
     </script>
