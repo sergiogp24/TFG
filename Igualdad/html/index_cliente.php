@@ -481,8 +481,24 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 <div class="d-flex justify-content-between align-items-center mt-3 mb-0">
                                     <div></div>
                                     <div class="text-center">
-                                        <a class="btn <?= ($view === 'plan') ? 'btn-primary' : 'btn-outline-primary' ?> btn-lg px-4" href="index_cliente.php?view=plan<?= h($empresaParamNav) ?>">Plan de Igualdad</a>
-                                        <a class="btn <?= ($view === 'mantenimiento') ? 'btn-dark' : 'btn-outline-dark' ?> btn-lg px-4" href="index_cliente.php?view=mantenimiento<?= h($empresaParamNav) ?>">Mantenimiento</a>
+                                        <?php if ($empresaTienePlan): ?>
+                                            <a class="btn <?= ($view === 'plan') ? 'btn-primary' : 'btn-outline-primary' ?> btn-lg px-4" href="index_cliente.php?view=plan<?= h($empresaParamNav) ?>">Plan de Igualdad</a>
+                                        <?php else: ?>
+                                            <span class="btn btn-outline-secondary btn-lg px-4 disabled"
+                                                  style="opacity:0.5;cursor:not-allowed;"
+                                                  title="No tienes un contrato de Plan de Igualdad activo">
+                                                🔒 Plan de Igualdad
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ($empresaTieneMantenimiento || $mantenimientosEnCursoCount > 0): ?>
+                                            <a class="btn <?= ($view === 'mantenimiento') ? 'btn-dark' : 'btn-outline-dark' ?> btn-lg px-4" href="index_cliente.php?view=mantenimiento<?= h($empresaParamNav) ?>">Mantenimiento</a>
+                                        <?php else: ?>
+                                            <span class="btn btn-outline-secondary btn-lg px-4 disabled"
+                                                  style="opacity:0.5;cursor:not-allowed;"
+                                                  title="No tienes un contrato de mantenimiento activo">
+                                                🔒 Mantenimiento
+                                            </span>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="text-end">
                                         <a href="index_cliente.php?view=empresas<?= h($empresaParamNav) ?>" class="btn btn-outline-secondary btn-sm">Volver a empresas</a>
@@ -761,6 +777,14 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 </div>
                             </div>
                         <?php elseif ($view === 'plan'): ?>
+                            <?php if (!$empresaTienePlan): ?>
+                                <div class="text-center py-5">
+                                    <div style="font-size:4rem">🔒</div>
+                                    <h4 class="mt-3 fw-bold">Acceso restringido</h4>
+                                    <p class="text-muted">Tu empresa no tiene un contrato de Plan de Igualdad activo.<br>Contacta con tu consultor para más información.</p>
+                                    <a href="index_cliente.php?view=mi_espacio<?= h($empresaParamNav) ?>" class="btn btn-outline-secondary mt-2">Volver al inicio</a>
+                                </div>
+                            <?php else: ?>
                             <div class="space-shell mb-8">
                                 <div class="text-center mb-5">
                                     <div class="space-kicker">PLAN DE IGUALDAD</div>
@@ -848,6 +872,7 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                     </div>
                                 </div>
                             </div>
+                            <?php endif; ?>
                         <?php elseif ($view === 'mi_espacio'): ?>
                             <div class="space-shell mb-8">
                                 <div class="text-center mb-5">
@@ -857,22 +882,28 @@ $clienteCssVersion = @filemtime(__DIR__ . '/../css/cliente.css') ?: time();
                                 </div>
                             </div>
                         <?php elseif ($view === 'mantenimiento'): ?>
-                            <div class="space-shell mb-8">
-                                <div class="text-center mb-4">
-                                    <div class="space-kicker">MANTENIMIENTO</div>
-                                    <h3 class="mb-1 fw-bold">Mantenimiento - <?= h($empresaAsignada['razon_social'] ?? '') ?></h3>
-                                    <div class="text-muted">Área de mantenimiento para la empresa seleccionada. (En desarrollo)</div>
+                            <?php if (!$empresaTieneMantenimiento && $mantenimientosEnCursoCount <= 0): ?>
+                                <div class="text-center py-5">
+                                    <div style="font-size:4rem">🔒</div>
+                                    <h4 class="mt-3 fw-bold">Acceso restringido</h4>
+                                    <p class="text-muted">Tu empresa no tiene un contrato de mantenimiento activo.<br>Contacta con tu consultor para más información.</p>
+                                    <a href="index_cliente.php?view=mi_espacio<?= h($empresaParamNav) ?>" class="btn btn-outline-secondary mt-2">Volver al inicio</a>
                                 </div>
-
-                                <div class="row g-3 justify-content-center">
-                                    <div class="col-12">
-                                        <div class="card border-0 shadow-sm p-0">
-                                            <!-- Iframe con demo estático de mantenimiento (sin funcionalidades) -->
-                                            <iframe src="mantenimiento_demo.php?id_empresa=<?= (int)$idEmpresaAsignada ?>" title="Mantenimiento demo" style="width:100%;height:760px;border:0;border-radius:8px;display:block;"></iframe>
+                            <?php else: ?>
+                                <div class="space-shell mb-8">
+                                    <div class="text-center mb-4">
+                                        <div class="space-kicker">MANTENIMIENTO</div>
+                                        <h3 class="mb-1 fw-bold">Mantenimiento - <?= h($empresaAsignada['razon_social'] ?? '') ?></h3>
+                                    </div>
+                                    <div class="row g-3 justify-content-center">
+                                        <div class="col-12">
+                                            <div class="card border-0 shadow-sm p-0">
+                                                <iframe src="mantenimiento_demo.php?id_empresa=<?= (int)$idEmpresaAsignada ?>" title="Mantenimiento demo" style="width:100%;height:760px;border:0;border-radius:8px;display:block;"></iframe>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            <?php endif; ?>
                         <?php else: ?>
                             <div class="registro-shell">
                                 <div class="d-flex align-items-end justify-content-between flex-wrap gap-3 mb-4">
